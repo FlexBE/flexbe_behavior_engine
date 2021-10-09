@@ -3,35 +3,52 @@ import sys
 import os
 import unittest
 import zlib
-import rospy
+import time
+import rclpy
+from rclpy.executors import MultiThreadedExecutor, SingleThreadedExecutor
 
-from flexbe_onboard.flexbe_onboard import FlexbeOnboard
+from flexbe_onboard import FlexbeOnboard
 from flexbe_core.proxy import ProxySubscriberCached
 
 from flexbe_msgs.msg import BehaviorSelection, BEStatus, BehaviorLog, BehaviorModification
 
 
 class TestOnboard(unittest.TestCase):
+    @classmethod
+    def setUp(self):
+        self.context = rclpy.context.Context()
+        rclpy.init(context=self.context)
+        self.executor = MultiThreadedExecutor(context=self.context)
+        self.node = rclpy.create_node('TestOnboard', context=self.context)
 
-    def __init__(self, name):
-        super(TestOnboard, self).__init__(name)
+        ProxySubscriberCached._initialize(self.node)
+
         self.sub = ProxySubscriberCached({
             'flexbe/status': BEStatus,
             'flexbe/log': BehaviorLog
         })
-        self.rate = rospy.Rate(100)
+        self.rate = self.node.create_rate(100, self.node.get_clock())
         # make sure that behaviors can be imported
         data_folder = os.path.dirname(os.path.realpath(__file__))
         sys.path.insert(0, data_folder)
         # run onboard and add custom test behaviors to onboard lib
-        self.onboard = FlexbeOnboard()
+        self.onboard = FlexbeOnboard(self.node)
         self.lib = self.onboard._behavior_lib
         self.lib._add_behavior_manifests(data_folder)
 
+    @classmethod
+    def tearDown(self):
+        self.node.destroy_node()
+        self.executor.shutdown()
+        rclpy.shutdown(context=self.context)
+
     def assertStatus(self, expected, timeout):
         """ Assert that the expected onboard status is received before the timeout. """
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
         for i in range(int(timeout*100)):
-            self.rate.sleep()
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            # self.rate.sleep()
+            time.sleep(0.1)
             if self.sub.has_msg('flexbe/status'):
                 break
         else:
@@ -42,8 +59,13 @@ class TestOnboard(unittest.TestCase):
         return msg
 
     def test_onboard_behaviors(self):
-        behavior_pub = rospy.Publisher('flexbe/start_behavior', BehaviorSelection, queue_size=1)
-        rospy.sleep(0.5)  # wait for publisher
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+
+        behavior_pub = self.node.create_publisher(BehaviorSelection, 'flexbe/start_behavior', 1)
+        # wait for publisher
+        end_time = time.time() + 10
+        while time.time() < end_time:
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
 
         # wait for the initial status message
         self.assertStatus(BEStatus.READY, 1)
@@ -61,6 +83,7 @@ class TestOnboard(unittest.TestCase):
             request.behavior_checksum = zlib.adler32(f.read().encode()) & 0x7fffffff
         self.sub.enable_buffer('flexbe/log')
         behavior_pub.publish(request)
+
         self.assertStatus(BEStatus.STARTED, 1)
         self.assertStatus(BEStatus.FINISHED, 3)
         behavior_logs = []
@@ -77,12 +100,13 @@ class TestOnboard(unittest.TestCase):
         request.arg_values = ['value_2']
         request.input_keys = ['data']
         request.input_values = ['2']
+
         with open(self.lib.get_sourcecode_filepath(be_id)) as f:
             content = f.read()
         modifications = [('flexbe_INVALID', 'flexbe_core'), ('raise ValueError("TODO: Remove!")', '')]
         for replace, by in modifications:
             index = content.index(replace)
-            request.modifications.append(BehaviorModification(index, index + len(replace), by))
+            request.modifications.append(BehaviorModification(index_begin=index, index_end=index + len(replace), new_content=by))
         for replace, by in modifications:
             content = content.replace(replace, by)
         request.behavior_checksum = zlib.adler32(content.encode()) & 0x7fffffff
@@ -91,6 +115,12 @@ class TestOnboard(unittest.TestCase):
         result = self.assertStatus(BEStatus.FINISHED, 3)
         self.assertEqual(result.args[0], 'finished')
         behavior_logs = []
+
+        # Wait for published message
+        end_time = time.time() + 1
+        while time.time() < end_time:
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+
         while self.sub.has_buffered('flexbe/log'):
             behavior_logs.append(self.sub.get_from_buffer('flexbe/log').text)
         self.assertIn('value_2', behavior_logs)
@@ -105,12 +135,16 @@ class TestOnboard(unittest.TestCase):
         result = self.assertStatus(BEStatus.FINISHED, 3)
         self.assertEqual(result.args[0], 'failed')
         behavior_logs = []
+
+        # Wait for published message
+        end_time = time.time() + 1
+        while time.time() < end_time:
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+
         while self.sub.has_buffered('flexbe/log'):
             behavior_logs.append(self.sub.get_from_buffer('flexbe/log').text)
         self.assertIn('value_1', behavior_logs)
 
 
 if __name__ == '__main__':
-    rospy.init_node('test_flexbe_onboard')
-    import rostest
-    rostest.rosrun('flexbe_onboard', 'test_flexbe_onboard', TestOnboard)
+    unittest.main()

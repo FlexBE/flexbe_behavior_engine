@@ -14,28 +14,28 @@ Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)
 
 Execute the following commands to install FlexBE:
 
-    roscd && cd ../src
+    cd "ros2_ws"/src
     git clone https://github.com/team-vigir/flexbe_behavior_engine.git
-    
+
 Furthermore, create your own repository for behavior development (contains examples):
-    
-    rosrun flexbe_widget create_repo [your_project_name]
-    
+
+    ros2 run flexbe_widget create_repo [your_project_name]
+
 Finally, it is recommended to install the FlexBE App user interface by following [these steps](http://philserver.bplaced.net/fbe/download.php).
 
 ## Usage
 
 Use the following launch file for running the onboard engine:
 
-    roslaunch flexbe_onboard behavior_onboard.launch
-    
+    ros2 launch flexbe_onboard behavior_onboard.launch.py
+
 Use the following launch file for running the operator control station (requires the FlexBE App):
 
-    roslaunch flexbe_app flexbe_ocs.launch
+    ros2 launch flexbe_app flexbe_ocs.launch.py
 
-Use the following lunach file to run both of the above, e.g., for testing on a single computer:
+Use the following launch file to run both of the above, e.g., for testing on a single computer:
 
-    roslaunch flexbe_app flexbe_full.launch
+    ros2 launch flexbe_app flexbe_full.launch.py
 
 ## Next Steps
 

@@ -9,6 +9,7 @@ wait_cond: rospy.wait_for_message('/test', __import__('geometry_msgs').msg.Pose)
 
 params:
     topic: //test
+    msg_type: geometry_msgs/Pose
     blocking: True
 
 output:

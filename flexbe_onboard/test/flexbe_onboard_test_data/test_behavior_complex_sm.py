@@ -7,7 +7,7 @@
 # Only code inside the [MANUAL] tags will be kept.        #
 ###########################################################
 
-from flexbe_INVALID import Behavior, Autonomy, OperatableStateMachine, ConcurrencyContainer, PriorityContainer, Logger
+from flexbe_INVALID import Behavior, Autonomy, OperatableStateMachine
 from flexbe_states.wait_state import WaitState
 from flexbe_states.decision_state import DecisionState
 from flexbe_states.log_state import LogState as flexbe_states__LogState
@@ -29,9 +29,17 @@ Note: This behavior contains intentional errors that are fixed by sent modificat
     '''
 
 
-    def __init__(self):
+    def __init__(self, node):
         super(TestBehaviorComplexSM, self).__init__()
         self.name = 'Test Behavior Complex'
+        self.node = node
+
+        WaitState.initialize_ros(node)
+        DecisionState.initialize_ros(node)
+        CalculationState.initialize_ros(node)
+        flexbe_states__LogState.initialize_ros(node)
+
+        OperatableStateMachine.initialize_ros(node)
 
         # parameters of this behavior
         self.add_parameter('param', 'value_1')
@@ -40,7 +48,7 @@ Note: This behavior contains intentional errors that are fixed by sent modificat
 
         # Additional initialization code can be added inside the following tags
         # [MANUAL_INIT]
-        
+
         # [/MANUAL_INIT]
 
         # Behavior comments:
@@ -54,7 +62,7 @@ Note: This behavior contains intentional errors that are fixed by sent modificat
 
         # Additional creation code can be added inside the following tags
         # [MANUAL_CREATE]
-        
+
         # [/MANUAL_CREATE]
 
 

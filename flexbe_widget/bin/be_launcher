@@ -6,7 +6,8 @@ exit
 fi
 '''
 # flake8: noqa
-import rospy
+import rclpy
+import time
 import sys
 import getopt
 
@@ -17,20 +18,24 @@ from flexbe_msgs.msg import BehaviorRequest
 def usage():
     print("Soon...")
 
-
-if __name__ == '__main__':
-    rospy.init_node('flexbe_widget')
+def main(node_args=None):
+    opts = None
+    args = None
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hb:a:", ["help", "behavior=", "autonomy="])
-    except getopt.GetoptError:
-        usage()
-        sys.exit(2)
+      print(sys.argv)
+      opts, args = getopt.getopt(sys.argv[1:], "hb:a:", ["help", "behavior=", "autonomy="])
+    except getopt.GetoptError as e:
+      usage()
+      print(e)
+      print("Continue after exception ")
+      #sys.exit(2)
 
     behavior = ""
     autonomy = 255
 
-    for opt, arg in opts:
+    if opts:
+      for opt, arg in opts:
         if opt in ("-h", "--help"):
             usage()
             sys.exit()
@@ -38,24 +43,28 @@ if __name__ == '__main__':
             behavior = arg
         elif opt in ("-a", "--autonomy"):
             autonomy = int(arg)
-    ignore_args = ['__name', '__log']  # auto-set by roslaunch
+    ignore_args = ['__node', '__log']  # auto-set by roslaunch
 
-    launcher = BehaviorLauncher()
+    rclpy.init(args=node_args)
+    node = rclpy.create_node('flexbe_widget')
+    launcher = BehaviorLauncher(node)
 
     if behavior != "":
-        request = BehaviorRequest()
-        request.behavior_name = behavior
-        request.autonomy_level = autonomy
-        for arg in args:
-            if ':=' not in arg:
-                continue
-            k, v = arg.split(':=', 1)
-            if k in ignore_args:
-                continue
-            request.arg_keys.append('/'+k)
-            request.arg_values.append(v)
-        rospy.sleep(0.2)  # wait for publishers...
-        launcher._callback(request)
+      request = BehaviorRequest(behavior_name=behavior, autonomy_level=autonomy)
+      for arg in args:
+          if ':=' not in arg:
+              continue
+          k, v = arg.split(':=', 1)
+          if k in ignore_args:
+              continue
+          request.arg_keys.append('/'+k)
+          request.arg_values.append(v)
+      time.sleep(0.2)  # wait for publishers...
+      launcher._callback(request)
 
     # Wait for ctrl-c to stop the application
-    rospy.spin()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

@@ -6,9 +6,13 @@ exit
 fi
 '''
 # flake8: noqa
-import rospy
+import rclpy
 import sys
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = rclpy.create_node('flexbe_breakpoint')
+    node.declare_parameter('/flexbe/breakpoints', sys.argv[1:])
 
 if __name__ == '__main__':
-    rospy.set_param('/flexbe/breakpoints', sys.argv[1:])
+  main()

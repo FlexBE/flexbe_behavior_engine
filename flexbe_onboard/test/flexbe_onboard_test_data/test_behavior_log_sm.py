@@ -7,7 +7,7 @@
 # Only code inside the [MANUAL] tags will be kept.        #
 ###########################################################
 
-from flexbe_core import Behavior, Autonomy, OperatableStateMachine, ConcurrencyContainer, PriorityContainer, Logger
+from flexbe_core import Behavior, Autonomy, OperatableStateMachine
 from flexbe_states.log_state import LogState as flexbe_states__LogState
 from flexbe_states.wait_state import WaitState
 # Additional imports can be added inside the following tags
@@ -26,9 +26,13 @@ class TestBehaviorLogSM(Behavior):
     '''
 
 
-    def __init__(self):
+    def __init__(self, node):
         super(TestBehaviorLogSM, self).__init__()
         self.name = 'Test Behavior Log'
+        self.node = node
+        WaitState.initialize_ros(node)
+        flexbe_states__LogState.initialize_ros(node)
+        OperatableStateMachine.initialize_ros(node)
 
         # parameters of this behavior
 
@@ -36,7 +40,7 @@ class TestBehaviorLogSM(Behavior):
 
         # Additional initialization code can be added inside the following tags
         # [MANUAL_INIT]
-        
+
         # [/MANUAL_INIT]
 
         # Behavior comments:
@@ -49,7 +53,7 @@ class TestBehaviorLogSM(Behavior):
 
         # Additional creation code can be added inside the following tags
         # [MANUAL_CREATE]
-        
+
         # [/MANUAL_CREATE]
 
 
@@ -71,5 +75,5 @@ class TestBehaviorLogSM(Behavior):
 
     # Private functions can be added inside the following tags
     # [MANUAL_FUNC]
-    
+
     # [/MANUAL_FUNC]

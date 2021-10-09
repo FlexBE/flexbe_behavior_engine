@@ -6,9 +6,9 @@ exit
 fi
 '''
 # flake8: noqa
-import rospy
+import rclpy
 from flexbe_msgs.msg import BehaviorSelection
-from rospkg import RosPack
+from rosidl_runtime_py import get_interface_path
 
 import pickle
 import zlib
@@ -17,8 +17,7 @@ import difflib
 
 def _callback(msg):
     new_code = msg.behavior_code
-    rp = RosPack()
-    path = rp.get_path('vigir_behavior_flexbe_test_behavior')
+    path = get_interface_path('vigir_behavior_flexbe_test_behavior')
     path += "/src/vigir_behavior_flexbe_test_behavior/flexbe_test_behavior_sm_original.py"
     with open(path) as f:
         lines = [line.rstrip('\n') for line in f]
@@ -67,10 +66,14 @@ def _callback(msg):
         print(change_string)
 
 
+def main(args=None):
+  rclpy.init(args=args)
+  node = rclpy.create_node('flexbe_widget')
+  sub = node.create_subscription(BehaviorSelection, "/flexbe/start_behavior", _callback)
+
+  # Wait for ctrl-c to stop the application
+  rclpy.spin()
+
+
 if __name__ == '__main__':
-    rospy.init_node('flexbe_widget')
-
-    sub = rospy.Subscriber("/flexbe/start_behavior", BehaviorSelection, _callback)
-
-    # Wait for ctrl-c to stop the application
-    rospy.spin()
+    main()

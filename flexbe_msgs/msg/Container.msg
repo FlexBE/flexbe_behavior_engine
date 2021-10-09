@@ -2,4 +2,4 @@ string path
 string[] children
 string[] outcomes
 string[] transitions
-byte[] autonomy
+int8[] autonomy

@@ -16,27 +16,36 @@ echo "Done"
 
 echo ""
 echo -e "\e[96m(2/4) Fetching project structure...\033[0m"
-git clone https://github.com/pschillinger/flexbe_project_behaviors.git ${name}_behaviors
+git clone https://gitlab.pcs.cnu.edu/zutell_thesis/flexbe_project_behaviors.git ${name}_behaviors
+# git clone https://github.com/pschillinger/flexbe_project_behaviors.git ${name}_behaviors
 cd ${name}_behaviors
  # use new flexbe_app workspace layout, remove when merged into master
 git fetch
-git checkout feature/flexbe_app
+# git checkout feature/flexbe_app
+git checkout ros2-devel
 
 echo ""
 echo -e "\e[96m(3/4) Configuring project template...\033[0m"
 sed -i -e "s/PROJECT_flexbe_states/${name}_flexbe_states/g" \
-  PROJECT_flexbe_states/CMakeLists.txt \
   PROJECT_flexbe_states/package.xml \
-  PROJECT_flexbe_states/setup.py
-mv PROJECT_flexbe_states/src/PROJECT_flexbe_states PROJECT_flexbe_states/src/${name}_flexbe_states
+  PROJECT_flexbe_states/setup.py \
+	PROJECT_flexbe_states/setup.cfg
+
+mv PROJECT_flexbe_states/PROJECT_flexbe_states PROJECT_flexbe_states/${name}_flexbe_states
+mv PROJECT_flexbe_states/resource/PROJECT_flexbe_states PROJECT_flexbe_states/resource/${name}_flexbe_states
 mv PROJECT_flexbe_states ${name}_flexbe_states
+
 sed -i -e "s/PROJECT_flexbe_behaviors/${name}_flexbe_behaviors/g" \
   PROJECT_flexbe_behaviors/CMakeLists.txt \
   PROJECT_flexbe_behaviors/package.xml \
   PROJECT_flexbe_behaviors/setup.py \
+	PROJECT_flexbe_behaviors/setup.cfg \
   PROJECT_flexbe_behaviors/manifest/example_behavior.xml
-mv PROJECT_flexbe_behaviors/src/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/src/${name}_flexbe_behaviors
+
+mv PROJECT_flexbe_behaviors/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/${name}_flexbe_behaviors
+mv PROJECT_flexbe_behaviors/resource/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/resource/${name}_flexbe_behaviors
 mv PROJECT_flexbe_behaviors ${name}_flexbe_behaviors
+
 rm README.md
 echo -e "# ${name}_behaviors\r\nThis repo contains all ${name}-specific states and behaviors." >> README.md
 echo "Done"

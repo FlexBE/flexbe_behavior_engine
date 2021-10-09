@@ -1,0 +1,80 @@
+#!/bin/bash
+if "true" : '''\'
+then
+python${ROS_PYTHON_VERSION:-} "${BASH_SOURCE[0]}" $*
+exit
+fi
+'''
+# flake8: noqa
+import rclpy
+import sys
+import os
+import yaml
+
+from flexbe_core import Logger as FlexbeLogger
+from flexbe_testing.logger import Logger
+
+from flexbe_testing import Tester
+
+if __name__ == '__main__':
+    node = rclpy.create_node('flexbe_testing')
+    perform_rostest = None
+    test_package = None
+
+    try:
+      perform_rostest = node.get_parameter('~perform_rostest')
+    except Exception as e:
+      node.declare_parameter('~perform_rostest', False)
+      perform_rostest = False
+
+    try:
+      test_package = node.get_parameter('~package')
+    except Exception as e:
+      node.declare_parameter('~package', "")
+      perform_rostest = ""
+
+    if perform_rostest and test_package == '':
+        node.get_logger.error('Need to pass the name of the package under testing'
+                     'as arg "package" to the flexbe_testing launch file!')
+
+    FlexbeLogger.initialize(node)
+    Logger.initialize(node)
+    Logger.mute_rospy()
+
+    filenames = list()
+    if len(sys.argv) > 1:
+        print('Loading provided test cases...')
+        for arg in sys.argv[1:]:
+            if not arg.startswith('-') and not arg.startswith('_'):
+                testfile_path = os.path.expanduser(arg)
+                filenames.append(testfile_path)
+
+    test_cases = dict()
+    for filename in filenames:
+        _, name = os.path.split(filename)
+        test_name, _ = os.path.splitext(name)
+        try:
+            with open(filename, 'r') as f:
+                config = getattr(yaml, 'unsafe_load', yaml.load)(f)
+            test_cases[test_name] = config
+        except IOError as io_error:
+            node.get_logger.error(io_error)
+            test_cases[test_name] = io_error  # not a valid config, caught during config verification
+
+    print('Ready for testing! (%d tests)' % len(test_cases))
+    tester = Tester()
+
+    success_cases = 0
+    for test_name, test_config in test_cases.items():
+        if noy rclpy.ok():
+            break
+        success_cases += tester.run_test(test_name, test_config)
+
+    print('')
+    result_color = '92' if success_cases == len(test_cases) else '93'
+    print('\033[%smTesting completed, %d of %d tests successful.\033[0m' %
+          (result_color, success_cases, len(test_cases)))
+    print('')
+
+    if perform_rostest:
+        tester.perform_rostest(test_package)
