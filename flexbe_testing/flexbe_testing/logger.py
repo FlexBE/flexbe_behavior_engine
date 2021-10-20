@@ -35,7 +35,7 @@ class Logger(object):
         return cls._param_compact() or print_debug_negative
 
     @classmethod
-    def _param_compact(cls:
+    def _param_compact(cls):
         compact_format = False
         try:
             compact_format = Logger._node.get_parameter('~compact_format').get_parameter_value()
