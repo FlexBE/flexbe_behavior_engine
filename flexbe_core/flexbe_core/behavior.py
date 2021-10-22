@@ -51,7 +51,7 @@ class Behavior(object):
         """
         setattr(self, name, default)
 
-    def add_behavior(self, behavior_class, behavior_id):
+    def add_behavior(self, behavior_class, behavior_id, node):
         """
         Adds another behavior as part of this behavior.
         This other behavior should be declared as contained in the behavior manifest.
@@ -64,7 +64,7 @@ class Behavior(object):
         """
         if not hasattr(self, 'contains'):
             Logger.logerr('Behavior was not initialized! Please call superclass constructor.')
-        instance = behavior_class()
+        instance = behavior_class(node)
         self.contains[behavior_id] = instance
 
     def use_behavior(self, behavior_class, behavior_id, default_keys=None, parameters=None):
