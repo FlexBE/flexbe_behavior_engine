@@ -54,6 +54,13 @@ class ProxyActionClient(object):
         if topic not in ProxyActionClient._clients:
             ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, msg_type, topic)
             self._check_topic_available(topic, wait_duration)
+        else:
+            if not isinstance(msg_type, ProxyActionClient._clients[topic]._action_type):
+                if msg_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
+                    ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, msg_type, topic)
+                else:
+                    raise TypeError("Trying to replace existing action client with different msg type")
+
 
     def send_goal(self, topic, goal):
         """
@@ -79,6 +86,7 @@ class ProxyActionClient(object):
             goal,
             feedback_callback=lambda f: self._feedback_callback(topic, f)
         )
+
         future.add_done_callback(partial(self._done_callback, topic=topic))
 
     def _done_callback(self, future, topic):

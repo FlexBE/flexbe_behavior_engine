@@ -46,6 +46,7 @@ class ProxyPublisher(object):
         """
         if '_latch' in kwargs or '_queue_size' in kwargs:
             Logger.warning('DEPRECATED use of arguments in publisher')
+
         if topic not in ProxyPublisher._topics:
             qos = qos or QOS_DEFAULT
             ProxyPublisher._topics[topic] = ProxyPublisher._node.create_publisher(msg_type, topic, qos)

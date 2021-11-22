@@ -308,7 +308,7 @@ class TestCore(unittest.TestCase):
 
 
     # Problem with RosState getting locked on state.sleep()
-    
+
     # def test_ros_state(self):
     #     # rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
     #     state = self._create()
@@ -397,101 +397,101 @@ class TestCore(unittest.TestCase):
 
 
     # Problem with getting locked when sleeping
-    # def test_concurrency_container(self):
-    #     rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-    #     TestSubjectState.initialize_ros(self.node)
-    #     ConcurrencyContainer.initialize_ros(self.node)
-    #     cc = ConcurrencyContainer(outcomes=['done', 'error'],
-    #                               conditions=[
-    #                                 ('error', [('main', 'error')]),
-    #                                 ('error', [('side', 'error')]),
-    #                                 ('done', [('main', 'done'), ('side', 'done')])
-    #                               ])
-    #     with cc:
-    #         OperatableStateMachine.add('main', TestSubjectState(),
-    #                                    transitions={'done': 'done', 'error': 'error'},
-    #                                    autonomy={'done': 1, 'error': 2})
-    #         OperatableStateMachine.add('side', TestSubjectState(),
-    #                                    transitions={'done': 'done', 'error': 'error'},
-    #                                    autonomy={'done': 1, 'error': 2})
-    #     with OperatableStateMachine(outcomes=['done', 'error']):
-    #         OperatableStateMachine.add('cc', cc,
-    #                                    transitions={'done': 'done', 'error': 'error'},
-    #                                    autonomy={'done': 1, 'error': 2})
-    #
-    #     class FakeRate(object):
-    #
-    #         def remaining(self):
-    #             return rclpy.Duration(0)
-    #
-    #         def sleep(self):
-    #             pass
-    #
-    #     # all states are called with their correct rate
-    #     cc.execute(None)
-    #     print("About to sleep")
-    #     thread = threading.Thread(target=rclpy.spin, args=([self.node]), daemon=True)
-    #     thread.start()
-    #
-    #     cc.sleep()
-    #     print("Awake again")
-    #     cc.execute(None)
-    #     self.assertAlmostEqual(cc.sleep_duration, .1, places=2)
-    #     cc.sleep()
-    #     cc['main'].set_rate(15)
-    #     cc['side'].set_rate(10)
-    #     cc['main'].count = 0
-    #     cc['side'].count = 0
-    #     start = self.node.get_clock().now()
-    #     cc_count = 0
-    #     while self.node.get_clock().now() - start <= 1.:
-    #         cc_count += 1
-    #         cc.execute(None)
-    #         self.assertLessEqual(cc.sleep_duration, .1)
-    #         cc.sleep()
-    #     self.assertIn(cc['main'].count, [14, 15, 16])
-    #     self.assertIn(cc['side'].count, [9, 10, 11])
-    #     self.assertLessEqual(cc_count, 27)
-    #
-    #     # verify ROS properties and disable sleep
-    #     cc._enable_ros_control()
-    #     self.assertTrue(cc['main']._is_controlled)
-    #     self.assertFalse(cc['side']._is_controlled)
-    #     cc['main']._rate = FakeRate()
-    #     cc['side']._rate = FakeRate()
-    #
-    #     # return outcome when all return done or any returns error
-    #     outcome = cc.execute(None)
-    #     self.assertIsNone(outcome)
-    #     cc['main'].result = 'error'
-    #     outcome = cc.execute(None)
-    #     self.assertEqual(outcome, 'error')
-    #     cc['main'].result = None
-    #     cc['side'].result = 'error'
-    #     outcome = cc.execute(None)
-    #     self.assertEqual(outcome, 'error')
-    #     cc['side'].result = 'done'
-    #     outcome = cc.execute(None)
-    #     self.assertIsNone(outcome)
-    #     cc['main'].result = 'done'
-    #     outcome = cc.execute(None)
-    #     self.assertEqual(outcome, 'done')
-    #     cc['main'].result = None
-    #     cc['side'].result = None
-    #
-    #     # always call on_exit exactly once when returning an outcome
-    #     outcome = cc.execute(None)
-    #     self.assertIsNone(outcome)
-    #     cc['main'].last_events = []
-    #     cc['side'].last_events = []
-    #     cc['main'].result = 'error'
-    #     outcome = cc.execute(None)
-    #     self.assertEqual(outcome, 'error')
-    #     self.assertListEqual(cc['main'].last_events, ['on_exit'])
-    #     self.assertListEqual(cc['side'].last_events, ['on_exit'])
-    #
-    #     rclpy.shutdown()
-    #     thread.join()
+    def test_concurrency_container(self):
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        TestSubjectState.initialize_ros(self.node)
+        ConcurrencyContainer.initialize_ros(self.node)
+        cc = ConcurrencyContainer(outcomes=['done', 'error'],
+                                  conditions=[
+                                    ('error', [('main', 'error')]),
+                                    ('error', [('side', 'error')]),
+                                    ('done', [('main', 'done'), ('side', 'done')])
+                                  ])
+        with cc:
+            OperatableStateMachine.add('main', TestSubjectState(),
+                                       transitions={'done': 'done', 'error': 'error'},
+                                       autonomy={'done': 1, 'error': 2})
+            OperatableStateMachine.add('side', TestSubjectState(),
+                                       transitions={'done': 'done', 'error': 'error'},
+                                       autonomy={'done': 1, 'error': 2})
+        with OperatableStateMachine(outcomes=['done', 'error']):
+            OperatableStateMachine.add('cc', cc,
+                                       transitions={'done': 'done', 'error': 'error'},
+                                       autonomy={'done': 1, 'error': 2})
+
+        class FakeRate(object):
+
+            def remaining(self):
+                return rclpy.Duration(0)
+
+            def sleep(self):
+                pass
+
+        # all states are called with their correct rate
+        cc.execute(None)
+        print("About to sleep")
+        thread = threading.Thread(target=rclpy.spin, args=([self.node]), daemon=True)
+        thread.start()
+
+        cc.sleep()
+        print("Awake again")
+        cc.execute(None)
+        self.assertAlmostEqual(cc.sleep_duration, .1, places=2)
+        cc.sleep()
+        cc['main'].set_rate(15)
+        cc['side'].set_rate(10)
+        cc['main'].count = 0
+        cc['side'].count = 0
+        start = self.node.get_clock().now()
+        cc_count = 0
+        while self.node.get_clock().now() - start <= 1.:
+            cc_count += 1
+            cc.execute(None)
+            self.assertLessEqual(cc.sleep_duration, .1)
+            cc.sleep()
+        self.assertIn(cc['main'].count, [14, 15, 16])
+        self.assertIn(cc['side'].count, [9, 10, 11])
+        self.assertLessEqual(cc_count, 27)
+
+        # verify ROS properties and disable sleep
+        cc._enable_ros_control()
+        self.assertTrue(cc['main']._is_controlled)
+        self.assertFalse(cc['side']._is_controlled)
+        cc['main']._rate = FakeRate()
+        cc['side']._rate = FakeRate()
+
+        # return outcome when all return done or any returns error
+        outcome = cc.execute(None)
+        self.assertIsNone(outcome)
+        cc['main'].result = 'error'
+        outcome = cc.execute(None)
+        self.assertEqual(outcome, 'error')
+        cc['main'].result = None
+        cc['side'].result = 'error'
+        outcome = cc.execute(None)
+        self.assertEqual(outcome, 'error')
+        cc['side'].result = 'done'
+        outcome = cc.execute(None)
+        self.assertIsNone(outcome)
+        cc['main'].result = 'done'
+        outcome = cc.execute(None)
+        self.assertEqual(outcome, 'done')
+        cc['main'].result = None
+        cc['side'].result = None
+
+        # always call on_exit exactly once when returning an outcome
+        outcome = cc.execute(None)
+        self.assertIsNone(outcome)
+        cc['main'].last_events = []
+        cc['side'].last_events = []
+        cc['main'].result = 'error'
+        outcome = cc.execute(None)
+        self.assertEqual(outcome, 'error')
+        self.assertListEqual(cc['main'].last_events, ['on_exit'])
+        self.assertListEqual(cc['side'].last_events, ['on_exit'])
+
+        rclpy.shutdown()
+        thread.join()
 
 
     def test_user_data(self):

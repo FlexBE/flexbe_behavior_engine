@@ -63,6 +63,11 @@ class ProxyServiceCaller(object):
             if found_service:
                 ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(msg_type, topic)
                 self._check_service_available(topic, wait_duration)
+        else:
+            if not isinstance(msg_type, ProxyServiceCaller._services[topic].srv_type):
+                if msg_type.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
+                    ProxyServiceCaller._node.destroy_client(ProxyServiceCaller._services[topic])
+                    ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(msg_type, topic)
 
     def is_available(self, topic):
         """

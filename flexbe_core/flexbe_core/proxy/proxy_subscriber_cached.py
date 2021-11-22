@@ -53,6 +53,7 @@ class ProxySubscriberCached(object):
                                                     'buffered': buffered,
                                                     'msg_queue': [],
                                                     'callbacks': defaultdict(list)}
+
         if callback is not None:
             ProxySubscriberCached._topics[topic]['callbacks'][topic].append(callback)
 
