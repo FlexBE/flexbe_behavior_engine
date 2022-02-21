@@ -107,10 +107,10 @@ class ComplexActionServer(object):
 
         self.goals_received_ -= 1;
 
-		#get from queue
+		# get from queue
         current_goal = self.goal_queue_.get()
 
-        #set the status of the current goal to be active
+        # set the status of the current goal to be active
         # current_goal.set_accepted("This goal has been accepted by the simple action server");
         current_goal.succeed()
 
@@ -130,14 +130,11 @@ class ComplexActionServer(object):
            return False;
 
        return self.current_goal.is_active
-       # status = self.current_goal.get_goal_status().status;
-       # return status == actionlib_msgs.msg.GoalStatus.ACTIVE #or status == actionlib_msgs.msg.GoalStatus.PREEMPTING;
 
 
     ## @brief Sets the status of the active goal to succeeded
     ## @param  result An optional result to send back to any clients of the goal
     def set_succeeded(self,result=None, text="", goal_handle=None):
-      # with self.action_server.lock, self.lock:
       goal_handle.succeed()
       if not result:
           result=self.get_default_result();
@@ -147,7 +144,6 @@ class ComplexActionServer(object):
     ## @brief Sets the status of the active goal to aborted
     ## @param  result An optional result to send back to any clients of the goal
     def set_aborted(self, result = None, text="" , goal_handle=None):
-        # with self.action_server.lock, self.lock:
         goal_handle.abort()
         if not result:
             result=self.get_default_result();
@@ -165,6 +161,7 @@ class ComplexActionServer(object):
     def get_default_result(self):
         return self.action_server.action_type
 
+
     ## @brief Allows users to register a callback to be invoked when a new goal is available
     ## @param cb The callback to be invoked
     def register_goal_callback(self,cb):
@@ -172,11 +169,6 @@ class ComplexActionServer(object):
             Logger.logwarn("Cannot call ComplexActionServer.register_goal_callback() because an executeCallback exists. Not going to register it.")
         else:
             self.goal_callback = cb;
-
-
-    ## @brief Explicitly start the action server, used it auto_start is set to false
-    # def start(self):
-    #     self.action_server.start();
 
 
     ## @brief Callback for when the ActionServer receives a new goal and passes it on
@@ -194,7 +186,7 @@ class ComplexActionServer(object):
               #add goal to queue
               self.goal_queue_.put(goal)
 
-                  #Trigger runLoop to call execute()
+              #Trigger runLoop to call execute()
               self.execute_condition.notify();
               self.execute_condition.release();
 
@@ -209,10 +201,8 @@ class ComplexActionServer(object):
 
     ## @brief Called from a separate thread to call blocking execute calls
     def executeLoop(self):
-          # loop_duration = rospy.Duration.from_sec(.1);
           loop_duration = rclpy.Duration.from_sec(0.1)
 
-          # while (not rospy.is_shutdown()):
           while (rclpy.ok()):
               Logger.logdebug("SAS: execute")
 
@@ -221,7 +211,6 @@ class ComplexActionServer(object):
                       break;
 
               if (self.is_new_goal_available()):
-                  # accept_new_goal() is performing its own locking
                   goal_handle = self.accept_new_goal();
                   if not self.execute_callback:
                       Logger.logerr("execute_callback_ must exist. This is a bug in ComplexActionServer")

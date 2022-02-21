@@ -14,10 +14,19 @@ class TestInterface(object):
         clsmembers = inspect.getmembers(package, lambda member: (
             inspect.isclass(member) and member.__module__ == package.__name__
         ))
+
+        Logger.initialize(node)
+
         self._class = next(c for name, c in clsmembers if name == classname)
         self._instance = None
-        self.node = node
-        Logger.initialize(node)
+        self._node = node
+
+        try:
+            self._class.initialize_ros(node)
+            Logger.print_positive("Given class is a state")
+        except Exception:
+            Logger.print_positive("Given class is a state machine")
+
         Logger.print_positive('%s imported' % self.get_base_name())
 
     def is_state(self):
@@ -27,7 +36,6 @@ class TestInterface(object):
         return "state" if self.is_state() else "behavior"
 
     # instantiate
-
     def instantiate(self, params=None):
         if self.is_state():
             self._instance = self._instantiate_state(params=params)
@@ -42,7 +50,7 @@ class TestInterface(object):
             return self._class(**params)
 
     def _instantiate_behavior(self, params=None):
-        be = self._class()
+        be = self._class(node=self._node)
         if params is not None:
             for name, value in params.items():
                 be.set_parameter(name, value)
@@ -65,14 +73,12 @@ class TestInterface(object):
         outcome = None
         while outcome is None and rclpy.ok():
             outcome = self._instance.execute(userdata)
-            self._instance.sleep()
             spin_cb()
         self._instance.on_stop()
         return outcome
 
     def _execute_behavior(self, userdata, spin_cb):
         self._instance.prepare_for_execution(userdata._data)
-        self._instance.confirm()
         # do not execute behavior directly, instead explicitly spin its state machine
         # this is required here for spinning ROS and processing roslaunch context callbacks
         outcome = None

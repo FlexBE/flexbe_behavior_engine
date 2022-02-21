@@ -4,21 +4,21 @@ import re
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 
-import roslaunch
+# import roslaunch
 import launch
 import launch_ros
 
 from .logger import Logger
 
 
-class Callback(roslaunch.pmon.ProcessListener):
-    def __init__(self, callback, node):
-        self._callback = callback
-        self._node = node
-
-    def process_died(self, process_name, exit_code):
-        self._node.get_logger().info("Process {} exited with {}".format(process_name, exit_code))
-        self._callback(process_name, exit_code)
+# class Callback(roslaunch.pmon.ProcessListener):
+#     def __init__(self, callback, node):
+#         self._callback = callback
+#         self._node = node
+#
+#     def process_died(self, process_name, exit_code):
+#         self._node.get_logger().info("Process {} exited with {}".format(process_name, exit_code))
+#         self._callback(process_name, exit_code)
 
 
 class TestContext(object):
@@ -82,13 +82,13 @@ class LaunchContext(TestContext):
         else:
             launchcontent = launch_config
 
-        launchconfig = roslaunch.config.ROSLaunchConfig()
-        loader = roslaunch.xmlloader.XmlLoader()
-        if launchpath is not None:
-            loader.load(launchpath, launchconfig, verbose=False)
-        else:
-            loader.load_string(launchcontent, launchconfig, verbose=False)
-        self._launchrunner = roslaunch.launch.ROSLaunchRunner(self._run_id, launchconfig)
+        # launchconfig = roslaunch.config.ROSLaunchConfig()
+        # loader = roslaunch.xmlloader.XmlLoader()
+        # if launchpath is not None:
+        #     loader.load(launchpath, launchconfig, verbose=False)
+        # else:
+        #     loader.load_string(launchcontent, launchconfig, verbose=False)
+        # self._launchrunner = roslaunch.launch.ROSLaunchRunner(self._run_id, launchconfig)
 
         def store(process_name, exit_code):
             self._exit_codes[process_name] = exit_code

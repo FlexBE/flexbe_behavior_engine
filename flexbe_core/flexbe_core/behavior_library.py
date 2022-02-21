@@ -14,7 +14,6 @@ class BehaviorLibrary(object):
     '''
 
     def __init__(self, node):
-        # self._behavior_lib = dict()
         self._node = node
         Logger.initialize(node)
         self.parse_packages()
@@ -24,7 +23,6 @@ class BehaviorLibrary(object):
         Parses all ROS2 packages to update the internal behavior library.
         """
         self._behavior_lib = dict()
-        # for pkg_name, pkg_path in ros2pkg.get_packages_with_prefixes().items():
         for pkg_name, pkg_path in get_packages_with_prefixes().items():
             pkg = parse_package(os.path.join(pkg_path, 'share', pkg_name))
             for export in pkg.exports:

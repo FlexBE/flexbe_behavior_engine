@@ -35,7 +35,6 @@ class FlexbeOnboard(object):
         # prepare temp folder
         self._tmp_folder = tempfile.mkdtemp()
         sys.path.append(self._tmp_folder)
-        # rospy.on_shutdown(self._cleanup_tempdir)
 
         # prepare manifest folder access
         self._behavior_lib = BehaviorLibrary(node)

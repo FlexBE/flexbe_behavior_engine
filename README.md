@@ -1,21 +1,26 @@
 # FlexBE Behavior Engine
 FlexBE is a high-level behavior engine coordinating the capabilities of a robot in order to solve complex tasks.
 Behaviors are modeled as hierarchical state machines where states correspond to active actions and transitions describe the reaction to outcomes.
-Main advantage over similar approaches is the good operator integration and extensive user interface.
+Main advantage over similar approaches is the good operator integration and an
+intuitive user interface.
 Besides executing behaviors in full autonomy, the operator can restrict execution of certain transitions or trigger them manually.
 Furthermore, it is even supported to modify the whole structure of a behavior during its execution without restarting it.
 The user interface features a runtime control interface as well as a graphical editor for state machines.
 
 Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)) for further information, tutorials, application examples, and much more.
 
-![FlexBE CI](https://github.com/team-vigir/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg)
+![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg)
 
 ## Installation
 
-Execute the following commands to install FlexBE:
+Execute the following commands to install FlexBE for ROS 2 systems:
 
     cd "ros2_ws"/src
     git clone https://github.com/team-vigir/flexbe_behavior_engine.git
+
+Next, navigate to the "ros2_ws" top-level directory and build FlexBE:
+
+    colcon build
 
 Furthermore, create your own repository for behavior development (contains examples):
 
@@ -37,6 +42,9 @@ Use the following launch file to run both of the above, e.g., for testing on a s
 
     ros2 launch flexbe_app flexbe_full.launch.py
 
+For running test use:
+python -m unittest src/flexbe_behavior_engine/<flexbe_dir>/test/<test.py>
+
 ## Next Steps
 
 - Do some of the [tutorials](http://philserver.bplaced.net/fbe/documentation.php).
@@ -54,16 +62,21 @@ Philipp Schillinger, Stefan Kohlbrecher, and Oskar von Stryk, ["Human-Robot Coll
         year = {2016},
         pages = {2796-2802},
         booktitle = {Proc. IEEE Int. Conf. on Robotics and Automation (ICRA)},
+        doi={10.1109/ICRA.2016.7487442}}
     }
 
 ### Further Publications
 
-Refer for example to the following publications to get an impression about ways to use FlexBE.
+Refer to the following publications to get an impression about ways to use FlexBE.
 Let us know if you know a paper which should be added to the list.
 
 - Stefan Kohlbrecher et al. ["A Comprehensive Software Framework for Complex Locomotion and Manipulation Tasks Applicable to Different Types of Humanoid Robots."](http://dx.doi.org/10.3389/frobt.2016.00031) Frontiers in Robotics and AI 3 (2016): 31.
 
 - Spyros Maniatopoulos, Philipp Schillinger, Vitchyr Pong, David C. Conner, and Hadas Kress-Gazit, ["Reactive High-level Behavior Synthesis for an Atlas Humanoid Robot"](http://dx.doi.org/10.1109/ICRA.2016.7487613), IEEE International Conference on Robotics and Automation (ICRA), Stockholm, Sweden, May 2016.
+
+- Alberto Romay et al., [“Collaborative autonomy between high-level behaviors and human operators for remote manipulation tasks using different humanoid robots,”](http://dx.doi.org/10.1002/rob.21671) Journal of Field Robotics, September 2016.
+
+- David C. Conner and Justin Willis, ["Flexible Navigation: Finite state machine-based integrated navigation and control for ROS enabled robots,"](http://dx.doi.org/10.1109/SECON.2017.7925266) SoutheastCon 2017.
 
 ## Maintainer
 

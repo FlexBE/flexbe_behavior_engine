@@ -122,7 +122,7 @@ class ProxyPublisher(object):
         while (ProxyPublisher._node.get_clock().now() - starting_time).nanoseconds * 10 ** -9 < timeout:
             if pub.get_subscription_count() > 0:
                 return True
-            # rate.sleep()
-            time.sleep(0.1)
+                
+            rate.sleep()
 
         return False

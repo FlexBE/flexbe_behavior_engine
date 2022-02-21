@@ -17,8 +17,8 @@ class SelftestBehaviorSM(Behavior):
 
 		self.node = node
 		OperatableStateMachine.initialize_ros(self.node)
-		CalculationState.initialize_ros(self.node)
-		DecisionState.initialize_ros(self.node)
+		SelftestBehaviorSM._CalculationState.initialize_ros(self.node)
+		SelftestBehaviorSM._DecisionState.initialize_ros(self.node)
 
 		# parameters of this behavior
 		self.add_parameter('value', 'wrong')

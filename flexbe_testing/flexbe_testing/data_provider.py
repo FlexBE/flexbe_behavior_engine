@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 import os
-# import rospkg
 # import rosbag
 from ament_index_python.packages import get_package_share_directory
-import rosbag2
 from pathlib import Path
-
 from .logger import Logger
 
 
@@ -24,15 +21,13 @@ class DataProvider(object):
                 bagpath = os.path.expanduser(bagfile)
             # package-relative path
             else:
-                # rp = rospkg.RosPack()
-                # pkgpath = rp.get_path(bagfile.split('/')[0])
                 pkgpath = get_package_share_directory(bagfile.split('/')[0])
                 bagpath = os.path.join(pkgpath, '/'.join(bagfile.split('/')[1:]))
 
             storage_options, converter_options = get_rosbag_options(bagpath)
 
-            self._bag = rosbag2_py.SequentialReader()
-            self._bag.open(storage_options, converter_options)
+            # self._bag = rosbag2_py.SequentialReader()
+            # self._bag.open(storage_options, converter_options)
 
             # self._bag = rosbag.Bag(bagpath)
             Logger.print_positive('using data source: %s' % bagpath)

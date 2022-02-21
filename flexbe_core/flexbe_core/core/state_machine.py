@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import time
+from flexbe_core.logger import Logger
 from flexbe_core.core.state import State
 from flexbe_core.core.user_data import UserData
 from flexbe_core.core.exceptions import StateError, StateMachineError
@@ -61,6 +61,11 @@ class StateMachine(State):
     def get_opened_container():
         return StateMachine._currently_opened_container
 
+    def wait(self, seconds=None, condition=None):
+        # This should not be called; expect to call ros_state_machine version instead!
+        Logger.localinfo("StateMachine: Dummy wait method for %s", self.name)
+
+
     # execution
 
     def spin(self, userdata=None):
@@ -83,7 +88,9 @@ class StateMachine(State):
 
     def sleep(self):
         if self._current_state is not None:
-            self._current_state.sleep()
+            self.wait(seconds=self._current_state.sleep_duration)
+        else:
+            self.wait(seconds=self.sleep_duration)
 
     def _execute_current_state(self):
         with UserData(reference=self._userdata, remap=self._remappings[self._current_state.name],

@@ -17,6 +17,7 @@ from flexbe_testing.logger import Logger
 from flexbe_testing import Tester
 
 if __name__ == '__main__':
+    rclpy.init()
     node = rclpy.create_node('flexbe_testing')
     perform_rostest = None
     test_package = None
@@ -39,7 +40,7 @@ if __name__ == '__main__':
 
     FlexbeLogger.initialize(node)
     Logger.initialize(node)
-    Logger.mute_rospy()
+    Logger.mute_rclpy()
 
     filenames = list()
     if len(sys.argv) > 1:
@@ -50,23 +51,26 @@ if __name__ == '__main__':
                 filenames.append(testfile_path)
 
     test_cases = dict()
-    for filename in filenames:
-        _, name = os.path.split(filename)
-        test_name, _ = os.path.splitext(name)
-        try:
-            with open(filename, 'r') as f:
-                config = getattr(yaml, 'unsafe_load', yaml.load)(f)
-            test_cases[test_name] = config
-        except IOError as io_error:
-            node.get_logger.error(io_error)
-            test_cases[test_name] = io_error  # not a valid config, caught during config verification
+
+    # The last filename is automatically added by the ros2 launch
+    # So this will parse through each file and ignore the extra launch defined file
+    for i in range(len(filenames) - 1):
+      _, name = os.path.split(filenames[i])
+      test_name, _ = os.path.splitext(name)
+      try:
+          with open(filenames[i], 'r') as f:
+              config = getattr(yaml, 'unsafe_load', yaml.load)(f)
+          test_cases[test_name] = config
+      except IOError as io_error:
+          node.get_logger.error(io_error)
+          test_cases[test_name] = io_error  # not a valid config, caught during config verification
 
     print('Ready for testing! (%d tests)' % len(test_cases))
-    tester = Tester()
+    tester = Tester(node)
 
     success_cases = 0
     for test_name, test_config in test_cases.items():
-        if noy rclpy.ok():
+        if not rclpy.ok():
             break
         success_cases += tester.run_test(test_name, test_config)
 

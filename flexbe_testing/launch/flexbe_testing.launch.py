@@ -33,6 +33,7 @@ def generate_launch_description():
         Node(
             package="flexbe_testing", executable="testing_node", output="screen",
             name="flexbe_testing",
+            arguments=[LaunchConfiguration("testcases")],
             parameters=[{"~package": LaunchConfiguration("package"),
                          "~print_debug_positive": LaunchConfiguration("print_debug_positive"),
                          "~print_debug_negative": LaunchConfiguration("print_debug_negative"),

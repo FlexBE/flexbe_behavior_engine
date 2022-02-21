@@ -5,7 +5,7 @@ params:
     first_arg: 5
 
 input:
-    second_arg: !!python/object/new:std_msgs.msg.Int32 {state: [2]}
+    second_arg: !!python/object/new:std_msgs.msg.Int32 {state: {"data": 2}}
 
 output:
     output_value: 7

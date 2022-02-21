@@ -1,10 +1,12 @@
 #!/usr/bin/env python
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rosidl_runtime_py import get_interface_path
 
 from flexbe_msgs.msg import *
+from flexbe_msgs.action import *
 from flexbe_core import BehaviorLibrary
 
 from std_msgs.msg import String, Empty
@@ -23,7 +25,6 @@ class BehaviorActionServer(object):
 		self._behavior_started = False
 		self._preempt_requested = False
 		self._current_goal = None
-		self._abort_goal = False
 
 		self._current_state = None
 		self._active_behavior_id = None
@@ -33,37 +34,26 @@ class BehaviorActionServer(object):
 		self._status_pub = self._node.create_subscription(BEStatus, 'flexbe/status', self._status_cb, 100)
 		self._state_pub = self._node.create_subscription(String, 'flexbe/behavior_update', self._state_cb, 100)
 
-		# self._as = actionlib.SimpleActionServer('flexbe/execute_behavior', BehaviorExecutionAction, None, False)
-		self._as = ActionServer(self._node, BehaviorExecutionAction, 'flexbe/execute_behavior', goal_callback=self._goal_cb,
-								cancel_callback=self._preempt_cb)
+		self._as = ActionServer(self._node, BehaviorExecution, 'flexbe/execute_behavior', goal_callback=self._goal_cb,
+								cancel_callback=self._preempt_cb, execute_callback=self._execute_cb)
 
-		# self._rp = RosPack()
-		self._behavior_lib = BehaviorLibrary()
-
-		# start action server after all member variables have been initialized
-		# self._as.start()
+		self._behavior_lib = BehaviorLibrary(node)
 
 		self._node.get_logger().info("%d behaviors available, ready for start request." % self._behavior_lib.count_behaviors())
 
 
 	def _goal_cb(self, goal_handle):
-		# if self._as.is_active() or not self._as.is_new_goal_available():
-		# 	return
+		self._current_goal = goal_handle
 		goal = goal_handle.request()
 
 		if self._preempt_requested:
 			goal_handle.canceled()
 
-		if self._abort_goal:
-			goal_handle.abort()
-			self._abort_goal = False
-
 		self._node.get_logger().info('Received a new request to start behavior: %s' % goal.behavior_name)
 		be_id, behavior = self._behavior_lib.find_behavior(goal.behavior_name)
 		if be_id is None:
 			self._node.get_logger().error("Deny goal: Did not find behavior with requested name %s" % goal.behavior_name)
-			# self._as.set_preempted()
-			goal_handle.canceled()
+			self._current_goal.canceled()
 			return
 
 		be_selection = BehaviorSelection()
@@ -82,7 +72,6 @@ class BehaviorActionServer(object):
 						filepath = os.path.expanduser(path)
 					else:
 						filepath = os.path.join(get_interface_path(path.split('/')[0]), '/'.join(path.split('/')[1:]))
-						# filepath = os.path.join(self._rp.get_path(path.split('/')[0]), '/'.join(path.split('/')[1:]))
 					with open(filepath, 'r') as f:
 						content = f.read()
 					if ns != '':
@@ -139,21 +128,22 @@ class BehaviorActionServer(object):
 		self._node.get_logger().info('Behavior execution preempt requested!')
 
 
+	def _execute_cb(self, goal_handle):
+		self._node.get_logger().info("Executing behavior")
+
+
 	def _status_cb(self, msg):
 		if msg.code == BEStatus.ERROR:
 			self._node.get_logger().error('Failed to run behavior! Check onboard terminal for further infos.')
-			# self._as.set_aborted('')
-			self._abort_goal = True
-			# Call goal cb in case there is a queued goal available
-			# self._goal_cb()
+			self._current_goal.abort()
 			return
 		if not self._behavior_started and msg.code == BEStatus.STARTED:
 			self._behavior_started = True
 			self._active_behavior_id = msg.behavior_id
 			self._node.get_logger().info('Behavior execution has started!')
 			# Preempt if the goal was asked to preempt before the behavior started
-			# if self._preempt_requested:
-			# 	self._preempt_cb()
+			if self._preempt_requested:
+				self._preempt_cb()
 		# Ignore status until behavior start was received
 		if not self._behavior_started:
 			return
@@ -164,20 +154,14 @@ class BehaviorActionServer(object):
 		elif msg.code == BEStatus.FINISHED:
 			result = msg.args[0] if len(msg.args) >= 1 else ''
 			self._node.get_logger().info('Finished behavior execution with result "%s"!' % result)
-			self._as.set_succeeded(BehaviorExecutionResult(outcome=result))
-			# Call goal cb in case there is a queued goal available
-			self._goal_cb()
+			self._current_goal.succeed()
 		elif msg.code == BEStatus.FAILED:
 			self._node.get_logger().error('Behavior execution failed in state %s!' % str(self._current_state))
-			# self._as.set_aborted('')
-			self._abort_goal = True
-			# Look up  _execute_cancel_request(self, request_header_and_message)
-			# Call goal cb in case there is a queued goal available
-			# self._goal_cb()
+			self._current_goal.abort()
 
 
 	def _state_cb(self, msg):
 		self._current_state = msg.data
-		# if self._as.is_active():
-		self._as.publish_feedback(BehaviorExecutionFeedback(self._current_state))
-		self._node.get_logger().loginfo('Current state: %s' % self._current_state)
+		if self._as.is_active:
+			self._current_goal.publish_feedback(BehaviorExecutionFeedback(self._current_state))
+			self._node.get_logger().loginfo('Current state: %s' % self._current_state)

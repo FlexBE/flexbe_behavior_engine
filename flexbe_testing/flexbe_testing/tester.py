@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import rosunit
+
 import unittest
 import re
 
@@ -47,15 +47,11 @@ class Tester(object):
 
         if not import_only:
             # prepare test context
-            context = None
-            if 'launch' in config:
-                context = LaunchContext(self.node, config['launch'], config.get('wait_cond', 'True'))
-            else:
-                context = TestContext()
+            context = TestContext()
 
             # load data source
             try:
-                data = DataProvider(self.node, bagfile=config.get('data', None))
+                data = DataProvider(self.node, bagfile=None)
             except Exception as e:
                 Logger.print_failure('unable to load data source %s:\n\t%s' %
                                      (config['data'], str(e)))
@@ -139,12 +135,6 @@ class Tester(object):
         assert 'path' in config
         assert 'class' in config or 'name' in config
         assert 'outcome' in config or config.get('import_only', False)
-
-    # ROSUNIT interface
-
-    # def perform_rostest(self, test_pkg):
-    #     TestCase = type(test_pkg + '_test_class', (unittest.TestCase,), self._tests)
-    #     rosunit.unitrun(test_pkg, test_pkg + '_flexbe_tests', TestCase)
 
     def _test_output(self, value, expected):
         def _test_call(test_self):

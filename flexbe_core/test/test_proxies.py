@@ -174,14 +174,11 @@ class TestProxies(unittest.TestCase):
         self.assertEqual(result.outcome, 'ok')
 
         client.send_goal(t1, BehaviorExecution.Goal())
-        client.cancel(t1)
-        end_time = time.time() + 10
-        while time.time() < end_time:
+
+        # end_time = time.time() + 2
+        while not client.has_result(t1):
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
             self.assertTrue(client.is_active(t1) or client.has_result(t1))
-
-        # client.cancel(t1)
-        time.sleep(0.3)
 
         self.assertFalse(client.is_active(t1))
 

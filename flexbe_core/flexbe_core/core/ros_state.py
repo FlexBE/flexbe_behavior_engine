@@ -22,7 +22,6 @@ class RosState(State):
         except ParameterNotDeclaredException as e:
             node.declare_parameter('breakpoints', [])
             RosState._breakpoints = node.get_parameter('breakpoints')
-        # RosState._breakpoints = node.declare_parameter('breakpoints', [])
         ProxyPublisher._initialize(RosState._node)
         ProxySubscriberCached._initialize(RosState._node)
         StateLogger.initialize_ros(RosState._node)
@@ -30,31 +29,43 @@ class RosState(State):
 
     def __init__(self, *args, **kwargs):
         super(RosState, self).__init__(*args, **kwargs)
-        self._rate = RosState._node.create_rate(10)
+
+        self._desired_period_ns = (1 / 10) * 1e9
+
+        if "desired_rate" in kwargs:
+            self._desired_period_ns = (1 / kwargs["desired_rate"]) * 1e9
+
         self._is_controlled = False
 
         self._pub = ProxyPublisher()
         self._sub = ProxySubscriberCached()
 
-    def sleep(self):
-        self._rate.sleep()
+        self._last_execution = None
 
     @property
     def sleep_duration(self):
-        return self._rate._timer.time_until_next_call() * 1e-9
+        """
+        Sleep duration in seconds
+        """
+        if self._last_execution is None:
+            return -1  # No sleep if not executed since last entry
 
-    def set_rate(self, rate):
+        elapsed = RosState._node.get_clock().now() - self._last_execution
+
+        # Take how long the timer should sleep for and subtract elapsed time
+        return (self._desired_period_ns - elapsed.nanoseconds) * 1e-9
+
+    def set_rate(self, desired_rate):
         """
         Set the execution rate of this state,
         i.e., the rate with which the execute method is being called.
 
         Note: The rate is best-effort, real-time support is not yet available.
 
-        @type label: float
-        @param label: The desired rate in Hz.
+        @type desired_rate: float
+        @param desired_rate: The desired rate in Hz.
         """
-        self._rate.destroy()
-        self._rate = RosState._node.create_rate(rate)
+        self._desired_period_ns = (1 / desired_rate) * 1e9
 
     def _enable_ros_control(self):
         self._is_controlled = True

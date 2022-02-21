@@ -22,7 +22,6 @@ class EventState(OperatableState):
 
     def __init__(self, *args, **kwargs):
         super(EventState, self).__init__(*args, **kwargs)
-        # StateLogger.initialize_ros(EventState._node)
 
         self.__execute = self.execute
         self.execute = self._event_execute
@@ -65,6 +64,7 @@ class EventState(OperatableState):
             self._skipped = False
             self.on_resume(*args, **kwargs)
 
+        self._last_execution = EventState._node.get_clock().now()
         outcome = self.__execute(*args, **kwargs)
 
         repeat = False

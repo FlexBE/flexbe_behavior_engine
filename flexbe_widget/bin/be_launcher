@@ -29,7 +29,6 @@ def main(node_args=None):
       usage()
       print(e)
       print("Continue after exception ")
-      #sys.exit(2)
 
     behavior = ""
     autonomy = 255

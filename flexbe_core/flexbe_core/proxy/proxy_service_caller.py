@@ -152,7 +152,6 @@ class ProxyServiceCaller(object):
             t = Timer(0.5, self._print_wait_warning, [topic])
             t.start()
             client.wait_for_service(wait_duration)
-            # rospy.wait_for_service(topic, wait_duration)
             available = True
         except rclpy.exceptions.ROSInterruptException:
             available = False

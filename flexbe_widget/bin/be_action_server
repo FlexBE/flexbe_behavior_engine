@@ -7,7 +7,6 @@ fi
 '''
 # flake8: noqa
 import rclpy
-
 from flexbe_widget.behavior_action_server import BehaviorActionServer
 
 def main(args=None):

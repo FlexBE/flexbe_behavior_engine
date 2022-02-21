@@ -18,22 +18,20 @@ class ConcurrencyContainer(OperatableStateMachine):
         self._conditions = conditions
         self._returned_outcomes = dict()
 
-    def sleep(self):
-        self.wait(seconds=self.sleep_duration)
-
     @property
     def sleep_duration(self):
-        sleep_dur = None
+        """
+        Sleep duration in seconds
+        """
+        sleep_dur = float("inf")
         for state in self._states:
-            if state.sleep_duration > 0:
-                sleep_dur = state.sleep_duration if sleep_dur is None else min(sleep_dur, state.sleep_duration)
+            sleep_dur = min(sleep_dur, state.sleep_duration)
 
-        return sleep_dur or 0.
+        return sleep_dur
 
     def _execute_current_state(self):
         # execute all states that are done with sleeping and determine next sleep duration
         for state in self._states:
-
             if state.name in list(self._returned_outcomes.keys()) and self._returned_outcomes[state.name] is not None:
                 continue  # already done with executing
 
@@ -46,16 +44,10 @@ class ConcurrencyContainer(OperatableStateMachine):
                     state.get_deep_state()._notify_skipped()
                 continue  # other state has priority
 
-            state_sleep_duration = state.sleep_duration
-            if state_sleep_duration <= 0:  # ready to execute
+            if state.sleep_duration <= 0:  # ready to execute
                 self._returned_outcomes[state.name] = self._execute_single_state(state)
-                # check again in case the sleep has already been handled by the child
-                if state_sleep_duration <= 0:
-                    # this sleep returns immediately since sleep duration is negative,
-                    # but is required here to reset the sleep time after executing
-                    state.sleep()
-            else:
-                Logger.loginfo('sleeping for current state %s : %s' % (state.name, str(state_sleep_duration)))
+            #else:
+            #    Logger.loginfo('sleeping for current state %s : %s' % (state.name, str(state.sleep_duration)))
 
         # Determine outcome
         outcome = None
@@ -112,6 +104,13 @@ class ConcurrencyContainer(OperatableStateMachine):
             state._disable_ros_control()
         if isinstance(state, OperatableStateMachine):
             state._disable_ros_control()
+
+    def on_enter(self, userdata):
+        for state in self._states :
+            #if not state._entering:
+            #    Logger.logerr('Reset entering flag for child state: %s' % (state.name))
+            state._entering = True  # force state to handle enter on first execute
+            state._last_execution = None
 
     def on_exit(self, userdata, states=None):
         for state in self._states if states is None else states:

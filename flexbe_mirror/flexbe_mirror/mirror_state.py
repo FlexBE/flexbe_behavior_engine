@@ -27,10 +27,6 @@ class MirrorState(EventState):
             msg = self._sub.get_from_buffer(self._outcome_topic)
             if msg.data < len(self.outcomes):
                 return self.outcomes[msg.data]
-        try:
-            self.sleep()
-        except ROSInterruptException:
-            print('Interrupted mirror sleep.')
 
     def on_enter(self, userdata):
         self._pub.publish('flexbe/behavior_update', String(data="/" + "/".join(self._target_path.split("/")[1:])))

@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.0.0 (2022-02-22)
+* Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
+* Includes changes to concurrent state and sleep handling
+------------------
 
 1.3.1 (2020-12-11)
 ------------------
