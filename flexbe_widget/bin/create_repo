@@ -20,7 +20,7 @@ git clone https://github.com/FlexBE/flexbe_project_behaviors.git ${name}_behavio
 cd ${name}_behaviors
  # use new ROS 2 flexbe_app workspace layout, remove when merged into master
 git fetch
-git checkout ros2-devel-alpha
+git checkout ros2-devel-alpha-python-manifest
 
 echo ""
 echo -e "\e[96m(3/4) Configuring project template...\033[0m"

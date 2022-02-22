@@ -1,9 +1,9 @@
 import os
 from ament_index_python import get_packages_with_prefixes
-from ros2pkg import api as ros2pkg
 from catkin_pkg.package import parse_package
 import xml.etree.ElementTree as ET
 import zlib
+import importlib
 
 from flexbe_core.logger import Logger
 
@@ -24,10 +24,11 @@ class BehaviorLibrary(object):
         """
         self._behavior_lib = dict()
         for pkg_name, pkg_path in get_packages_with_prefixes().items():
+
             pkg = parse_package(os.path.join(pkg_path, 'share', pkg_name))
             for export in pkg.exports:
                 if export.tagname == "flexbe_behaviors":
-                    self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
+                    self._add_behavior_manifests(os.path.join(pkg_path, 'lib'), pkg_name)
 
     def _add_behavior_manifests(self, path, pkg=None):
         """
@@ -40,28 +41,29 @@ class BehaviorLibrary(object):
         @type pkg: string
         @param pkg: Optional name of a package to only add manifests referring to this package.
         """
+
         for entry in os.listdir(path):
             entry_path = os.path.join(path, entry)
+
             if os.path.isdir(entry_path):
                 self._add_behavior_manifests(entry_path, pkg)
-            elif entry.endswith(".xml") and not entry.startswith("#"):
-                m = ET.parse(entry_path).getroot()
-                # structure sanity check
-                if (m.tag != "behavior"
-                        or len(m.findall(".//executable")) == 0
-                        or m.find("executable").get("package_path") is None
-                        or len(m.find("executable").get("package_path").split(".")) < 2):
-                    continue
-                e = m.find("executable")
-                if pkg is not None and e.get("package_path").split(".")[0] != pkg:
-                    continue  # ignore if manifest not in specified package
-                be_id = zlib.adler32(e.get("package_path").encode()) & 0x7fffffff
+            elif "manifest" in entry_path and entry.endswith(".py") and not entry.startswith("__init__"):
+                module_part = entry_path.split("/")
+                module_path = module_part[len(module_part) - 3] + "." +  module_part[len(module_part) - 2] + "." + module_part[len(module_part) - 1]
+                module_path = module_path[:len(module_path) - 3]
+
+                module = importlib.import_module(module_path)
+                manifest = getattr(module, entry[:entry.find("_manifest")])
+                be_id = zlib.adler32(manifest["executable"]["package_path"].encode()) & 0x7fffffff
+                self._behavior_lib[be_id] = manifest
+
                 self._behavior_lib[be_id] = {
-                    "name": m.get("name"),
-                    "package": ".".join(e.get("package_path").split(".")[:-1]),
-                    "file": e.get("package_path").split(".")[-1],
-                    "class": e.get("class")
+                    "name": manifest["name"],
+                    "package": ".".join(manifest["executable"]["package_path"].split(".")[:-1]),
+                    "file": manifest["executable"]["package_path"].split(".")[-1],
+                    "class": manifest["executable"]["class"]
                 }
+
 
     def get_behavior(self, be_id):
         """
