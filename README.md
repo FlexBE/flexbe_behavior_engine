@@ -1,4 +1,5 @@
 # FlexBE Behavior Engine
+
 FlexBE is a high-level behavior engine coordinating the capabilities of a robot in order to solve complex tasks.
 Behaviors are modeled as hierarchical state machines where states correspond to active actions and transitions describe the reaction to outcomes.
 Main advantage over similar approaches is the good operator integration and an
@@ -49,6 +50,11 @@ python -m unittest src/flexbe_behavior_engine/<flexbe_dir>/test/<test.py>
 
 - Do some of the [tutorials](http://philserver.bplaced.net/fbe/documentation.php).
 - Visit the [FlexBE GitHub Organization](https://github.com/FlexBE) for additional available states.
+
+- If you are converted an existing system from ROS 1 to ROS 2, we provide a
+[ROS 2 Conversion Best Practices Guide](flexbe_states/ros2-conversion-best-practices.md)
+to assist in converting any custom FlexBE state implementations.
+
 
 ## Publications
 
