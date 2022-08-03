@@ -33,18 +33,18 @@ class ProxyServiceCaller(object):
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for the given services if not available right now.
         """
-        for topic, msg_type in topics.items():
-            self.setupService(topic, msg_type, qos, wait_duration)
+        for topic, srv_type in topics.items():
+            self.setupService(topic, srv_type, qos, wait_duration)
 
-    def setupService(self, topic, msg_type, qos=QOS_DEFAULT, wait_duration=10):
+    def setupService(self, topic, srv_type, qos=QOS_DEFAULT, wait_duration=10):
         """
         Tries to set up a service caller for calling it later.
 
         @type topic: string
         @param topic: The topic of the service to call.
 
-        @type msg_type: service class
-        @param msg_type: The type of messages of this service.
+        @type srv_type: service class
+        @param srv_type: The type of messages of this service.
 
         @type persistent: bool
         @param persistent: Defines if this service caller is persistent.
@@ -61,13 +61,16 @@ class ProxyServiceCaller(object):
                     break
 
             if found_service:
-                ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(msg_type, topic)
+                ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(srv_type, topic)
                 self._check_service_available(topic, wait_duration)
         else:
-            if not isinstance(msg_type, ProxyServiceCaller._services[topic].srv_type):
-                if msg_type.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
+            if srv_type is not ProxyServiceCaller._services[topic].srv_type:
+                if srv_type.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
+                    Logger.localinfo(f'Existing service for {topic} with same message type name, but different instance - re-create service!')
                     ProxyServiceCaller._node.destroy_client(ProxyServiceCaller._services[topic])
-                    ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(msg_type, topic)
+                    ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(srv_type, topic)
+                else:
+                    raise TypeError("Trying to replace existing service caller with different service msg type")
 
     def is_available(self, topic):
         """
@@ -91,8 +94,28 @@ class ProxyServiceCaller(object):
         if not self._check_service_available(topic):
             raise ValueError('Cannot call service client %s: Topic not available.' % topic)
         # call service (forward any exceptions)
+
+        if not isinstance(request, ProxyServiceCaller._services[topic].srv_type):
+            if request.__class__.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
+                # This is the case if the same class is imported multiple times
+                # To avoid rclpy TypeErrors, we will Automatically convert the to base type
+                # used in the service clients
+
+                new_request = ProxyServiceCaller._services[topic].srv_type()
+                for attr, val in vars(new_request):
+                    assert hasattr(request, attr), "Types must share common attributes!"  # Validate that attributes in common
+
+                for attr, val in vars(request):
+                    setattr(new_request, attr, val)
+            else:
+                raise TypeError(f"Invalid request type {request.__class__.__name__} (vs. {ProxyServiceCaller._services[topic].srv_type.__name__}) for topic {topic}")
+        else:
+            # Same class definition instance as stored
+            new_request = request
+
         Logger.loginfo("Client about to call service")
-        return ProxyServiceCaller._services[topic].call(request)
+
+        return ProxyServiceCaller._services[topic].call(new_request)
 
     def call_async(self, topic, request):
         """
@@ -108,7 +131,23 @@ class ProxyServiceCaller(object):
         if not self._check_service_available(topic):
             raise ValueError('Cannot call service client %s: Topic not available.' % topic)
         # call service (forward any exceptions)
-        ProxyServiceCaller._result[topic] = ProxyServiceCaller._services[topic].call_async(request)
+        if not isinstance(request, ProxyServiceCaller._services[topic].srv_type):
+            if request.__class__.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
+                # This is the case if the same class is imported multiple times
+                # To avoid rclpy TypeErrors, we will automatically convert to the base type
+                # used in the original service clients
+
+                new_request = ProxyServiceCaller._services[topic].srv_type()
+                assert new_request.__slots__ == request.__slots__, f"Message attributes for {topic} do not match!"
+                for attr in request.__slots__:
+                    setattr(new_request, attr, getattr(request, attr))
+            else:
+                raise TypeError(f"Invalid request type {request.__class__.__name__} (vs. {ProxyServiceCaller._services[topic].srv_type.__name__}) for topic {topic}")
+        else:
+            # Same class definition instance as stored
+            new_request = request
+
+        ProxyServiceCaller._result[topic] = ProxyServiceCaller._services[topic].call_async(new_request)
 
     def done(self, topic):
         """

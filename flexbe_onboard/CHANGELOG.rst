@@ -1,6 +1,16 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.1.0 (2022-08-02)
+* ROS 2 Humble release
+* FlexbeOnboard is-a Node
+* Includes changes sync check handling
+* Add formatted traceback to local log for behavior errors
+* Updated status messages
+* Update script_dir in setup.cfg
+* Tested under Ubuntu 22.04 and ROS Humble
+------------------
+
 2.0.0 (2022-02-22)
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling

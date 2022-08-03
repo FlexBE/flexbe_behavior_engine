@@ -51,9 +51,9 @@ class PreemptableState(LockableState):
     def _enable_ros_control(self):
         super(PreemptableState, self)._enable_ros_control()
         self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._preempt_topic, Empty)
+        self._sub.subscribe(self._preempt_topic, Empty, id=id(self))
         PreemptableState.preempt = False
 
     def _disable_ros_control(self):
         super(PreemptableState, self)._disable_ros_control()
-        self._sub.unsubscribe_topic(self._preempt_topic)
+        self._sub.unsubscribe_topic(self._preempt_topic, id=id(self))

@@ -33,7 +33,7 @@ class TestProxies(unittest.TestCase):
         t2 = '/pubsub_2'
         pub = ProxyPublisher({t1: String})
         pub = ProxyPublisher({t2: String})
-        sub = ProxySubscriberCached({t1: String})
+        sub = ProxySubscriberCached({t1: String}, id=id(self))
 
         self.assertTrue(pub.is_available(t1))
 
@@ -48,7 +48,7 @@ class TestProxies(unittest.TestCase):
         self.assertTrue(pub.is_available(t1))
         self.assertTrue(pub.is_available(t2))
 
-        sub = ProxySubscriberCached({t2: String})
+        sub = ProxySubscriberCached({t2: String}, id=id(self))
 
         pub.publish(t1, msg1)
         pub.publish(t2, msg2)
@@ -75,7 +75,7 @@ class TestProxies(unittest.TestCase):
 
         t1 = '/buffered_1'
         pub = ProxyPublisher({t1: String})
-        sub = ProxySubscriberCached({t1: String})
+        sub = ProxySubscriberCached({t1: String}, id=id(self))
         sub.enable_buffer(t1)
         self.assertTrue(pub.wait_for_any(t1))
 

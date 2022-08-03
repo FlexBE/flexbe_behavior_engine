@@ -53,6 +53,8 @@ class Logger(object):
         else:
             Logger._node.get_logger().debug(text + ' (unknown log level %s)' % str(severity))
 
+    # NOTE: Below text strings can only have single % symbols if they are being treated
+    # as format strings with appropriate arguments (otherwise replace with %% for simple string without args)
     @staticmethod
     def logdebug(text, *args):
         Logger.log(text % args, Logger.REPORT_DEBUG)

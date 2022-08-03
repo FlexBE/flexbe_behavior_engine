@@ -1,6 +1,5 @@
 import os
 from ament_index_python import get_packages_with_prefixes
-from ros2pkg import api as ros2pkg
 from catkin_pkg.package import parse_package
 import xml.etree.ElementTree as ET
 import zlib
@@ -126,7 +125,7 @@ class BehaviorLibrary(object):
         if be_entry is None:
             # rely on get_behavior to handle/log missing package
             return None
-        #TODO Replace use of non-existing self._rp
+        # TODO Replace use of non-existing self._rp
         try:
             module_path = __import__(be_entry["package"]).__path__[-1]
         except ImportError:

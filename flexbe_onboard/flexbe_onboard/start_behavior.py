@@ -5,16 +5,16 @@ from flexbe_onboard.flexbe_onboard import FlexbeOnboard
 
 def main(args=None):
     rclpy.init(args=args)
-    node = rclpy.create_node('flexbe_onboard')
 
-    FlexbeOnboard(node)
+    onboard = FlexbeOnboard()
 
     # Wait for ctrl-c to stop the application
-    rclpy.spin(node)
-    rclpy.shutdown()
+    rclpy.spin(onboard)
 
+    onboard.get_logger().info("Onboard shutdown ...")
     ProxySubscriberCached().shutdown()
-
+    onboard.get_logger().info("Done!")
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

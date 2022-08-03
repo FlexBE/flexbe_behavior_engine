@@ -5,7 +5,7 @@ QOS_DEFAULT = QoSProfile(depth=10)  # default queue_size setting
 """ Matches the default QoS behavior of ROS topics. """
 
 QOS_LATCH = QoSProfile(depth=1,
-                       durability=QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
+                       durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
 """ Ensure that late subscribers always receive the latest previous message on the topic. """
 
 QOS_LOSSY = QoSProfile(depth=10,

@@ -89,13 +89,13 @@ class EventState(OperatableState):
     def _enable_ros_control(self):
         super(EventState, self)._enable_ros_control()
         self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._repeat_topic, Empty)
-        self._sub.subscribe(self._pause_topic, Bool)
+        self._sub.subscribe(self._repeat_topic, Empty, id=id(self))
+        self._sub.subscribe(self._pause_topic, Bool, id=id(self))
 
     def _disable_ros_control(self):
         super(EventState, self)._disable_ros_control()
-        self._sub.unsubscribe_topic(self._repeat_topic)
-        self._sub.unsubscribe_topic(self._pause_topic)
+        self._sub.unsubscribe_topic(self._repeat_topic, id=id(self))
+        self._sub.unsubscribe_topic(self._pause_topic, id=id(self))
         self._last_active_container = None
         if self._paused:
             PriorityContainer.active_container = None

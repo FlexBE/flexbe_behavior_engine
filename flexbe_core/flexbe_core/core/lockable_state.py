@@ -98,13 +98,13 @@ class LockableState(ManuallyTransitionableState):
     def _enable_ros_control(self):
         super(LockableState, self)._enable_ros_control()
         self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._lock_topic, String)
-        self._sub.subscribe(self._unlock_topic, String)
+        self._sub.subscribe(self._lock_topic, String, id=id(self))
+        self._sub.subscribe(self._unlock_topic, String, id=id(self))
 
     def _disable_ros_control(self):
         super(LockableState, self)._disable_ros_control()
-        self._sub.unsubscribe_topic(self._lock_topic)
-        self._sub.unsubscribe_topic(self._unlock_topic)
+        self._sub.unsubscribe_topic(self._lock_topic, id=id(self))
+        self._sub.unsubscribe_topic(self._unlock_topic, id=id(self))
 
     def is_locked(self):
         return self._locked

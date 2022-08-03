@@ -52,8 +52,9 @@ class OperatableState(PreemptableState):
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
-                Logger.localinfo("State result: %s > %s" % (self.name, outcome))
-                self._pub.publish(self._outcome_topic, UInt8(data=self.outcomes.index(outcome)))
+                outcome_index = self.outcomes.index(outcome)
+                Logger.localinfo("State result: %s > %s (%d)" % (self.name, outcome, outcome_index))
+                self._pub.publish(self._outcome_topic, UInt8(data=outcome_index))
                 self._pub.publish(self._debug_topic, String(data="%s > %s" % (self.path, outcome)))
                 if self._force_transition:
                     StateLogger.log('flexbe.operator', self, type='forced', forced=outcome,

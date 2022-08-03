@@ -36,31 +36,37 @@ class ProxyActionClient(object):
         @param wait_duration: Defines how long to wait for each client in the
             given set to become available (if it is not already available).
         """
-        for topic, msg_type in topics.items():
-            self.setupClient(topic, msg_type, wait_duration)
+        for topic, action_type in topics.items():
+            self.setupClient(topic, action_type, wait_duration)
 
-    def setupClient(self, topic, msg_type, wait_duration=10):
+    def setupClient(self, topic, action_type, wait_duration=10):
         """
         Tries to set up an action client for calling it later.
 
         @type topic: string
         @param topic: The topic of the action to call.
 
-        @type msg_type: msg type
-        @param msg_type: The type of messages of this action client.
+        @type action_type: action type
+        @param action_type: The type of Action for this action client.
 
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for the given client if it is not available right now.
         """
         if topic not in ProxyActionClient._clients:
-            ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, msg_type, topic)
+            ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
             self._check_topic_available(topic, wait_duration)
         else:
-            if not isinstance(msg_type, ProxyActionClient._clients[topic]._action_type):
-                if msg_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
-                    ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, msg_type, topic)
+            if action_type is not ProxyActionClient._clients[topic]._action_type:
+                if action_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
+                    Logger.localinfo(f'Existing action client for {topic} with same action type name, but different instance - recreate  client!')
+
+                    # destroy() causes a crash under Humble
+                    #ProxyActionClient._clients[topic].destroy()
+
+                    ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
+                    self._check_topic_available(topic, wait_duration)
                 else:
-                    raise TypeError("Trying to replace existing action client with different msg type")
+                    raise TypeError("Trying to replace existing action client with different action type")
 
 
     def send_goal(self, topic, goal):
@@ -82,10 +88,26 @@ class ProxyActionClient(object):
         ProxyActionClient._has_active_goal[topic] = True
         ProxyActionClient._current_goal[topic] = None
 
+        if not isinstance(goal, ProxyActionClient._clients[topic]._action_type.Goal):
+            if goal.__class__.__name__ == ProxyActionClient._clients[topic]._action_type.Goal.__name__:
+                # This is the case if the same class is imported multiple times
+                # To avoid rclpy TypeErrors, we will automatically convert to the base type
+                # used in the original service/publisher clients
+                new_goal = ProxyActionClient._clients[topic]._action_type.Goal()
+                Logger.localinfo(f"  converting goal {str(type(new_goal))} vs. {str(type(goal))}")
+                assert new_goal.__slots__ == goal.__slots__, f"Message attributes for {topic} do not match!"
+                for attr in goal.__slots__:
+                    setattr(new_goal, attr, getattr(goal, attr))
+            else:
+                raise TypeError(f"Invalid goal type {goal.__class__.__name__} (vs. {ProxyActionClient._clients[topic]._action_type.Goal.__name__}) for topic {topic}")
+        else:
+            # Same class definition instance as stored
+            new_goal = goal
+
         # send goal
         ProxyActionClient._clients[topic].wait_for_server()
         future = ProxyActionClient._clients[topic].send_goal_async(
-            goal,
+            new_goal,
             feedback_callback=lambda f: self._feedback_callback(topic, f)
         )
 
@@ -184,7 +206,7 @@ class ProxyActionClient(object):
         @type topic: string
         @param topic: The topic of interest.
         """
-        return ProxyActionClient._has_active_goal[topic]
+        return ProxyActionClient._has_active_goal.get(topic, False)
 
     def cancel(self, topic):
         """
@@ -194,8 +216,9 @@ class ProxyActionClient(object):
         @param topic: The topic of interest.
         """
 
-        if ProxyActionClient._current_goal[topic] is not None:
-            ProxyActionClient._current_goal[topic].result().cancel_goal()
+        current_goal = ProxyActionClient._current_goal.get(topic)
+        if current_goal is not None:
+            current_goal.result().cancel_goal()
 
         ProxyActionClient._cancel_current_goal[topic] = True
         ProxyActionClient._current_goal[topic] = None

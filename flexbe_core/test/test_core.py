@@ -15,10 +15,10 @@ from std_msgs.msg import Bool, Empty, UInt8, String
 from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
 
 
-class TestSubjectState(EventState):
+class SubjectStateTest(EventState):
 
     def __init__(self):
-        super(TestSubjectState, self).__init__(outcomes=['done', 'error'])
+        super(SubjectStateTest, self).__init__(outcomes=['done', 'error'])
         self.result = None
         self.last_events = []
         self.count = 0
@@ -71,9 +71,9 @@ class TestCore(unittest.TestCase):
     #     rclpy.shutdown(context=self.context)
 
     def _create(self):
-        TestSubjectState.initialize_ros(self.node)
+        SubjectStateTest.initialize_ros(self.node)
         OperatableStateMachine.initialize_ros(self.node)
-        state = TestSubjectState()
+        state = SubjectStateTest()
         state._enable_ros_control()
         with OperatableStateMachine(outcomes=['done', 'error']):
             OperatableStateMachine.add('subject', state,
@@ -120,7 +120,7 @@ class TestCore(unittest.TestCase):
         ProxySubscriberCached._initialize(self.node)
         state = self._create()
         fb_topic = 'flexbe/command_feedback'
-        sub = ProxySubscriberCached({fb_topic: CommandFeedback})
+        sub = ProxySubscriberCached({fb_topic: CommandFeedback}, id=id(self))
         time.sleep(0.2)
 
         # enter during first execute
@@ -170,7 +170,7 @@ class TestCore(unittest.TestCase):
         state = self._create()
         out_topic = 'flexbe/mirror/outcome'
         req_topic = 'flexbe/outcome_request'
-        sub = ProxySubscriberCached({out_topic: UInt8, req_topic: OutcomeRequest})
+        sub = ProxySubscriberCached({out_topic: UInt8, req_topic: OutcomeRequest}, id=id(self))
         #  wait for pub/sub
         end_time = time.time() + 1
         while time.time() < end_time:
@@ -215,7 +215,7 @@ class TestCore(unittest.TestCase):
         ProxySubscriberCached._initialize(self.node)
         state = self._create()
         fb_topic = 'flexbe/command_feedback'
-        sub = ProxySubscriberCached({fb_topic: CommandFeedback})
+        sub = ProxySubscriberCached({fb_topic: CommandFeedback}, id=id(self))
         #  wait for pub/sub
         end_time = time.time() + 1
         while time.time() < end_time:
@@ -245,7 +245,7 @@ class TestCore(unittest.TestCase):
         ProxySubscriberCached._initialize(self.node)
         state = self._create()
         fb_topic = 'flexbe/command_feedback'
-        sub = ProxySubscriberCached({fb_topic: CommandFeedback})
+        sub = ProxySubscriberCached({fb_topic: CommandFeedback}, id=id(self))
         time.sleep(0.2)
 
         # lock and unlock as commanded, return outcome after unlock
@@ -297,7 +297,7 @@ class TestCore(unittest.TestCase):
         ProxySubscriberCached._initialize(self.node)
         state = self._create()
         fb_topic = 'flexbe/command_feedback'
-        sub = ProxySubscriberCached({fb_topic: CommandFeedback})
+        sub = ProxySubscriberCached({fb_topic: CommandFeedback}, id=id(self))
         time.sleep(0.2)
 
         # return requested outcome
@@ -403,7 +403,7 @@ class TestCore(unittest.TestCase):
     # Problem with getting locked when sleeping
     # def test_concurrency_container(self):
     #     rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-    #     TestSubjectState.initialize_ros(self.node)
+    #     SubjectStateTest.initialize_ros(self.node)
     #     ConcurrencyContainer.initialize_ros(self.node)
     #     cc = ConcurrencyContainer(outcomes=['done', 'error'],
     #                               conditions=[
@@ -412,10 +412,10 @@ class TestCore(unittest.TestCase):
     #                                 ('done', [('main', 'done'), ('side', 'done')])
     #                               ])
     #     with cc:
-    #         OperatableStateMachine.add('main', TestSubjectState(),
+    #         OperatableStateMachine.add('main', SubjectStateTest(),
     #                                    transitions={'done': 'done', 'error': 'error'},
     #                                    autonomy={'done': 1, 'error': 2})
-    #         OperatableStateMachine.add('side', TestSubjectState(),
+    #         OperatableStateMachine.add('side', SubjectStateTest(),
     #                                    transitions={'done': 'done', 'error': 'error'},
     #                                    autonomy={'done': 1, 'error': 2})
     #     with OperatableStateMachine(outcomes=['done', 'error']):

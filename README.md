@@ -58,18 +58,11 @@ to assist in converting any custom FlexBE state implementations.
 
 ## Publications
 
-Please use the following publication for reference when using FlexBE:
+Please use the following publications for reference when using FlexBE:
 
-Philipp Schillinger, Stefan Kohlbrecher, and Oskar von Stryk, ["Human-Robot Collaborative High-Level Control with Application to Rescue Robotics"](http://dx.doi.org/10.1109/ICRA.2016.7487442), IEEE International Conference on Robotics and Automation (ICRA), Stockholm, Sweden, May 2016.
+- Philipp Schillinger, Stefan Kohlbrecher, and Oskar von Stryk, ["Human-Robot Collaborative High-Level Control with Application to Rescue Robotics"](http://dx.doi.org/10.1109/ICRA.2016.7487442), IEEE International Conference on Robotics and Automation (ICRA), Stockholm, Sweden, May 2016.
 
-    @INPROCEEDINGS{2016:ICRA_Schillinger-etal,
-        author = {Philipp Schillinger and Stefan Kohlbrecher and Oskar von Stryk},
-        title = {Human-Robot Collaborative High-Level Control with Application to Rescue Robotics},
-        year = {2016},
-        pages = {2796-2802},
-        booktitle = {Proc. IEEE Int. Conf. on Robotics and Automation (ICRA)},
-        doi={10.1109/ICRA.2016.7487442}}
-    }
+- Joshua Zutell, David C. Conner and Philipp Schillinger, ["ROS 2-Based Flexible Behavior Engine for Flexible Navigation ,"](http://dx.doi.org/10.1109/SoutheastCon48659.2022.9764047), IEEE SouthEastCon, April 2022.
 
 ### Further Publications
 

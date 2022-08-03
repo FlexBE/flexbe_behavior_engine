@@ -50,6 +50,18 @@ class ProxyPublisher(object):
         if topic not in ProxyPublisher._topics:
             qos = qos or QOS_DEFAULT
             ProxyPublisher._topics[topic] = ProxyPublisher._node.create_publisher(msg_type, topic, qos)
+        else:
+            if msg_type is not ProxyPublisher._topics[topic].msg_type:
+                # Change in required msg_type for topic name  - update publisher with new type
+                if msg_type.__name__ == ProxyPublisher._topics[topic].msg_type.__name__:
+                    # Same message type name, so likely due to reloading Python module on behavior change
+                    Logger.localinfo(f'Existing publisher for {topic} with same message type name, but different instance - re-create publisher!')
+                    # crashes Humble - ProxyPublisher._node.destroy_publisher(ProxyPublisher._topics[topic])
+                    qos = qos or QOS_DEFAULT
+                    ProxyPublisher._topics[topic] = ProxyPublisher._node.create_publisher(msg_type, topic, qos)
+                else:
+                    Logger.info(f'Mis-matched msg_types ({msg_type.__name__} vs. {ProxyPublisher._topics[topic].msg_type.__name__}) for {topic}  (possibly due to reload of behavior)!')
+                    raise TypeError("Trying to replace existing publisher with different msg type")
 
     def is_available(self, topic):
         """
@@ -74,10 +86,30 @@ class ProxyPublisher(object):
             Logger.warning('ProxyPublisher: topic %s not yet registered!' % topic)
             return
 
+        if not isinstance(msg, ProxyPublisher._topics[topic].msg_type):
+            # Change in required msg_type for topic name  - update publisher with new type
+            if msg.__class__.__name__ == ProxyPublisher._topics[topic].msg_type.__name__:
+            # This is the case if the same class is imported multiple times
+            # To avoid rclpy TypeErrors, we will automatically convert to the base type
+            # used in the original publisher
+                Logger.localinfo('Publish - converting datatype for %s!\n%s: %s/%s' % (topic, str(msg.__class__.__name__),str(id(msg.__class__)),str(id(ProxyPublisher._topics[topic].msg_type))))
+
+                new_msg = ProxyPublisher._topics[topic].msg_type()
+                assert new_msg.__slots__ == msg.__slots__, f"Message attributes for {topic} do not match!"
+                for attr in msg.__slots__:
+                    setattr(new_msg, attr, getattr(msg, attr))
+
+            else:
+                raise TypeError(f"Invalid request type {msg.__class__.__name__} (vs. {ProxyPublisher._topics[topic].msg_type.__name__}) for topic {topic}")
+        else:
+            # Same class definition instance as stored
+            new_msg = msg
+
         try:
-            ProxyPublisher._topics[topic].publish(msg)
+            ProxyPublisher._topics[topic].publish(new_msg)
         except Exception as e:
-            Logger.warning('Something went wrong when publishing to %s!\n%s' % (topic, str(e)))
+            Logger.warning('Something went wrong when publishing to %s!\n%s: %s' % (topic, str(type(e)), str(e)))
+
 
     def wait_for_any(self, topic, timeout=5.0):
         """
@@ -122,7 +154,7 @@ class ProxyPublisher(object):
         while (ProxyPublisher._node.get_clock().now() - starting_time).nanoseconds * 10 ** -9 < timeout:
             if pub.get_subscription_count() > 0:
                 return True
-                
+
             rate.sleep()
 
         return False

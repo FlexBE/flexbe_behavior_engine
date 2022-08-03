@@ -54,7 +54,7 @@ class SubscriberState(EventState):
 
     def _connect(self):
         try:
-            self._sub = ProxySubscriberCached({self._topic: self._msg_type})
+            self._sub = ProxySubscriberCached({self._topic: self._msg_type}, id=id(self))
             self._connected = True
             return True
         except Exception as e:

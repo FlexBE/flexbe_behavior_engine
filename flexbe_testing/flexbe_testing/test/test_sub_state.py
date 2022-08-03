@@ -12,7 +12,7 @@ class TestSubState(EventState):
 		super(TestSubState, self).__init__(outcomes=['received', 'unavailable'],
 										output_keys=['output_value'])
 		self._topic = topic
-		self._sub = ProxySubscriberCached({self._topic: String})
+		self._sub = ProxySubscriberCached({self._topic: String}, id=id(self))
 		self._msg_counter = 0
 		self._timeout = TestSubState._node.get_clock().now() + rclpy.duration.Duration(seconds=1.5)
 

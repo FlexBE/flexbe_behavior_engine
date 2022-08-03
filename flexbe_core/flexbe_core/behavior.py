@@ -166,6 +166,15 @@ class Behavior(object):
         self._state_machine.destroy()
         return result
 
+    def get_latest_status(self):
+        """
+        Returns the latest execution information as a BehaviorSync message
+        """
+        if self._state_machine:
+            return self._state_machine.get_latest_status()
+        else:
+            return BehaviorSync()
+
     def prepare_for_switch(self, state):
         """
         Prepares the behavior for being executed after a behavior switch.

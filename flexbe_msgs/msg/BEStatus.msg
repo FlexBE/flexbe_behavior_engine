@@ -13,6 +13,7 @@ uint8 ERROR = 11
 
 # Engine Status
 uint8 READY = 20
+uint8 RUNNING = 30
 
 builtin_interfaces/Time stamp
 int32 behavior_id

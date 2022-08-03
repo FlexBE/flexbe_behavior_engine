@@ -20,7 +20,7 @@ class MirrorState(EventState):
         self._outcome_topic = 'flexbe/mirror/outcome'
 
         self._pub = ProxyPublisher()
-        self._sub = ProxySubscriberCached({self._outcome_topic: UInt8})
+        self._sub = ProxySubscriberCached({self._outcome_topic: UInt8}, id=id(self))
 
     def execute(self, userdata):
         if self._sub.has_buffered(self._outcome_topic):

@@ -23,10 +23,9 @@ class TestOnboard(unittest.TestCase):
 
         ProxySubscriberCached._initialize(self.node)
 
-        self.sub = ProxySubscriberCached({
-            'flexbe/status': BEStatus,
-            'flexbe/log': BehaviorLog
-        })
+        self.sub = ProxySubscriberCached({'flexbe/status': BEStatus,
+                                          'flexbe/log': BehaviorLog
+                                         }, id=id(self))
         self.rate = self.node.create_rate(100, self.node.get_clock())
         # make sure that behaviors can be imported
         data_folder = os.path.dirname(os.path.realpath(__file__))

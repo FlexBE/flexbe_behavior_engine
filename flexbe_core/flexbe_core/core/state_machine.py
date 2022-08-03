@@ -66,14 +66,22 @@ class StateMachine(State):
         Logger.localinfo("StateMachine: Dummy wait method for %s", self.name)
 
 
+    def get_latest_state(self):
+        """
+        Returns the latest execution information as a BehaviorSync message
+        """
+        return self._behavior_sync
+
     # execution
 
     def spin(self, userdata=None):
         outcome = None
         while True:
             outcome = self.execute(userdata)
+
             if outcome is not None:
                 break
+
             self.sleep()
         return outcome
 
@@ -96,7 +104,11 @@ class StateMachine(State):
         with UserData(reference=self._userdata, remap=self._remappings[self._current_state.name],
                       input_keys=self._current_state.input_keys, output_keys=self._current_state.output_keys
                       ) as userdata:
+                      self._current_state._inner_sync_request = False # clear any prior downstream sync request
                       outcome = self._current_state.execute(userdata)
+
+        # Pass any sync request to parent
+        self._inner_sync_request = self._current_state._inner_sync_request
 
         if outcome is not None:
             try:
@@ -123,7 +135,10 @@ class StateMachine(State):
 
     @property
     def current_state_label(self):
-        return self.current_state.name
+        if self._current_state is not None:
+            return self._current_state.name
+        else:
+            raise "No state active!"
 
     @property
     def initial_state(self):

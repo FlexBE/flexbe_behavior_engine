@@ -20,6 +20,7 @@ class State(object):
         # properties of instances of a state machine
         self._name = None
         self._parent = None
+        self._inner_sync_request = False  # Any state can generate request, but should be rare
 
     def execute(self, userdata):
         pass

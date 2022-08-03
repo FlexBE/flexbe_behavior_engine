@@ -1,6 +1,14 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.1.0 (2022-08-02)
+* ROS 2 Humble release
+* Includes changes sync check handling
+* Label proxy subscribers by instance id and handle instance type changes
+* Update proxy action client handling
+* Tested under Ubuntu 22.04 and ROS Humble
+------------------
+
 2.0.0 (2022-02-22)
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
