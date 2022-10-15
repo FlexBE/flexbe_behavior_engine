@@ -33,6 +33,7 @@ class RosState(State):
         self._desired_period_ns = (1 / 10) * 1e9
 
         if "desired_rate" in kwargs:
+            Logger.localinfo(f'RosState: Set desired state update rate to {kwargs["desired_rate"]} Hz.')
             self._desired_period_ns = (1 / kwargs["desired_rate"]) * 1e9
 
         self._is_controlled = False

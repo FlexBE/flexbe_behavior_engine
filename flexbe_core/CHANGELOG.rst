@@ -1,6 +1,14 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.1.1 (2022-09-12)
+* ProxyServiceCaller changes
+  * fix issue #1
+  * wait_duration handling
+  * connect without service being available
+  * misc cleanup
+------------------
+
 2.1.0 (2022-08-02)
 * ROS 2 Humble release
 * Includes changes sync check handling
