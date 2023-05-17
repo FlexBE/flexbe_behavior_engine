@@ -23,7 +23,7 @@ class SubscriberState(EventState):
         super(SubscriberState, self).__init__(outcomes=['received', 'unavailable'],
                                               output_keys=['message'])
         self._topic = topic
-        self._msg_type = message_type
+        self._msg_type = msg_type
         self._blocking = blocking
         self._clear = clear
         self._connected = False
