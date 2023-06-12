@@ -21,16 +21,20 @@ set(msg_files
   "msg/SynthesisErrorCodes.msg"
   "msg/SynthesisRequest.msg"
   "msg/UICommand.msg"
+  "msg/UserdataInfo.msg"
 )
 set(action_files
   "action/BehaviorInput.action"
   "action/BehaviorExecution.action"
   "action/BehaviorSynthesis.action"
 )
-
+set(service_files
+  "srv/GetUserdata.srv"
+)
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${action_files}
+  ${service_files}
   ADD_LINTER_TESTS
 )
 

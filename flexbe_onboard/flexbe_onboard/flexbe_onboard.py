@@ -14,8 +14,10 @@ from ast import literal_eval as cast
 
 from flexbe_core import BehaviorLibrary, Logger
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
+from flexbe_core.core.state_machine import StateMachine
 
-from flexbe_msgs.msg import BehaviorSelection, BehaviorSync, BEStatus, CommandFeedback
+from flexbe_msgs.msg import BehaviorSelection, BehaviorSync, BEStatus, CommandFeedback, UserdataInfo
+from flexbe_msgs.srv import GetUserdata
 from std_msgs.msg import Empty
 
 
@@ -63,6 +65,8 @@ class FlexbeOnboard(Node):
         self._current_state_checksum = -1
         self._sub = ProxySubscriberCached()
         self._sub.subscribe('flexbe/start_behavior', BehaviorSelection, self._behavior_callback, id=id(self))
+
+        self._userdata_service = self.create_service(GetUserdata, 'get_user_data', self._userdata_callback)
 
         time.sleep(0.5)  # wait for publishers etc to really be set up
         self._execute_heartbeat() # Will also publish BEStatus ready until first behavior received
@@ -193,6 +197,39 @@ class FlexbeOnboard(Node):
             self._running = False
             self._switching = False
             self.be = None
+
+    def _userdata_callback(self, request, response):
+        userdata = []
+        if self.be and self.be._state_machine:
+            # get userdata from top-level behavior
+            if self.be._state_machine._userdata:
+                for key, data in self.be._state_machine._userdata._data.items():
+                    # add userdata if it fits to the requested key (get all userdata for empty string)
+                    if (request.userdata_key == '' or request.userdata_key == key):
+                        userdata.append(UserdataInfo(state=self.be._state_machine._name,
+                                                     key=str(key),
+                                                     type=type(data).__name__,
+                                                     data=str(data)))
+            # get userdata from sub-behaviors
+            userdata = self._get_userdata_from_whole_sm(self.be._state_machine, userdata,
+                                                        request.userdata_key, str(self.be._state_machine._name) + '/')
+
+            if (len(userdata) > 0):
+                # also print in terminal (better readability for complex message types)
+                self.get_logger().info('GetUserdata Service: Found {} occurrences of key="{}" from be="{}"'.format(len(userdata), request.userdata_key, self.be._state_machine._name))
+                for ud in userdata:
+                    self.get_logger().info('\tuser data key={}:\n{}\n{}'.format(ud.key, ud.data, 10*"-"))
+                self.get_logger().info('{} End get user data {}'.format(10*"=", 10*"="))
+                response.success = True
+            else:
+                response.success = False
+            response.message = 'Found {} occurrences of "{}" from be="{}"'.format(len(userdata), request.userdata_key, self.be._state_machine._name)
+            response.userdata = userdata
+        else:
+            response.success = False
+            response.message = 'no state_machine running'
+        return response
+
 
     # ==================================== #
     # Preparation of new behavior requests #
@@ -408,6 +445,22 @@ class FlexbeOnboard(Node):
             return self._attr_dict((k, self._convert_dict(v)) for k, v in list(o.items()))
         else:
             return o
+
+    def _get_userdata_from_whole_sm(self, state_machine, userdata, userdata_key, path):
+        # iterate recursively through all sub-behaviors
+        for subbehavior in state_machine._states:
+            # check if userdata available
+            if isinstance(subbehavior, StateMachine):
+                if subbehavior._userdata:
+                    for key, data in subbehavior._userdata._data.items():
+                        # add userdata if fits to the requested key (get all userdata for empty string)
+                        if (userdata_key == '' or userdata_key == key):
+                            userdata.append(UserdataInfo(state=path + subbehavior.name + '/',
+                                                         key=str(key),
+                                                         type=type(data).__name__,
+                                                         data=str(data)))
+                self._get_userdata_from_whole_sm(subbehavior, userdata, userdata_key, path + subbehavior.name + '/')
+        return userdata
 
     class _attr_dict(dict):
         __getattr__ = dict.__getitem__
