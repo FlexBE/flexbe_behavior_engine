@@ -113,7 +113,7 @@ class TestCore(unittest.TestCase):
                 sub.remove_last_msg(topic)
                 raise AssertionError('Should not receive message on topic %s, but got:\n%s'
                                      % (topic, str(received)))
-
+        self.node.destroy_rate(rate)
     # Test Cases
     def test_event_state(self):
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)

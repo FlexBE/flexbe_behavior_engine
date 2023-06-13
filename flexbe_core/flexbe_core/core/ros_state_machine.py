@@ -29,13 +29,16 @@ class RosStateMachine(StateMachine):
 
     def wait(self, seconds=None, condition=None):
         if seconds is not None and seconds > 0:
-            RosStateMachine._node.create_rate(1 / seconds, RosStateMachine._node.get_clock()).sleep()
+            rate = RosStateMachine._node.create_rate(1 / seconds, RosStateMachine._node.get_clock())
+            rate.sleep()
+            RosStateMachine._node.destroy_rate(rate)
         if condition is not None:
             rate = RosStateMachine._node.create_rate(100, RosStateMachine._node.get_clock())
             while rclpy.ok():
                 if condition():
                     break
                 rate.sleep()
+            RosStateMachine._node.destroy_rate(rate)
 
     def _enable_ros_control(self):
         self._is_controlled = True

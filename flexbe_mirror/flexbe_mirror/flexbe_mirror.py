@@ -65,7 +65,7 @@ class FlexbeMirror(Node):
         rate = self.create_rate(10, self.get_clock())
         while self._stopping:
             rate.sleep()
-
+        self.destroy_rate(rate)
         if self._running:
             Logger.logwarn('Received a new mirror structure while mirror is already running, '
                            'adding to buffer (checksum: %s).' % str(msg.behavior_id))
@@ -105,7 +105,7 @@ class FlexbeMirror(Node):
             rate = self.create_rate(10, self.get_clock())
             while self._stopping:
                 rate.sleep()
-
+            self.destroy_rate(rate)
             if self._running:
                 Logger.logwarn('Tried to start mirror while it is already running, will ignore.')
                 return
@@ -157,6 +157,7 @@ class FlexbeMirror(Node):
                 rate = self.create_rate(10, self.get_clock())
                 while self._running:
                     rate.sleep()
+                self.destroy_rate(rate)
             else:
                 Logger.loginfo('No onboard behavior is active.')
 
@@ -240,6 +241,7 @@ class FlexbeMirror(Node):
                 rate = self.create_rate(100, self.get_clock())
                 while self._running:
                     rate.sleep()
+                self.destroy_rate(rate)
                 self._sm = None
             if msg.current_state_checksum in self._state_checksums:
                 current_state_path = self._state_checksums[msg.current_state_checksum]
