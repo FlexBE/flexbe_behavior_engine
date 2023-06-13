@@ -123,6 +123,7 @@ class FlexbeOnboard(Node):
                     if active_state is not None or not self._running:
                         break
                     rate.sleep()
+                self.destroy_rate(rate)
 
                 # extract the active state if any
                 if active_state is not None:

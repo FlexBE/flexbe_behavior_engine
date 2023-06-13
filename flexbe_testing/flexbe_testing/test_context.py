@@ -111,6 +111,7 @@ class LaunchContext(TestContext):
                 is_running = eval(self._wait_cond)
                 check_running_rate.sleep()
             Logger.print_positive('waiting condition satisfied')
+            self._node.destroy_rate(check_running_rate)
         except Exception as e:
             self._valid = False
             Logger.print_negative('unable to check waiting condition:\n\t%s' % str(e))
@@ -126,6 +127,7 @@ class LaunchContext(TestContext):
         self._node.get_logger().info("Waiting for all launched nodes to exit")
         while not all(name in self._exit_codes for name in self._launched_proc_names):
             check_exited_rate.sleep()
+        self._node.destroy_rate(check_exited_rate)
 
     def __exit__(self, exception_type, exception_value, traceback):
         self._launchrunner.stop()

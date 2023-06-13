@@ -37,6 +37,7 @@ class TestOnboard(unittest.TestCase):
 
     @classmethod
     def tearDown(self):
+        self.node.destroy_rate(self.rate)
         self.node.destroy_node()
         self.executor.shutdown()
         rclpy.shutdown(context=self.context)
