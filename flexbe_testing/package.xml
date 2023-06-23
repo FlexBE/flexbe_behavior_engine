@@ -9,7 +9,8 @@
         flexbe_testing provides a framework for unit testing states.
     </description>
     <author>Philipp Schillinger</author>
-    <maintainer email="schillin@kth.se">Philipp Schillinger</maintainer>
+    <maintainer email="philsplus@gmail.com">Philipp Schillinger</maintainer>
+    <maintainer email="robotics@cnu.edu">David Conner</maintainer>
 
     <license>BSD</license>
     <url type="website">http://ros.org/wiki/flexbe_core</url>
@@ -26,6 +27,7 @@
     <test_depend>ament_pep257</test_depend>
     <test_depend>python3-pytest</test_depend>
     <test_depend>std_msgs</test_depend>
+    <test_depend>ament_cmake_pytest</test_depend>
 
     <buildtool_depend>ament_cmake</buildtool_depend>
     <buildtool_depend>ament_cmake_python</buildtool_depend>

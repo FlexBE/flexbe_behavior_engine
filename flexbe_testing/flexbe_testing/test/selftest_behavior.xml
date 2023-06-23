@@ -2,26 +2,26 @@
 
 <behavior name="Selftest Behavior">
 
-	<executable package_path="flexbe_test_flexbe_behaviors.selftest_behavior_sm" class="SelftestBehaviorSM" />
-	<tagstring>test</tagstring>
-	<author>Philipp Schillinger</author>
-	<date>Fri Apr 17 2020</date>
-	<description>
-		Simple behavior for the flexbe_testing self-test of behaviors.
-	</description>
+    <executable package_path="flexbe_test_flexbe_behaviors.selftest_behavior_sm" class="SelftestBehaviorSM" />
+    <tagstring>test</tagstring>
+    <author>Philipp Schillinger</author>
+    <date>Fri Apr 17 2020</date>
+    <description>
+        Simple behavior for the flexbe_testing self-test of behaviors.
+    </description>
 
 
-	<!-- Contained Behaviors -->
+    <!-- Contained Behaviors -->
 
-	<!-- Available Parameters -->
-	<params>
+    <!-- Available Parameters -->
+    <params>
 
-		<param type="enum" name="value" default="wrong" label="value" hint="Sets the value">
-			<option value="wrong" />
-			<option value="correct" />
-		</param>
+        <param type="enum" name="value" default="wrong" label="value" hint="Sets the value">
+            <option value="wrong" />
+            <option value="correct" />
+        </param>
 
-	</params>
+    </params>
 
 
 </behavior>
