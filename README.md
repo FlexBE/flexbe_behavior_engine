@@ -1,11 +1,12 @@
 # FlexBE Behavior Engine
 
 FlexBE is a high-level behavior engine coordinating the capabilities of a robot in order to solve complex tasks.
-Behaviors are modeled as hierarchical state machines where states correspond to active actions and transitions describe the reaction to outcomes.
+Behaviors are modeled as hierarchical state machines (HFSM) where states correspond to active actions 
+and transitions describe the reaction to outcomes.
 Main advantage over similar approaches is the good operator integration and an
 intuitive user interface.
 Besides executing behaviors in full autonomy, the operator can restrict execution of certain transitions or trigger them manually.
-Furthermore, it is even supported to modify the whole structure of a behavior during its execution without restarting it.
+Furthermore, FlexBE supports modifying the whole structure of a behavior during its execution without restarting it.
 The user interface features a runtime control interface as well as a graphical editor for state machines.
 
 Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)) for further information, tutorials, application examples, and much more.
@@ -14,10 +15,12 @@ Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)
 
 ## Installation
 
-Execute the following commands to install FlexBE for ROS 2 systems:
+For released versions, FlexBE is available as ` apt install` package `ros-<DISTRO>-flexbe-*`
+
+To build from source, execute the following commands to install FlexBE for ROS 2 systems:
 
     cd "ros2_ws"/src
-    git clone https://github.com/team-vigir/flexbe_behavior_engine.git
+    git clone https://github.com/FlexBE/flexbe_behavior_engine.git
 
 Next, navigate to the "ros2_ws" top-level directory and build FlexBE:
 
@@ -27,7 +30,7 @@ Furthermore, create your own repository for behavior development (contains examp
 
     ros2 run flexbe_widget create_repo [your_project_name]
 
-Finally, it is recommended to install the FlexBE App user interface by following [these steps](http://philserver.bplaced.net/fbe/download.php).
+Finally, it is recommended to install the FlexBE App user interface by following [these steps](https://github.com/FlexBE/flexbe_app.git).
 
 ## Usage
 
@@ -43,8 +46,8 @@ Use the following launch file to run both of the above, e.g., for testing on a s
 
     ros2 launch flexbe_app flexbe_full.launch.py
 
-For running test use:
-python -m unittest src/flexbe_behavior_engine/<flexbe_dir>/test/<test.py>
+For running tests use:
+`colcon test --ctest-args --packages-select <flexbe_package>`
 
 ## Next Steps
 
@@ -77,6 +80,7 @@ Let us know if you know a paper which should be added to the list.
 
 - David C. Conner and Justin Willis, ["Flexible Navigation: Finite state machine-based integrated navigation and control for ROS enabled robots,"](http://dx.doi.org/10.1109/SECON.2017.7925266) SoutheastCon 2017.
 
-## Maintainer
+## Maintainers
 
 - Philipp Schillinger ([@pschillinger](https://github.com/pschillinger), [Contact](http://philserver.bplaced.net/fbe/contact.php))
+- David Conner ([@dcconner](https://github.com/dcconner))
