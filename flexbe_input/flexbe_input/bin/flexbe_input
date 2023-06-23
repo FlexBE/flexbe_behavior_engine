@@ -8,11 +8,11 @@ fi
 # flake8: noqa
 import rclpy
 
-from flexbe_input.flexbe_input import BehaviorInput
+from flexbe_input.flexbe_input import FlexBEInput
 
 def main():
   node = rclpy.create_node('flexbe_input')
-  be_input = BehaviorInput(node)
+  be_input = FlexBEInput(node)
 
   # Wait for ctrl-c to stop the application
   rclpy.spin()

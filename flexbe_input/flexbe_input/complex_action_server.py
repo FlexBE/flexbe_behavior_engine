@@ -25,13 +25,14 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-#
+
+
 # Author: Brian Wright.
 # Based on C++ simple_action_server.h by Eitan Marder-Eppstein
 
 import rclpy
-from rclpy.action import ActionServer, ServerGoalHandle
-from rclpy.node import Node
+from rclpy.action import ActionServer
+from rclpy.duration import Duration
 
 import threading
 import traceback
@@ -39,198 +40,194 @@ from flexbe_core import Logger
 
 import six
 
+
 def nop_cb(goal_handle):
     pass
 
 
-## @class ComplexActionServer
-## @brief The ComplexActionServer
-## Operate with concurrent goals in a multi-threaded fashion
-class ComplexActionServer(object):
-    ## @brief Constructor for a ComplexActionServer
-    ## @param name A name for the action server
-    ## @param execute_cb Optional callback that gets called in a separate thread whenever
-    ## a new goal is received, allowing users to have blocking callbacks.
-    ## Adding an execute callback also deactivates the goalCallback.
-    ## @param  auto_start A boolean value that tells the ActionServer wheteher or not to start publishing as soon as it comes up. THIS SHOULD ALWAYS BE SET TO FALSE TO AVOID RACE CONDITIONS and start() should be called after construction of the server.
-    def __init__(self, node, name, ActionSpec, execute_cb = None, auto_start = True):
+# @class ComplexActionServer
+# @brief The ComplexActionServer
+# Operate with concurrent goals in a multi-threaded fashion
+
+
+class ComplexActionServer:
+    # @brief Constructor for a ComplexActionServer
+    # @param name A name for the action server
+    # @param execute_cb Optional callback that gets called in a separate thread whenever
+    # a new goal is received, allowing users to have blocking callbacks.
+    # Adding an execute callback also deactivates the goalCallback.
+    # @param  auto_start A boolean value that tells the ActionServer wheteher or not
+    #                    to start publishing as soon as it comes up.
+    #                    THIS SHOULD ALWAYS BE SET TO FALSE TO AVOID RACE CONDITIONS and
+    #                    start() should be called after construction of the server.
+    def __init__(self, node, name, ActionSpec, execute_cb=None, auto_start=False):
         self.node = node
-        self.goals_received_ = 0;
+        self.goals_received_ = 0
         self.goal_queue_ = six.moves.queue.Queue()
 
         self.new_goal = False
 
-        self.execute_callback = execute_cb;
-        self.goal_callback = None;
+        self.execute_callback = execute_cb
+        self.goal_callback = None
 
         self.need_to_terminate = False
-        self.terminate_mutex = threading.RLock();
+        self.terminate_mutex = threading.RLock()
 
         # since the internal_goal/preempt_callbacks are invoked from the
         # ActionServer while holding the self.action_server.lock
         # self.lock must always be locked after the action server lock
         # to avoid an inconsistent lock acquisition order
-        self.lock = threading.RLock();
+        self.lock = threading.RLock()
 
-        self.execute_condition = threading.Condition(self.lock);
+        self.execute_condition = threading.Condition(self.lock)
 
-        self.current_goal = None;
-        self.next_goal = None;
+        self.current_goal = None
+        self.next_goal = None
 
         if self.execute_callback:
-            self.execute_thread = threading.Thread(None, self.executeLoop);
-            self.execute_thread.start();
+            self.execute_thread = threading.Thread(None, self.executeLoop)
+            self.execute_thread.start()
         else:
             self.execute_thread = None
 
-
-        #create the action server
-        self.action_server = ActionServer(node, ActionSpec, name, goal_callback=self.internal_goal_callback,
-                                          cancel_callback=self.internal_preempt_callback);
-
+        # create the action server
+        self.action_server = ActionServer(node,
+                                          action_type=ActionSpec,
+                                          action_name=name,
+                                          execute_callback=None,
+                                          goal_callback=self.internal_goal_callback,
+                                          cancel_callback=self.internal_preempt_callback)
 
     def __del__(self):
         if hasattr(self, 'execute_callback') and self.execute_callback:
             with self.terminate_mutex:
-                self.need_to_terminate = True;
+                self.need_to_terminate = True
 
-            assert(self.execute_thread);
-            self.execute_thread.join();
+            assert(self.execute_thread)
+            self.execute_thread.join()
 
-
-    ## @brief Accepts a new goal when one is available The status of this
-    ## goal is set to active upon acceptance,
+    # @brief Accepts a new goal when one is available The status of this
+    # goal is set to active upon acceptance,
     def accept_new_goal(self):
         # with self.action_server.lock, self.lock:
 
         Logger.logdebug("Accepting a new goal")
 
-        self.goals_received_ -= 1;
+        self.goals_received_ -= 1
 
-		# get from queue
+        # get from queue
         current_goal = self.goal_queue_.get()
 
         # set the status of the current goal to be active
         # current_goal.set_accepted("This goal has been accepted by the simple action server");
         current_goal.succeed()
 
-        return current_goal;
+        return current_goal
 
-
-    ## @brief Allows  polling implementations to query about the availability of a new goal
-    ## @return True if a new goal is available, false otherwise
+    # @brief Allows  polling implementations to query about the availability of a new goal
+    # @return True if a new goal is available, false otherwise
     def is_new_goal_available(self):
         return self.goals_received_ > 0
 
-
-    ## @brief Allows  polling implementations to query about the status of the current goal
-    ## @return True if a goal is active, false otherwise
+    # @brief Allows  polling implementations to query about the status of the current goal
+    # @return True if a goal is active, false otherwise
     def is_active(self):
-       if self.current_goal and not self.current_goal.get_goal():
-           return False;
+        if self.current_goal and not self.current_goal.get_goal():
+            return False
 
-       return self.current_goal.is_active
+        return self.current_goal.is_active
 
-
-    ## @brief Sets the status of the active goal to succeeded
-    ## @param  result An optional result to send back to any clients of the goal
-    def set_succeeded(self,result=None, text="", goal_handle=None):
-      goal_handle.succeed()
-      if not result:
-          result=self.get_default_result();
-
-      return result
-
-    ## @brief Sets the status of the active goal to aborted
-    ## @param  result An optional result to send back to any clients of the goal
-    def set_aborted(self, result = None, text="" , goal_handle=None):
-        goal_handle.abort()
+    # @brief Sets the status of the active goal to succeeded
+    # @param  result An optional result to send back to any clients of the goal
+    def set_succeeded(self, result=None, text="", goal_handle=None):
+        goal_handle.succeed()
         if not result:
-            result=self.get_default_result();
+            result = self.get_default_result()
 
         return result
 
+    # @brief Sets the status of the active goal to aborted
+    # @param  result An optional result to send back to any clients of the goal
+    def set_aborted(self, result=None, text="", goal_handle=None):
+        goal_handle.abort()
+        if not result:
+            result = self.get_default_result()
 
+        return result
 
-    ## @brief Publishes feedback for a given goal
-    ## @param  feedback Shared pointer to the feedback to publish
-    def publish_feedback(self,feedback):
-        self.current_goal.publish_feedback(feedback);
-
+    # @brief Publishes feedback for a given goal
+    # @param  feedback Shared pointer to the feedback to publish
+    def publish_feedback(self, feedback):
+        self.current_goal.publish_feedback(feedback)
 
     def get_default_result(self):
         return self.action_server.action_type
 
-
-    ## @brief Allows users to register a callback to be invoked when a new goal is available
-    ## @param cb The callback to be invoked
-    def register_goal_callback(self,cb):
+    # @brief Allows users to register a callback to be invoked when a new goal is available
+    # @param cb The callback to be invoked
+    def register_goal_callback(self, cb):
         if self.execute_callback:
-            Logger.logwarn("Cannot call ComplexActionServer.register_goal_callback() because an executeCallback exists. Not going to register it.")
+            Logger.logwarn("Cannot call ComplexActionServer.register_goal_callback() "
+                           "because an executeCallback exists. Not going to register it.")
         else:
-            self.goal_callback = cb;
+            self.goal_callback = cb
 
-
-    ## @brief Callback for when the ActionServer receives a new goal and passes it on
+    # @brief Callback for when the ActionServer receives a new goal and passes it on
     def internal_goal_callback(self, goal):
-          self.execute_condition.acquire();
+        self.execute_condition.acquire()
 
-          try:
-              Logger.logdebug("A new goal %shas been recieved by the single goal action server",goal.goal_id)
+        try:
+            Logger.localinfo(f"A new goal {goal.goal_id} has been recieved by the single goal action server")
 
-              print("got a goal")
-              self.next_goal = goal;
-              self.new_goal = True;
-              self.goals_received_ += 1
+            self.next_goal = goal
+            self.new_goal = True
+            self.goals_received_ += 1
 
-              #add goal to queue
-              self.goal_queue_.put(goal)
+            # add goal to queue
+            self.goal_queue_.put(goal)
 
-              #Trigger runLoop to call execute()
-              self.execute_condition.notify();
-              self.execute_condition.release();
+            # Trigger runLoop to call execute()
+            self.execute_condition.notify()
+            self.execute_condition.release()
 
-          except Exception as e:
-              Logger.logerr("ComplexActionServer.internal_goal_callback - exception %s",str(e))
-              self.execute_condition.release();
+        except Exception as e:
+            Logger.logerr("ComplexActionServer.internal_goal_callback - exception %s", str(e))
+            self.execute_condition.release()
 
+    # @brief Callback for when the ActionServer receives a new preempt and passes it on
+    def internal_preempt_callback(self, preempt):
+        return
 
-    ## @brief Callback for when the ActionServer receives a new preempt and passes it on
-    def internal_preempt_callback(self,preempt):
-    	return
-
-    ## @brief Called from a separate thread to call blocking execute calls
+    # @brief Called from a separate thread to call blocking execute calls
     def executeLoop(self):
-          loop_duration = rclpy.Duration.from_sec(0.1)
+        loop_duration = Duration(seconds=0.1)
 
-          while (rclpy.ok()):
-              Logger.logdebug("SAS: execute")
+        while (rclpy.ok()):
+            Logger.logdebug("SAS: execute")
 
-              with self.terminate_mutex:
-                  if (self.need_to_terminate):
-                      break;
+            with self.terminate_mutex:
+                if (self.need_to_terminate):
+                    break
 
-              if (self.is_new_goal_available()):
-                  goal_handle = self.accept_new_goal();
-                  if not self.execute_callback:
-                      Logger.logerr("execute_callback_ must exist. This is a bug in ComplexActionServer")
-                      return
+            if (self.is_new_goal_available()):
+                goal_handle = self.accept_new_goal()
+                if not self.execute_callback:
+                    Logger.logerr("execute_callback_ must exist. This is a bug in ComplexActionServer")
+                    return
 
-                  try:
+                try:
 
-                      print("run new executecb")
-                      thread = threading.Thread(target=self.run_goal,args=(goal_handle.get_goal(),goal_handle));
-                      thread.start()
+                    print("run new executecb")
+                    thread = threading.Thread(target=self.run_goal, args=(goal_handle.get_goal(), goal_handle))
+                    thread.start()
 
-                  except Exception as ex:
-                      Logger.logerr("Exception in your execute callback: %s\n%s", str(ex),
-                                   traceback.format_exc())
-                      self.set_aborted(None, "Exception in execute callback: %s" % str(ex))
+                except Exception as ex:
+                    Logger.logerr(f"Exception in your execute callback: {str(ex)}\n",
+                                  f"{traceback.format_exc().replace('%', '%%')}")
+                    self.set_aborted(None, f"Exception in execute callback: {str(ex)}")
 
-              with self.execute_condition:
-                  self.execute_condition.wait(loop_duration.to_sec());
+            with self.execute_condition:
+                self.execute_condition.wait(loop_duration.nanoseconds * 1.e-9)
 
-
-    def run_goal(self,goal, goal_handle):
-       print('new thread')
-       self.execute_callback(goal,goal_handle);
+    def run_goal(self, goal, goal_handle):
+        self.execute_callback(goal, goal_handle)

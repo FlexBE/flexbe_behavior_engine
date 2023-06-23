@@ -1,28 +1,28 @@
+"""Setup for flexbe_input package."""
 from setuptools import setup
 from setuptools import find_packages
 
-package_name = 'flexbe_input'
+PACKAGE_NAME = 'flexbe_input'
 
 setup(
-    name=package_name,
+    name=PACKAGE_NAME,
     version='2.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
-        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
+        ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
+        ('share/' + PACKAGE_NAME, ['package.xml']),
+        # No tests yet ('share/' + PACKAGE_NAME + "/tests", glob('tests/*.test')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='phil',
     maintainer_email='philsplus@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='flexbe_input enables to send data to onboard behavior when required.',
+    license='BSD',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'complex_action_server = flexbe_input.complex_action_server',
-            'flexbe_input = flexbe_input.flexbe_input',
-            'behavior_input = flexbe_input.bin.behavior_input:main'
-        ],
+            'flexbe_input = flexbe_input.bin.flexbe_input:main'
+        ]
     },
 )
