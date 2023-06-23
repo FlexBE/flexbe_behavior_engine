@@ -6,7 +6,7 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 
-INSTALL(PROGRAMS
+install(PROGRAMS
     bin/be_action_server
     bin/be_compress
     bin/be_launcher
@@ -16,7 +16,7 @@ INSTALL(PROGRAMS
     DESTINATION lib/${PROJECT_NAME}
 )
 
-INSTALL(DIRECTORY
+install(DIRECTORY
     launch
     DESTINATION share/${PROJECT_NAME}
 )
