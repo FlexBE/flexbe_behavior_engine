@@ -1,20 +1,55 @@
 #!/usr/bin/env python
-import os
-import time
-import yaml
-import pickle
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""Logger for active state information."""
+
+from functools import wraps, partial
+
 import logging
 import logging.config
-from functools import wraps, partial
-from flexbe_core.proxy import ProxyPublisher
-from std_msgs.msg import String
+import os
+import pickle
+import time
+import yaml
+
 from rclpy.exceptions import ParameterNotDeclaredException
 
+from std_msgs.msg import String
 
-class StateLogger(object):
-    '''
-    Realizes logging of active states.
-    '''
+from flexbe_core.proxy import ProxyPublisher
+
+
+class StateLogger:
+    """Realize logging of active states."""
+
     enabled = False
     _serialize_impl = 'yaml'
     _node = None
@@ -31,27 +66,27 @@ class StateLogger(object):
         StateLogger._node = node
         try:
             StateLogger._log_folder = node.get_parameter('log_folder')
-        except ParameterNotDeclaredException as e:
+        except ParameterNotDeclaredException:
             StateLogger._log_folder = node.declare_parameter('log_folder', '~/.flexbe_logs')
 
         try:
             StateLogger._log_enabled = node.get_parameter('log_enabled')
-        except ParameterNotDeclaredException as e:
+        except ParameterNotDeclaredException:
             StateLogger._log_enabled = node.declare_parameter('log_enabled', False)
 
         try:
             StateLogger._log_serialize = node.get_parameter('log_serialize')
-        except ParameterNotDeclaredException as e:
+        except ParameterNotDeclaredException:
             StateLogger._log_serialize = node.declare_parameter('log_serialize', 'yaml')
 
         try:
             StateLogger._log_level = node.get_parameter('log_level')
-        except ParameterNotDeclaredException as e:
+        except ParameterNotDeclaredException:
             StateLogger._log_level = node.declare_parameter('log_level', 'INFO')
 
         try:
             StateLogger._log_config = node.get_parameter('log_config')
-        except ParameterNotDeclaredException as e:
+        except ParameterNotDeclaredException:
             StateLogger._log_config = node.declare_parameter('log_config', '')
 
     @staticmethod
@@ -90,8 +125,8 @@ class StateLogger(object):
             },
             'loggers': {'flexbe': {'level': 'INFO', 'handlers': ['file']}}
         }, **yaml.safe_load(StateLogger._log_config.get_parameter_value().string_value))
-        if ('handlers' in logger_config and 'file' in logger_config['handlers'] and
-                'filename' in logger_config['handlers']['file']):
+        if ('handlers' in logger_config and 'file' in logger_config['handlers']
+                and 'filename' in logger_config['handlers']['file']):
             logger_config['handlers']['file']['filename'] %= {
                 'log_folder': log_folder,
                 'behavior': name,
@@ -111,12 +146,12 @@ class StateLogger(object):
 
     @staticmethod
     def get(name):
-        """ Obtain a reference to the named logger. """
+        """Obtain a reference to the named logger."""
         return logging.getLogger(name)
 
     @staticmethod
     def log(name, state, **kwargs):
-        """ Log custom data as given by the keyword arguments. """
+        """Log custom data as given by the keyword arguments."""
         if StateLogger.enabled:
             StateLogger.get(name).log(kwargs.get('loglevel', logging.INFO), dict(StateLogger._basic(state), **kwargs))
 
@@ -124,9 +159,10 @@ class StateLogger(object):
 
     @staticmethod
     def log_events(name, **events):
-        """ Log whenever any of the specified events of the state is activated. """
+        """Log whenever any of the specified events of the state is activated."""
         def decorator(cls):
             cls_init = cls.__init__
+
             @wraps(cls.__init__)
             def log_events_init(self, *args, **kwargs):
                 cls_init(self, *args, **kwargs)
@@ -134,6 +170,7 @@ class StateLogger(object):
                     def wrap_event_method(event, method):
                         if hasattr(self, method):
                             event_method = getattr(self, method)
+
                             @wraps(event_method)
                             def event_wrapper(*args, **kwargs):
                                 time_start = StateLogger._node.get_clock().now().nanoseconds
@@ -154,13 +191,15 @@ class StateLogger(object):
 
     @staticmethod
     def log_outcomes(name):
-        """ Log all outcomes of the state. """
+        """Log all outcomes of the state."""
         def decorator(cls):
             cls_init = cls.__init__
+
             @wraps(cls.__init__)
             def log_outcomes_init(self, *args, **kwargs):
                 cls_init(self, *args, **kwargs)
                 execute_method = getattr(self, 'execute')
+
                 @wraps(execute_method)
                 def execute_wrapper(*args, **kwargs):
                     outcome = None
@@ -179,28 +218,31 @@ class StateLogger(object):
 
     @staticmethod
     def log_userdata(name, keys=None):
-        """ Log all userdata that is passed to the state. """
+        """Log all userdata that is passed to the state."""
         def decorator(cls):
             cls_init = cls.__init__
+
             @wraps(cls.__init__)
             def log_userdata_init(self, *args, **kwargs):
                 cls_init(self, *args, **kwargs)
                 input_keys = kwargs.get('input_keys', [])
                 on_enter_method = getattr(self, 'on_enter')
+
                 @wraps(on_enter_method)
                 def on_enter_wrapper(userdata):
                     logger = StateLogger.get(name)
                     if StateLogger.enabled and logger.isEnabledFor(logging.DEBUG) and input_keys:
-                        logdata = dict(StateLogger._basic(self), userdata=dict())
+                        logdata = dict(StateLogger._basic(self))
+                        logdata['userdata'] = {}
                         for key in input_keys:
                             if keys is not None and key not in keys:
                                 continue
                             try:
                                 logdata['userdata'][key] = StateLogger._serialize(userdata[key])
-                            except Exception as e:
-                                from flexbe_core import Logger
+                            except Exception as exc:  # pylint: disable=W0703
+                                from flexbe_core import Logger  # pylint: disable=C0415
                                 Logger.warning('State %s failed to log userdata for key %s: %s' %
-                                               (self.name, key, str(e)))
+                                               (self.name, key, str(exc)))
                         logger.debug(logdata)
                     on_enter_method(userdata)
                 setattr(self, 'on_enter', on_enter_wrapper)
@@ -217,7 +259,8 @@ class StateLogger(object):
             'str': str,
             'repr': repr,
             'pickle': pickle.dumps,
-        }.get(StateLogger._serialize_impl, lambda o: eval(StateLogger._serialize_impl, locals={'object': o}))(obj)
+        }.get(StateLogger._serialize_impl, lambda o: eval(StateLogger._serialize_impl,  # pylint: disable=W0123
+                                                          locals={'object': o}))(obj)
 
     @staticmethod
     def _basic(state):
@@ -232,19 +275,21 @@ class StateLogger(object):
 
 
 class YamlFormatter(logging.Formatter):
+    """Special yaml formatting class."""
 
     def format(self, record):
         record.msg.update(logger=record.name, loglevel=record.levelname)
-        return '- %s' % super(YamlFormatter, self).format(record)
+        return '- %s' % super().format(record)
 
 
 class PublishBehaviorLogMessage(logging.Handler):
+    """publish messages to behavior logs."""
 
     def __init__(self, level=logging.NOTSET, topic='flexbe/state_logger'):
-        super(PublishBehaviorLogMessage, self).__init__(level)
+        super().__init__(level)
         self._topic = topic
         self._pub = ProxyPublisher({self._topic: String})
 
     def emit(self, record):
         message = self.format(record)
-        self._pub.publish(self._topic, String(message))
+        self._pub.publish(self._topic, String(data=message))

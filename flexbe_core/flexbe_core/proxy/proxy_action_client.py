@@ -1,16 +1,44 @@
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""A proxy for calling actions provides a single point for all state action interfaces."""
 from functools import partial
-from rclpy.duration import Duration
-from rclpy.action import ActionClient
 from threading import Timer
+
+from rclpy.action import ActionClient
 
 from flexbe_core.logger import Logger
 
 
-#TODO implement action client
-class ProxyActionClient(object):
-    """
-    A proxy for calling actions.
-    """
+class ProxyActionClient:
+    """A proxy for calling actions."""
+
     _node = None
     _clients = {}
     _has_active_goal = {}
@@ -21,13 +49,36 @@ class ProxyActionClient(object):
     _feedback = {}
 
     @staticmethod
-    def _initialize(node):
+    def initialize(node):
+        """Initialize ROS setup for proxy action client."""
         ProxyActionClient._node = node
         Logger.initialize(node)
 
-    def __init__(self, topics={}, wait_duration=10):
+    @staticmethod
+    def shutdown():
+        """Shuts this proxy down by reseting all action clients."""
+        try:
+            print(f"Shutdown proxy action clients with {len(ProxyActionClient._clients)} topics ...")
+            for topic, client in ProxyActionClient._clients.items():
+                try:
+                    ProxyActionClient._clients[topic] = None
+                    client.destroy()
+                except Exception as exc:  # pylint: disable=W0703
+                    Logger.error(f"Something went wrong during shutdown of proxy action client for {topic}!\n{str(exc)}")
+
+            print("Shutdown proxy action clients  ...")
+            ProxyActionClient._result.clear()
+            ProxyActionClient._feedback.clear()
+            ProxyActionClient._cancel_current_goal.clear()
+            ProxyActionClient._has_active_goal.clear()
+            ProxyActionClient._current_goal.clear()
+            ProxyActionClient._node = None
+        except Exception as exc:  # pylint: disable=W0703
+            print(f'Something went wrong during shutdown of proxy action clients!\n{ str(exc)}')
+
+    def __init__(self, topics=None, wait_duration=10):
         """
-        Initializes the proxy with optionally a given set of clients.
+        Initialize the proxy with optionally a given set of clients.
 
         @type topics: dictionary string - message class
         @param topics: A dictionay containing a collection of topic - message type pairs.
@@ -36,12 +87,14 @@ class ProxyActionClient(object):
         @param wait_duration: Defines how long to wait for each client in the
             given set to become available (if it is not already available).
         """
-        for topic, action_type in topics.items():
-            self.setupClient(topic, action_type, wait_duration)
+        if topics is not None:
+            for topic, action_type in topics.items():
+                ProxyActionClient.setupClient(topic, action_type, wait_duration)
 
-    def setupClient(self, topic, action_type, wait_duration=10):
+    @classmethod
+    def setupClient(cls, topic, action_type, wait_duration=10):
         """
-        Tries to set up an action client for calling it later.
+        Set up an action client for calling it later.
 
         @type topic: string
         @param topic: The topic of the action to call.
@@ -54,24 +107,24 @@ class ProxyActionClient(object):
         """
         if topic not in ProxyActionClient._clients:
             ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
-            self._check_topic_available(topic, wait_duration)
+            ProxyActionClient._check_topic_available(topic, wait_duration)
         else:
             if action_type is not ProxyActionClient._clients[topic]._action_type:
                 if action_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
-                    Logger.localinfo(f'Existing action client for {topic} with same action type name, but different instance - recreate  client!')
+                    Logger.localinfo(f'Existing action client for {topic}'
+                                     f' with same action type name, but different instance -  re-create  client!')
 
-                    # destroy() causes a crash under Humble
-                    #ProxyActionClient._clients[topic].destroy()
+                    # crashes Humble - ProxyActionClient._clients[topic].destroy()
 
                     ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
-                    self._check_topic_available(topic, wait_duration)
+                    ProxyActionClient._check_topic_available(topic, wait_duration)
                 else:
                     raise TypeError("Trying to replace existing action client with different action type")
 
-
-    def send_goal(self, topic, goal):
+    @classmethod
+    def send_goal(cls, topic, goal):
         """
-        Performs an action call on the given topic.
+        Call action on the given topic.
 
         @type topic: string
         @param topic: The topic to call.
@@ -79,8 +132,8 @@ class ProxyActionClient(object):
         @type goal: action goal
         @param goal: The request to send to the action server.
         """
-        if not self._check_topic_available(topic):
-            raise ValueError('Cannot send goal for action client %s: Topic not available.' % topic)
+        if not ProxyActionClient._check_topic_available(topic):
+            raise ValueError(f'Cannot send goal for action client {topic}: Topic not available.')
         # reset previous results
         ProxyActionClient._result[topic] = None
         ProxyActionClient._feedback[topic] = None
@@ -99,7 +152,8 @@ class ProxyActionClient(object):
                 for attr in goal.__slots__:
                     setattr(new_goal, attr, getattr(goal, attr))
             else:
-                raise TypeError(f"Invalid goal type {goal.__class__.__name__} (vs. {ProxyActionClient._clients[topic]._action_type.Goal.__name__}) for topic {topic}")
+                raise TypeError(f"Invalid goal type {goal.__class__.__name__}"
+                                f" (vs. {ProxyActionClient._clients[topic]._action_type.Goal.__name__}) for topic {topic}")
         else:
             # Same class definition instance as stored
             new_goal = goal
@@ -108,90 +162,102 @@ class ProxyActionClient(object):
         ProxyActionClient._clients[topic].wait_for_server()
         future = ProxyActionClient._clients[topic].send_goal_async(
             new_goal,
-            feedback_callback=lambda f: self._feedback_callback(topic, f)
+            feedback_callback=lambda f: ProxyActionClient._feedback_callback(topic, f)
         )
 
-        future.add_done_callback(partial(self._done_callback, topic=topic))
+        future.add_done_callback(partial(ProxyActionClient._done_callback, topic=topic))
 
-    def _done_callback(self, future, topic):
+    @classmethod
+    def _done_callback(cls, future, topic):
         ProxyActionClient._current_goal[topic] = future
         result = future.result().get_result_async()
-        result.add_done_callback(partial(self._result_callback, topic=topic))
+        result.add_done_callback(partial(ProxyActionClient._result_callback, topic=topic))
 
-    def _result_callback(self, future, topic):
+    @classmethod
+    def _result_callback(cls, future, topic):
         result = future.result().result
         ProxyActionClient._result[topic] = result
         ProxyActionClient._has_active_goal[topic] = False
 
-    def _feedback_callback(self, topic, feedback):
+    @classmethod
+    def _feedback_callback(cls, topic, feedback):
         ProxyActionClient._feedback[topic] = feedback
 
-    def is_available(self, topic):
+    @classmethod
+    def is_available(cls, topic):
         """
-        Checks if the client on the given action topic is available.
+        Check if the client on the given action topic is available.
 
         @type topic: string
         @param topic: The topic of interest.
         """
-        return self._check_topic_available(topic)
+        return ProxyActionClient._check_topic_available(topic)
 
-    def has_result(self, topic):
+    @classmethod
+    def has_result(cls, topic):
         """
-        Checks if the given action call already has a result.
+        Check if the given action call already has a result.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         return ProxyActionClient._result.get(topic) is not None
 
-    def get_result(self, topic):
+    @classmethod
+    def get_result(cls, topic):
         """
-        Returns the result message of the given action call.
+        Return the result message of the given action call.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         return ProxyActionClient._result.get(topic)
 
-    def remove_result(self, topic):
+    @classmethod
+    def remove_result(cls, topic):
         """
-        Removes the latest result message of the given action call.
+        Remove the latest result message of the given action call.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         ProxyActionClient._result[topic] = None
 
-    def has_feedback(self, topic):
+    @classmethod
+    def has_feedback(cls, topic):
         """
-        Checks if the given action call has any feedback.
+        Check if the given action call has any feedback.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         return ProxyActionClient._feedback.get(topic) is not None
 
-    def get_feedback(self, topic):
+    @classmethod
+    def get_feedback(cls, topic):
         """
-        Returns the latest feedback message of the given action call.
+        Return the latest feedback message of the given action call.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         return ProxyActionClient._feedback.get(topic)
 
-    def remove_feedback(self, topic):
+    @classmethod
+    def remove_feedback(cls, topic):
         """
-        Removes the latest feedback message of the given action call.
+        Remove the latest feedback message of the given action call.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         ProxyActionClient._feedback[topic] = None
 
-    def get_state(self, topic):
+    @classmethod
+    def get_state(cls, topic):
         """
-        Determines the current actionlib state of the given action topic.
+        Determine the current actionlib state of the given action topic.
+
         A list of possible states is defined in actionlib_msgs/GoalStatus.
 
         @type topic: string
@@ -199,23 +265,24 @@ class ProxyActionClient(object):
         """
         return ProxyActionClient._clients[topic].get_state()
 
-    def is_active(self, topic):
+    @classmethod
+    def is_active(cls, topic):
         """
-        Determines if an action request is already being processed on the given topic.
+        Determine if an action request is already being processed on the given topic.
 
         @type topic: string
         @param topic: The topic of interest.
         """
         return ProxyActionClient._has_active_goal.get(topic, False)
 
-    def cancel(self, topic):
+    @classmethod
+    def cancel(cls, topic):
         """
-        Cancels the current action call on the given action topic.
+        Cancel the current action call on the given action topic.
 
         @type topic: string
         @param topic: The topic of interest.
         """
-
         current_goal = ProxyActionClient._current_goal.get(topic)
         if current_goal is not None:
             current_goal.result().cancel_goal()
@@ -223,9 +290,10 @@ class ProxyActionClient(object):
         ProxyActionClient._cancel_current_goal[topic] = True
         ProxyActionClient._current_goal[topic] = None
 
-    def _check_topic_available(self, topic, wait_duration=1):
+    @classmethod
+    def _check_topic_available(cls, topic, wait_duration=1):
         """
-        Checks whether a topic is available.
+        Check whether a topic is available.
 
         @type topic: string
         @param topic: The topic of the action.
@@ -237,24 +305,26 @@ class ProxyActionClient(object):
         if client is None:
             Logger.logerr("Action client %s not yet registered, need to add it first!" % topic)
             return False
-        t = Timer(.5, self._print_wait_warning, [topic])
-        t.start()
+        tmr = Timer(.5, ProxyActionClient._print_wait_warning, [topic])
+        tmr.start()
         available = client.wait_for_server(wait_duration)
 
         warning_sent = False
         try:
-            t.cancel()
-        except Exception:
+            tmr.cancel()
+        except Exception:  # pylint: disable=W0703
             # already printed the warning
             warning_sent = True
 
         if not available:
             Logger.logerr("Action client %s timed out!" % topic)
             return False
-        else:
-            if warning_sent:
-                Logger.loginfo("Finally found action client %s..." % (topic))
+
+        if warning_sent:
+            Logger.loginfo("Finally found action client %s..." % (topic))
+
         return True
 
-    def _print_wait_warning(self, topic):
+    @classmethod
+    def _print_wait_warning(cls, topic):
         Logger.logwarn("Waiting for action client %s..." % (topic))

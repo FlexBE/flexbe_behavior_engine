@@ -1,23 +1,57 @@
 #!/usr/bin/env python
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""Implement of LockableStateMachine that can prevent transition."""
+
 from flexbe_core.core.ros_state_machine import RosStateMachine
 
 
 class LockableStateMachine(RosStateMachine):
     """
     A state machine that can be locked.
+
     When locked, no transition can be done regardless of the resulting outcome.
     However, if any outcome would be triggered, the outcome will be stored
     and the state won't be executed anymore until it is unlocked and the stored outcome is set.
     """
+
     path_for_switch = None
 
     def __init__(self, *args, **kwargs):
-        super(LockableStateMachine, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._locked = False
 
     def get_deep_state(self):
         """
-        Looks for the current state (traversing all state machines down to the real state).
+        Look for the current state (traversing all state machines down to the real state).
 
         @return: The current state (not state machine)
         """
@@ -33,9 +67,10 @@ class LockableStateMachine(RosStateMachine):
         if outcome is None or outcome == 'None':
             return True
         transition_target = self._transitions[state].get(outcome)
-        return (self._is_internal_transition(transition_target) or
-                (not self._locked and (self.parent is None or
-                                       self.parent.transition_allowed(self.name, transition_target))))
+        return (self._is_internal_transition(transition_target)
+                or (not self._locked
+                    and (self.parent is None
+                         or self.parent.transition_allowed(self.name, transition_target))))
 
     # for switching
 
@@ -47,7 +82,7 @@ class LockableStateMachine(RosStateMachine):
             self._current_state = self._labels[wanted_state]
             if len(path_segments) <= 2:
                 LockableStateMachine.path_for_switch = None
-        return super(LockableStateMachine, self).execute(userdata)
+        return super().execute(userdata)
 
     def replace_userdata(self, userdata):
         self._userdata = userdata
@@ -68,19 +103,21 @@ class LockableStateMachine(RosStateMachine):
         if path == self.path:
             self._locked = True
             return True
-        elif self._parent is not None:
+
+        if self._parent is not None:
             return self._parent.lock(path)
-        else:
-            return False
+
+        return False
 
     def unlock(self, path):
         if path == self.path:
             self._locked = False
             return True
-        elif self._parent is not None:
+
+        if self._parent is not None:
             return self._parent.unlock(path)
-        else:
-            return False
+
+        return False
 
     def is_locked(self):
         return self._locked
@@ -104,6 +141,6 @@ class LockableStateMachine(RosStateMachine):
         for state in self._states:
             if state.is_locked():
                 return state
-            elif isinstance(state, LockableStateMachine):
+            if isinstance(state, LockableStateMachine):
                 return state.get_locked_state()
         return None

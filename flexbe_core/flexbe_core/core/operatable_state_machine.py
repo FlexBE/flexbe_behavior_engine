@@ -1,26 +1,58 @@
 #!/usr/bin/env python
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""OperatableStateMachine."""
+
 import zlib
+from std_msgs.msg import Empty, UInt8, Int32
+from flexbe_msgs.msg import Container, ContainerStructure, BehaviorSync, CommandFeedback
+
 from flexbe_core.core.user_data import UserData
+from flexbe_core.core.operatable_state import OperatableState
+from flexbe_core.core.preemptable_state_machine import PreemptableStateMachine
 from flexbe_core.logger import Logger
 from flexbe_core.state_logger import StateLogger
-from flexbe_core.core.operatable_state import OperatableState
-
-from flexbe_msgs.msg import Container, ContainerStructure, BehaviorSync, CommandFeedback
-from std_msgs.msg import Empty, UInt8, Int32
-
-from flexbe_core.core.preemptable_state_machine import PreemptableStateMachine
 
 
 class OperatableStateMachine(PreemptableStateMachine):
     """
     A state machine that can be operated.
+
     It synchronizes its current state with the mirror and supports some control mechanisms.
     """
 
     autonomy_level = 3
 
     def __init__(self, *args, **kwargs):
-        super(OperatableStateMachine, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.id = None
         self._autonomy = {}
         self._inner_sync_request = False
@@ -52,9 +84,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         self._autonomy[label] = autonomy
 
     def _build_structure_msg(self):
-        """
-        Creates a message to describe the structure of this state machine.
-        """
+        """Create a message to describe the structure of this state machine."""
         structure_msg = ContainerStructure()
         container_msg = self._add_to_structure_msg(structure_msg)
         container_msg.outcomes = self.outcomes
@@ -63,7 +93,7 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     def _add_to_structure_msg(self, structure_msg):
         """
-        Adds this state machine and all children to the structure message.
+        Add this state machine and all children to the structure message.
 
         @type structure_msg: ContainerStructure
         @param structure_msg: The message that will finally contain the structure message.
@@ -88,9 +118,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         return container_msg
 
     def get_latest_status(self):
-        """
-        Returns the latest execution information as a BehaviorSync message
-        """
+        """Return the latest execution information as a BehaviorSync message."""
         with self._status_lock:
             path = self._last_deep_state_path
             beh_id = self.id
@@ -104,51 +132,51 @@ class OperatableStateMachine(PreemptableStateMachine):
     def _execute_current_state(self):
         # catch any exception and keep state active to let operator intervene
         try:
-            self._inner_sync_request = False # clear any prior sync request
-            outcome = super(OperatableStateMachine, self)._execute_current_state()
+            # --- @TODO remove self._inner_sync_request = False  # clear any prior sync request
+            outcome = super()._execute_current_state()
             self._last_exception = None
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=W0703
             # Error here
             outcome = None
             self._last_exception = exc
             Logger.logerr('Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
-            import traceback
-            Logger.localinfo(traceback.format_exc())
+            import traceback  # pylint: disable=C0415
+            Logger.localinfo(traceback.format_exc().replace("%", "%%"))  # Guard against exeception including format!
 
-        # # provide explicit sync as back-up functionality
-        # # should be used only if there is no other choice
-        # # since it requires additional 8 byte + header update bandwith and time to restart mirror
-        # if self._inner_sync_request:
-        #     deep_state = self.get_deep_state()
-        #     if deep_state is not None:
-        #         if self.id is None:
-        #             Logger.localwarn('Inner sync requested by %s' % (self.current_state_label))
-        #             self.parent._inner_sync_request = True
         return outcome
 
     def process_sync_request(self):
-        # provide explicit sync as back-up functionality
-        # should be used only if there is no other choice
-        # since it requires additional 8 byte + header update bandwith and time to restart mirror
+        """
+        Provide explicit sync as back-up functionality.
+
+        Should be used sparingly if there is no other choice
+        since it requires additional 8 byte + header update bandwith and time to restart mirror
+        """
         if self._inner_sync_request:
             deep_state = self.get_deep_state()
             if deep_state is not None:
-                self._inner_sync_request = False
                 if self.id is None:
-                    Logger.error('Inner sync requested by %s (%s)- but why processing here?' % (self.current_state_label, deep_state.name))
+                    Logger.error(f"Inner sync requested by {self.current_state_label} "
+                                 f"({deep_state.name})- but why processing here?")
                     self.parent._inner_sync_request = True
+                    self._inner_sync_request = False  # Clear after passing upstream
                 else:
-                    Logger.warning('Inner sync processed by %d with current state=%s (%s)' % (self.id, self.current_state_label, deep_state.name))
+                    Logger.warning(f"Sync request processed by {self.id} {self.name} with "
+                                   f"current state={self.current_state_label} ({deep_state.name})")
                     msg = BehaviorSync()
                     msg.behavior_id = self.id
                     msg.current_state_checksum = zlib.adler32(deep_state.path.encode()) & 0x7fffffff
                     self._pub.publish('flexbe/mirror/sync', msg)
-            else:
-                Logger.warning('Inner sync requested for %s : %s - no deep state!?' % (self.name, self.current_state_label))
-            self._inner_sync_request = False
-        else:
-            Logger.error('Inner sync processed for %s - no flag?' % (self.name))
+                    self._inner_sync_request = False
+                    self._pub.publish('flexbe/command_feedback', CommandFeedback(command="sync", args=[]))
+                    Logger.localinfo("<-- Sent synchronization message for mirror.")
 
+            else:
+                Logger.warning(f"Inner sync requested for {self.name} :"
+                               f" {self.current_state_label} - no deep state!?'")
+                self._inner_sync_request = False
+        else:
+            Logger.error('Inner sync processed for %s - but no sync request flag?' % (self.name))
 
     def is_transition_allowed(self, label, outcome):
         return self._autonomy[label].get(outcome, -1) < OperatableStateMachine.autonomy_level
@@ -160,15 +188,16 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo(f'Destroy state machine {self.name}: {self.id} ...')
         self._notify_stop()
         self._disable_ros_control()
-        self._sub.unsubscribe_topic('flexbe/command/autonomy', id=id(self))
-        self._sub.unsubscribe_topic('flexbe/command/sync', id=id(self))
-        self._sub.unsubscribe_topic('flexbe/command/attach', id=id(self))
-        self._sub.unsubscribe_topic('flexbe/request_mirror_structure', id=id(self))
+        self._sub.unsubscribe_topic('flexbe/command/autonomy', inst_id=id(self))
+        self._sub.unsubscribe_topic('flexbe/command/sync', inst_id=id(self))
+        self._sub.unsubscribe_topic('flexbe/command/attach', inst_id=id(self))
+        self._sub.unsubscribe_topic('flexbe/request_mirror_structure', inst_id=id(self))
         StateLogger.shutdown()
 
     def confirm(self, name, beh_id):
         """
-        Confirms the state machine and triggers the creation of the structural message.
+        Confirm the state machine and triggers the creation of the structural message.
+
         It is mandatory to call this function at the top-level state machine
         between building it and starting its execution.
 
@@ -189,10 +218,10 @@ class OperatableStateMachine(PreemptableStateMachine):
         # Gives feedback about executed commands to the GUI
         self._pub.createPublisher('flexbe/command_feedback', CommandFeedback)
 
-        self._sub.subscribe('flexbe/command/autonomy', UInt8, self._set_autonomy_level, id=id(self))
-        self._sub.subscribe('flexbe/command/sync', Empty, self._sync_callback, id=id(self))
-        self._sub.subscribe('flexbe/command/attach', UInt8, self._attach_callback, id=id(self))
-        self._sub.subscribe('flexbe/request_mirror_structure', Int32, self._mirror_structure_callback, id=id(self))
+        self._sub.subscribe('flexbe/command/autonomy', UInt8, self._set_autonomy_level, inst_id=id(self))
+        self._sub.subscribe('flexbe/command/sync', Empty, self._sync_callback, inst_id=id(self))
+        self._sub.subscribe('flexbe/command/attach', UInt8, self._attach_callback, inst_id=id(self))
+        self._sub.subscribe('flexbe/request_mirror_structure', Int32, self._mirror_structure_callback, inst_id=id(self))
 
         StateLogger.initialize(name)
         StateLogger.log('flexbe.initialize', None, behavior=name, autonomy=OperatableStateMachine.autonomy_level)
@@ -209,25 +238,19 @@ class OperatableStateMachine(PreemptableStateMachine):
     # operator callbacks
 
     def _set_autonomy_level(self, msg):
-        """ Sets the current autonomy level. """
+        """Set the current autonomy level."""
         if OperatableStateMachine.autonomy_level != msg.data:
-            Logger.localinfo('--> Autonomy changed to %d' % msg.data)
+            Logger.localinfo(f'--> Request autonomy changed to {msg.data} on {self.name}')
         if msg.data < 0:
-            self.preempt()
+            Logger.localinfo(f'--> Negative autonomy level={msg.data} - Preempt {self.name}!')
+            self._preempt_cb(msg)
         else:
             OperatableStateMachine.autonomy_level = msg.data
         self._pub.publish('flexbe/command_feedback', CommandFeedback(command="autonomy", args=[]))
 
     def _sync_callback(self, msg):
-        Logger.localinfo("--> Synchronization requested...")
-        msg = BehaviorSync()
-        msg.behavior_id = self.id
-        # make sure we are already executing
-        self.wait(condition=lambda: self.get_deep_state() is not None)
-        msg.current_state_checksum = zlib.adler32(self.get_deep_state().path.encode()) & 0x7fffffff
-        self._pub.publish('flexbe/mirror/sync', msg)
-        self._pub.publish('flexbe/command_feedback', CommandFeedback(command="sync", args=[]))
-        Logger.localinfo("<-- Sent synchronization message for mirror.")
+        Logger.localinfo(f"--> Synchronization requested ... ({self.id}) {self.name}")
+        self._inner_sync_request = True  # Flag to process at the end of spin loop
 
     def _attach_callback(self, msg):
         Logger.localinfo("--> Enabling attach control...")
@@ -243,7 +266,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo("<-- Sent attach confirm.")
 
     def _mirror_structure_callback(self, msg):
-        Logger.localinfo("--> Creating behavior structure for mirror...")
+        Logger.localinfo(f"--> Creating behavior structure for mirror...\n  {msg}")
         self._pub.publish('flexbe/mirror/structure', self._build_structure_msg())
         Logger.localinfo("<-- Sent behavior structure for mirror.")
         # enable control of states since a mirror is listening
@@ -269,9 +292,10 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     def on_exit(self, userdata):
         if self._current_state is not None:
-            ud = UserData(reference=self.userdata, input_keys=self._current_state.input_keys,
-                          output_keys=self._current_state.output_keys,
-                          remap=self._remappings[self._current_state.name])
+            udata = UserData(reference=self.userdata,
+                             input_keys=self._current_state.input_keys,
+                             output_keys=self._current_state.output_keys,
+                             remap=self._remappings[self._current_state.name])
             self._current_state._entering = True
-            self._current_state.on_exit(ud)
+            self._current_state.on_exit(udata)
             self._current_state = None

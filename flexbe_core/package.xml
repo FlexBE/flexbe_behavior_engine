@@ -9,7 +9,8 @@
         flexbe_core provides the core components for the FlexBE behavior engine.
     </description>
     <author>Philipp Schillinger</author>
-    <maintainer email="schillin@kth.se">Philipp Schillinger</maintainer>
+    <maintainer email="philsplus@gmail.com">Philipp Schillinger</maintainer>
+    <maintainer email="robotics@cnu.edu">David Conner</maintainer>
 
     <license>BSD</license>
     <url type="website">http://ros.org/wiki/flexbe_core</url>

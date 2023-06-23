@@ -1,15 +1,48 @@
 #!/usr/bin/env python
-from flexbe_core.logger import Logger
 
-from flexbe_msgs.msg import CommandFeedback
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""PreemptableState."""
+
 from std_msgs.msg import Empty
 
+from flexbe_msgs.msg import CommandFeedback
+
 from flexbe_core.core.lockable_state import LockableState
+from flexbe_core.logger import Logger
 
 
 class PreemptableState(LockableState):
     """
     A state that can be preempted.
+
     If preempted, the state will not be executed anymore and return the outcome preempted.
     """
 
@@ -17,7 +50,7 @@ class PreemptableState(LockableState):
     preempt = False
 
     def __init__(self, *args, **kwargs):
-        super(PreemptableState, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__execute = self.execute
         self.execute = self._preemptable_execute
 
@@ -49,11 +82,11 @@ class PreemptableState(LockableState):
             PreemptableState.preempt = True
 
     def _enable_ros_control(self):
-        super(PreemptableState, self)._enable_ros_control()
+        super()._enable_ros_control()
         self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._preempt_topic, Empty, id=id(self))
+        self._sub.subscribe(self._preempt_topic, Empty, inst_id=id(self))
         PreemptableState.preempt = False
 
     def _disable_ros_control(self):
-        super(PreemptableState, self)._disable_ros_control()
-        self._sub.unsubscribe_topic(self._preempt_topic, id=id(self))
+        super()._disable_ros_control()
+        self._sub.unsubscribe_topic(self._preempt_topic, inst_id=id(self))

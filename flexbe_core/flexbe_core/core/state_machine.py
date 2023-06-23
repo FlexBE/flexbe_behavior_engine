@@ -1,4 +1,35 @@
 #!/usr/bin/env python
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""Implement FlexBE Statemachine."""
 from flexbe_core.logger import Logger
 from flexbe_core.core.state import State
 from flexbe_core.core.user_data import UserData
@@ -6,15 +37,16 @@ from flexbe_core.core.exceptions import StateError, StateMachineError
 
 
 class StateMachine(State):
+    """Implement of FlexBE Statemachine."""
 
     _currently_opened_container = None
 
     def __init__(self, *args, **kwargs):
-        super(StateMachine, self).__init__(*args, **kwargs)
-        self._states = list()
-        self._labels = dict()
-        self._transitions = dict()
-        self._remappings = dict()
+        super().__init__(*args, **kwargs)
+        self._states = []
+        self._labels = {}
+        self._transitions = {}
+        self._remappings = {}
         self._current_state = None
         self._own_userdata = UserData()
         self._userdata = None
@@ -43,7 +75,7 @@ class StateMachine(State):
     def add(label, state, transitions, remapping=None):
         self = StateMachine.get_opened_container()
         if self is None:
-            raise StateMachineError("No container openend, activate one first by: 'with state_machine:'")
+            raise StateMachineError("No container opened, activate one first by: 'with state_machine:'")
         if label in self._labels:
             raise StateMachineError("The label %s has already been added to this state machine!" % label)
         if label in self._outcomes:
@@ -52,7 +84,7 @@ class StateMachine(State):
         self._states.append(state)
         self._labels[label] = state
         self._transitions[label] = transitions
-        self._remappings[label] = remapping or dict()
+        self._remappings[label] = remapping or {}
         # update state instance
         state.set_name(label)
         state.set_parent(self)
@@ -61,18 +93,12 @@ class StateMachine(State):
     def get_opened_container():
         return StateMachine._currently_opened_container
 
-    def wait(self, seconds=None, condition=None):
+    def wait(self, seconds=None):
         # This should not be called; expect to call ros_state_machine version instead!
-        Logger.localinfo("StateMachine: Dummy wait method for %s", self.name)
-
-
-    def get_latest_state(self):
-        """
-        Returns the latest execution information as a BehaviorSync message
-        """
-        return self._behavior_sync
-
-    # execution
+        Logger.localinfo(f"Error calling StateMachine.wait Dummy wait method for "
+                         f"{self.name} seconds={seconds}")
+        raise RuntimeError(f"Error calling StateMachine.wait Dummy wait method for "
+                           f"{self.name} seconds={seconds}")
 
     def spin(self, userdata=None):
         outcome = None
@@ -104,21 +130,24 @@ class StateMachine(State):
         with UserData(reference=self._userdata, remap=self._remappings[self._current_state.name],
                       input_keys=self._current_state.input_keys, output_keys=self._current_state.output_keys
                       ) as userdata:
-                      self._current_state._inner_sync_request = False # clear any prior downstream sync request
-                      outcome = self._current_state.execute(userdata)
+            self._current_state._inner_sync_request = False  # clear any prior downstream sync request
+            outcome = self._current_state.execute(userdata)
 
         # Pass any sync request to parent
-        self._inner_sync_request = self._current_state._inner_sync_request
+        self._inner_sync_request = self._inner_sync_request or self._current_state._inner_sync_request
 
         if outcome is not None:
             try:
                 target = self._transitions[self._current_state.name][outcome]
-            except KeyError as e:
-                outcome = None
-                raise StateError("Returned outcome '%s' is not registered as transition!" % str(e))
+            except KeyError as exc:
+                err_msg = f"Returned outcome '{outcome}' is not registered as a transition from '{self._current_state}'"
+                raise StateError(err_msg) from exc
+
             self._current_state = self._labels.get(target)
             if self._current_state is None:
                 return target
+
+        return None
 
     # properties
 
@@ -130,22 +159,22 @@ class StateMachine(State):
     def current_state(self):
         if self._current_state is not None:
             return self._current_state
-        else:
-            raise StateMachineError("No state active!")
+
+        raise StateMachineError("No state active!")
 
     @property
     def current_state_label(self):
         if self._current_state is not None:
             return self._current_state.name
-        else:
-            raise "No state active!"
+
+        raise StateMachineError("No state active!")
 
     @property
     def initial_state(self):
         if len(self._states) > 0:
             return self._states[0]
-        else:
-            raise StateMachineError("No states added yet!")
+
+        raise StateMachineError("No states added yet!")
 
     @property
     def initial_state_label(self):
@@ -155,8 +184,8 @@ class StateMachine(State):
     def sleep_duration(self):
         if self._current_state is not None:
             return self._current_state.sleep_duration
-        else:
-            return 0.
+
+        return 0.
 
     # consistency checks
 

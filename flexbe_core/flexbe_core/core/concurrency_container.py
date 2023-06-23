@@ -1,4 +1,39 @@
 #!/usr/bin/env python
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""
+A state machine that can be operated.
+
+It synchronizes its current state with the mirror and supports some control mechanisms.
+"""
 from flexbe_core.logger import Logger
 from flexbe_core.core.user_data import UserData
 from flexbe_core.core.event_state import EventState
@@ -10,19 +45,18 @@ from flexbe_core.core.operatable_state_machine import OperatableStateMachine
 class ConcurrencyContainer(OperatableStateMachine):
     """
     A state machine that can be operated.
+
     It synchronizes its current state with the mirror and supports some control mechanisms.
     """
 
-    def __init__(self, conditions=dict(), *args, **kwargs):
-        super(ConcurrencyContainer, self).__init__(*args, **kwargs)
-        self._conditions = conditions
-        self._returned_outcomes = dict()
+    def __init__(self, conditions=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._conditions = conditions if conditions else {}
+        self._returned_outcomes = {}
 
     @property
     def sleep_duration(self):
-        """
-        Sleep duration in seconds
-        """
+        """Sleep duration in seconds."""
         sleep_dur = float("inf")
         for state in self._states:
             sleep_dur = min(sleep_dur, state.sleep_duration)
@@ -31,9 +65,9 @@ class ConcurrencyContainer(OperatableStateMachine):
 
     def _execute_current_state(self):
         # execute all states that are done with sleeping and determine next sleep duration
-        self._inner_sync_request = False # clear prior
+        self._inner_sync_request = False  # clear prior request for lower level state
         for state in self._states:
-            if state.name in list(self._returned_outcomes.keys()) and self._returned_outcomes[state.name] is not None:
+            if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 continue  # already done with executing
 
             if (PriorityContainer.active_container is not None
@@ -46,9 +80,9 @@ class ConcurrencyContainer(OperatableStateMachine):
                 continue  # other state has priority
 
             if state.sleep_duration <= 0:  # ready to execute
-                oc = self._execute_single_state(state)
-                self._returned_outcomes[state.name] = oc
-                if oc:
+                out = self._execute_single_state(state)
+                self._returned_outcomes[state.name] = out
+                if out:
                     # Track any state with outcome as the current state
                     self._current_state = state
 
@@ -62,9 +96,9 @@ class ConcurrencyContainer(OperatableStateMachine):
             return self._preempted_name  # handle preemption if required
         # check conditions
         for item in self._conditions:
-            (oc, cond) = item
+            (out, cond) = item
             if all(sn in self._returned_outcomes and self._returned_outcomes[sn] == o for sn, o in cond):
-                outcome = oc
+                outcome = out
                 break
 
         if outcome is None:
@@ -72,9 +106,9 @@ class ConcurrencyContainer(OperatableStateMachine):
 
         # trigger on_exit for those states that are not done yet
         self.on_exit(self.userdata,
-                     states=[s for s in self._states if (s.name not in list(self._returned_outcomes.keys()) or
-                                                         self._returned_outcomes[s.name] is None)])
-        self._returned_outcomes = dict()
+                     states=[s for s in self._states if (s.name not in self._returned_outcomes
+                                                         or self._returned_outcomes[s.name] is None)])
+        self._returned_outcomes = {}
         # right now, going out of a concurrency container may break sync
         # thus, as a quick fix, explicitly request sync again on any output
         self._inner_sync_request = True
@@ -87,19 +121,19 @@ class ConcurrencyContainer(OperatableStateMachine):
         try:
             with UserData(reference=self._userdata, remap=self._remappings[state.name],
                           input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
-                state._inner_sync_request = False  # clear any prior sync on call
+                state._inner_sync_request = False  # clear any prior sync on call to individual state
                 if force_exit:
                     state._entering = True
                     state.on_exit(userdata)
                 else:
                     result = state.execute(userdata)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=W0703
             result = None
             self._last_exception = exc
             Logger.logerr('ConcurrencyContainer: Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
-            import traceback
-            Logger.localinfo(traceback.format_exc())
-            
+            import traceback  # pylint: disable=C0415
+            Logger.localinfo(traceback.format_exc().replace("%", "%%"))
+
         return result
 
     def _enable_ros_control(self):
@@ -116,10 +150,9 @@ class ConcurrencyContainer(OperatableStateMachine):
         if isinstance(state, OperatableStateMachine):
             state._disable_ros_control()
 
-    def on_enter(self, userdata):
-        for state in self._states :
-            #if not state._entering:
-            #    Logger.logerr('Reset entering flag for child state: %s' % (state.name))
+    def on_enter(self, userdata):  # pylint: disable=W0613
+        for state in self._states:
+            # Force on_enter at state level (userdata passed by _execute_single_state)
             state._entering = True  # force state to handle enter on first execute
             state._last_execution = None
 

@@ -1,16 +1,45 @@
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
+"""Provide access to all known behaviors."""
 import os
-from ament_index_python import get_packages_with_prefixes
-from catkin_pkg.package import parse_package
 import xml.etree.ElementTree as ET
 import zlib
+
+from ament_index_python import get_packages_with_prefixes
+from catkin_pkg.package import parse_package
 
 from flexbe_core.logger import Logger
 
 
-class BehaviorLibrary(object):
-    '''
-    Provides access to all known behaviors.
-    '''
+class BehaviorLibrary:
+    """Provide access to all known behaviors."""
 
     def __init__(self, node):
         self._node = node
@@ -18,10 +47,8 @@ class BehaviorLibrary(object):
         self.parse_packages()
 
     def parse_packages(self):
-        """
-        Parses all ROS2 packages to update the internal behavior library.
-        """
-        self._behavior_lib = dict()
+        """Parse all ROS2 packages to update the internal behavior library."""
+        self._behavior_lib = {}
         for pkg_name, pkg_path in get_packages_with_prefixes().items():
             pkg = parse_package(os.path.join(pkg_path, 'share', pkg_name))
             for export in pkg.exports:
@@ -31,6 +58,7 @@ class BehaviorLibrary(object):
     def _add_behavior_manifests(self, path, pkg=None):
         """
         Recursively add all behavior manifests in the given folder to the internal library.
+
         If a package name is specified, only manifests referring to this package are added.
 
         @type path: string
@@ -44,27 +72,27 @@ class BehaviorLibrary(object):
             if os.path.isdir(entry_path):
                 self._add_behavior_manifests(entry_path, pkg)
             elif entry.endswith(".xml") and not entry.startswith("#"):
-                m = ET.parse(entry_path).getroot()
+                mrt = ET.parse(entry_path).getroot()
                 # structure sanity check
-                if (m.tag != "behavior"
-                        or len(m.findall(".//executable")) == 0
-                        or m.find("executable").get("package_path") is None
-                        or len(m.find("executable").get("package_path").split(".")) < 2):
+                if (mrt.tag != "behavior"
+                        or len(mrt.findall(".//executable")) == 0
+                        or mrt.find("executable").get("package_path") is None
+                        or len(mrt.find("executable").get("package_path").split(".")) < 2):
                     continue
-                e = m.find("executable")
-                if pkg is not None and e.get("package_path").split(".")[0] != pkg:
+                exct = mrt.find("executable")
+                if pkg is not None and exct.get("package_path").split(".")[0] != pkg:
                     continue  # ignore if manifest not in specified package
-                be_id = zlib.adler32(e.get("package_path").encode()) & 0x7fffffff
+                be_id = zlib.adler32(exct.get("package_path").encode()) & 0x7fffffff
                 self._behavior_lib[be_id] = {
-                    "name": m.get("name"),
-                    "package": ".".join(e.get("package_path").split(".")[:-1]),
-                    "file": e.get("package_path").split(".")[-1],
-                    "class": e.get("class")
+                    "name": mrt.get("name"),
+                    "package": ".".join(exct.get("package_path").split(".")[:-1]),
+                    "file": exct.get("package_path").split(".")[-1],
+                    "class": exct.get("class")
                 }
 
     def get_behavior(self, be_id):
         """
-        Provides the library entry corresponding to the given ID.
+        Provide the library entry corresponding to the given ID.
 
         @type be_id: int
         @param be_id: Behavior ID to look up.
@@ -74,36 +102,37 @@ class BehaviorLibrary(object):
         try:
             return self._behavior_lib[be_id]
         except KeyError:
-            Logger.logwarn("Did not find ID %d in libary, updating..." % be_id)
+            Logger.logwarn(f"Did not find ID {be_id} in libary, updating...")
             self.parse_packages()
             return self._behavior_lib.get(be_id, None)
 
     def find_behavior(self, be_name):
         """
-        Searches for a behavior with the given name and returns it along with its ID.
+        Search for a behavior with the given name and returns it along with its ID.
 
         @type be_name: string
         @param be_name: Behavior ID to look up.
 
         @return Tuple (be_id, be_entry) corresponding to the name or (None, None) if not found.
         """
-        find = lambda: next((id, be) for (id, be)  # noqa: E731 (allow lambda, only used locally here)
-                            in self._behavior_lib.items()
-                            if be["name"] == be_name)
+        def __find_behavior():
+            return next((id, be) for (id, be)
+                        in self._behavior_lib.items()
+                        if be["name"] == be_name)
         try:
-            return find()
+            return __find_behavior()
         except StopIteration:
             Logger.logwarn("Did not find behavior '%s' in libary, updating..." % be_name)
             self.parse_packages()
             try:
-                return find()
+                return __find_behavior()
             except StopIteration:
                 Logger.logerr("Still cannot find behavior '%s' in libary after update, giving up!" % be_name)
                 return None, None
 
     def count_behaviors(self):
         """
-        Counts the available behaviors.
+        Count the available behaviors.
 
         @return Number of behaviors.
         """
@@ -111,7 +140,7 @@ class BehaviorLibrary(object):
 
     def get_sourcecode_filepath(self, be_id, add_tmp=False):
         """
-        Constructs a file path to the source code of corresponding to the given ID.
+        Construct a file path to the source code of corresponding to the given ID.
 
         @type be_id: int
         @param be_id: Behavior ID to look up.
@@ -125,12 +154,20 @@ class BehaviorLibrary(object):
         if be_entry is None:
             # rely on get_behavior to handle/log missing package
             return None
-        # TODO Replace use of non-existing self._rp
+
         try:
             module_path = __import__(be_entry["package"]).__path__[-1]
         except ImportError:
-            Logger.logwarn("Cannot import behavior package '%s', using 'rospack find' instead" % be_entry["package"])
-            # rp can find it because otherwise, the above entry would not exist
-            module_path = os.path.join(self._rp.get_path(be_entry["package"]), "src", be_entry["package"])
+            try:
+                # Attempt to replace prior use of ROS 1 package finder
+                Logger.logwarn(f"""Cannot import behavior package '{be_entry["package"]}', """
+                               f"""try using 'get_package_share_directory' instead""")
+                from ament_index_python.packages import get_package_share_directory  # pylint: disable=C0415
+
+                module_path = get_package_share_directory(be_entry["package"])
+            except Exception as exc:
+                Logger.logerr(f"""Cannot import behavior package '{be_entry["package"]}' """)
+                raise exc
+
         filename = be_entry["file"] + '.py' if not add_tmp else '_tmp.py'
         return os.path.join(module_path, filename)
