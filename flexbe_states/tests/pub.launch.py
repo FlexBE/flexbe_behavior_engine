@@ -27,4 +27,18 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-# import roslib; roslib.load_manifest('flexbe_states')
+"""Demo test for publishing a topic via launch file."""
+
+# ROS 1 style
+# <launch>
+#     <node name="pub" pkg="ros2" type="topic" args="pub /test geometry_msgs/Pose;{position: {x: 6.4}};" />
+# </launch>
+
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        ExecuteProcess(cmd=['ros2', 'topic', 'pub', '/test', 'geometry_msgs/Pose', 'position: {x: 6.4}'])
+    ])

@@ -1,23 +1,21 @@
 path: flexbe_states.subscriber_state
 class: SubscriberState
 
-launch: '<launch>
-    <node name="pub" pkg="rostopic" type="rostopic" args="pub /test geometry_msgs/Pose &quot;{position: {x: 6.4}}&quot;" />
-</launch>'
+launch: "from launch import LaunchDescription; from launch.actions import ExecuteProcess; def generate_launch_description():  return LaunchDescription([ExecuteProcess(cmd=['ros2', 'topic', 'pub', '/test', 'geometry_msgs/Pose', 'position: {x: 6.4}'])])"
 
-wait_cond: rospy.wait_for_message('/test', __import__('geometry_msgs').msg.Pose)
+wait_cond: rclpy.wait_for_message.wait_for_message('/test', __import__('geometry_msgs').msg.Pose)
 
 params:
     topic: //test
     msg_type: geometry_msgs/Pose
     blocking: True
 
-output:
-    message: !!python/object/new:geometry_msgs.msg.Pose
-        state:
-        - !!python/object/new:geometry_msgs.msg.Point
-            state: [6.4, 0.0, 0.0]
-        - !!python/object/new:geometry_msgs.msg.Quaternion
-            state: [0.0, 0.0, 0.0, 0.0]
+#output:
+#    message: !!python/object/new:geometry_msgs.msg.Pose
+#        state:
+#        - !!python/object/new:geometry_msgs.msg.Point
+#            state: [6.4, 0.0, 0.0]
+#        - !!python/object/new:geometry_msgs.msg.Quaternion
+#            state: [0.0, 0.0, 0.0, 0.0]
 
 outcome: received

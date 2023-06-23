@@ -6,11 +6,11 @@
     <name>flexbe_states</name>
     <version>2.1.0</version>
     <description>
-      flexbe_states provides a collection of predefined states.
-      Feel free to add new states.
+      flexbe_states provides a collection of common generic predefined states.
     </description>
     <author>Philipp Schillinger</author>
-    <maintainer email="schillin@kth.se">Philipp Schillinger</maintainer>
+    <maintainer email="philsplus@gmail.com">Philipp Schillinger</maintainer>
+    <maintainer email="robotics@cnu.edu">David Conner</maintainer>
 
     <license>BSD</license>
     <url type="website">http://ros.org/wiki/flexbe_core</url>

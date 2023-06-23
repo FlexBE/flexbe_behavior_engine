@@ -1,14 +1,45 @@
 #!/usr/bin/env python
+
+# Copyright 2023 Philipp Schillinger, Team ViGIR, Christopher Newport University
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#
+#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#      contributors may be used to endorse or promote products derived from
+#      this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+
 import pickle
 
 from flexbe_core import EventState, Logger
-from flexbe_msgs.msg import BehaviorInputAction, BehaviorInputGoal, BehaviorInputResult
+from flexbe_msgs.action import BehaviorInput
 from flexbe_core.proxy import ProxyActionClient
 
 
 class InputState(EventState):
-    '''
+    """
     Implements a state where the state machine needs an input from the operator.
+
     Requests of different types, such as requesting a waypoint, a template, or a pose, can be specified.
 
     -- request 	uint8 		One of the custom-defined values to specify the type of request.
@@ -20,17 +51,15 @@ class InputState(EventState):
     <= aborted 				The operator declined to provide the requested data.
     <= no_connection 		No request could be sent to the operator.
     <= data_error 			Data has been received, but could not be deserialized successfully.
-    '''
+    """
 
     def __init__(self, request, message):
-        '''
-        Constructor
-        '''
+        """Construct instance."""
         super(InputState, self).__init__(outcomes=['received', 'aborted', 'no_connection', 'data_error'],
                                          output_keys=['data'])
         self._action_topic = 'flexbe/behavior_input'
-        ProxyActionClient._initialize(InputState._node)
-        self._client = ProxyActionClient({self._action_topic: BehaviorInputAction})
+        ProxyActionClient.initialize(InputState._node)
+        self._client = ProxyActionClient({self._action_topic: BehaviorInput})
 
         self._request = request
         self._message = message
@@ -45,7 +74,7 @@ class InputState(EventState):
 
         if self._client.has_result(self._action_topic):
             result = self._client.get_result(self._action_topic)
-            if result.result_code != BehaviorInputResult.RESULT_OK:
+            if result.result_code != BehaviorInput.Result.RESULT_OK:
                 userdata.data = None
                 return 'aborted'
             else:
@@ -60,10 +89,12 @@ class InputState(EventState):
                 self._received = True
                 return 'received'
 
+        return None
+
     def on_enter(self, userdata):
         self._received = False
 
-        action_goal = BehaviorInputGoal()
+        action_goal = BehaviorInput.Goal()
         action_goal.request_type = self._request
         action_goal.msg = self._message
 
