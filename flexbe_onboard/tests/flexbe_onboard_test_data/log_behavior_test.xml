@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<behavior name="Test Behavior Log">
+<behavior name="Log Behavior Test">
 
-	<executable package_path="flexbe_onboard_test_data.test_behavior_log_sm" class="TestBehaviorLogSM" />
+	<executable package_path="flexbe_onboard_test_data.log_behavior_test_sm" class="LogBehaviorTestSM" />
 	<tagstring></tagstring>
 	<author>Philipp Schillinger</author>
 	<date>Mon Mar 30 2020</date>

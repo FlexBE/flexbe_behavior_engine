@@ -27,28 +27,39 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+"""Test description."""
+
+import os
+import sys
+import launch
+import launch_testing.actions
+import pytest
 
 
-def generate_launch_description():
+@pytest.mark.rostest
+def generate_test_description():
 
-    return LaunchDescription([
-        DeclareLaunchArgument("log_enabled", default_value="False"),
-        DeclareLaunchArgument("log_folder", default_value="~/.flexbe_logs"),
-        DeclareLaunchArgument("log_serialize", default_value="yaml"),
-        DeclareLaunchArgument("log_level", default_value="INFO"),
-        DeclareLaunchArgument("use_sim_time", default_value="False"),
-        DeclareLaunchArgument("enable_clear_imports", default_value="False",
-                              description="Delete behavior-specific module imports after execution."),
-        Node(
-            name="behavior", package="flexbe_onboard", executable="start_behavior", output="screen",
-            parameters=[{"log_enabled": LaunchConfiguration("log_enabled"),
-                         "log_folder": LaunchConfiguration("log_folder"),
-                         "log_serialize": LaunchConfiguration("log_serialize"),
-                         "log_level": LaunchConfiguration("log_level"),
-                         "enable_clear_imports": LaunchConfiguration("enable_clear_imports"),
-                         "use_sim_time": LaunchConfiguration("use_sim_time")}])
-    ])
+    path_to_test = os.path.dirname(__file__)
+
+    TEST_PROC_PATH = os.path.join(path_to_test, 'test_onboard.py')
+
+    # This is necessary to get unbuffered output from the process under test
+    proc_env = os.environ.copy()
+    proc_env['PYTHONUNBUFFERED'] = '1'
+
+    test_onboard = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, TEST_PROC_PATH],
+        env=proc_env, output='screen',
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=90),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=90)
+    )
+
+    return (
+        launch.LaunchDescription([
+            test_onboard,
+            launch_testing.actions.ReadyToTest()
+        ]),
+        {
+            'test_onboard': test_onboard,
+        }
+    )
