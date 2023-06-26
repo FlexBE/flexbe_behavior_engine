@@ -99,6 +99,42 @@ class FlexbeMirror(Node):
 
         Logger.loginfo('--> Mirror - ready!')
 
+    def shutdown_mirror(self):
+        """Shut mirror down."""
+        try:
+            print("    Shutting down behavior mirror ...", flush=True)
+            with self._sync_lock:
+
+                self._stopping = True
+                if self._sm is not None and self._running:
+                    print('    Mirror is shutting down with behavior still active!', flush=True)
+                    PreemptableState.preempt = True
+
+                    stopping_cnt = 0
+                    while self._running and stopping_cnt < 200:
+                        if stopping_cnt % 49 == 0:
+                            print('    Waiting for mirror to stop ...')
+                        stopping_cnt += 1
+                        self._timing_event.wait(0.005)  # Use system time for polling check, never sim_time
+
+                    if self._running:
+                        print('    Failed to stop mirror while it is already running!', flush=True)
+                        return False
+                    else:
+                        self._stopping = False
+                        self._active_id = BehaviorSync.INVALID
+                        self._sm = None
+                        self._current_struct = None
+
+                print('    Mirror is shutdown!', flush=True)
+                return True
+            return False  # No active behavior
+
+        except Exception as exc:  # pylint: disable=W0703
+            print(f"Exception shutting down behavior mirror {type(exc)}\n   {exc}", flush=True)
+            import traceback
+            print(traceback.format_exc().replace("%", "%%"), flush=True)
+
     def _mirror_callback(self, msg):
         Logger.loginfo('--> Mirror - received updated structure')
 

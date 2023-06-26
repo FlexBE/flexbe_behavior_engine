@@ -60,9 +60,14 @@ class ProxyServiceCaller:
             for topic, service in ProxyServiceCaller._services.items():
                 try:
                     ProxyServiceCaller._services[topic] = None
-                    service.destroy()
+                    try:
+                        ProxyServiceCaller._node.destroy_client(service)
+                    except Exception as exc:  # pylint: disable=W0703
+                        Logger.error("Something went wrong destroying service client"
+                                     f" for {topic}!\n  {type(exc)} - {str(exc)}")
                 except Exception as exc:  # pylint: disable=W0703
-                    Logger.error(f"Something went wrong during shutdown of proxy service caller for {topic}!\n%s", str(exc))
+                    Logger.error("Something went wrong during shutdown of proxy service"
+                                 f" caller for {topic}!\n  {type(exc)} - {exc}")
 
             print("Shutdown proxy service caller  ...")
             ProxyServiceCaller._results.clear()
@@ -110,7 +115,12 @@ class ProxyServiceCaller:
                 if srv_type.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
                     Logger.localinfo(f'Existing service for {topic} with same message type name,'
                                      f' but different instance - re-create service!')
-                    ProxyServiceCaller._node.destroy_client(ProxyServiceCaller._services[topic])
+                    try:
+                        ProxyServiceCaller._node.destroy_client(ProxyServiceCaller._services[topic])
+                    except Exception as exc:  # pylint: disable=W0703
+                        Logger.error("Something went wrong destroying service client"
+                                     f" for {topic}!\n  {type(exc)} - {exc}")
+
                     ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(srv_type, topic)
                     if isinstance(wait_duration, float):
                         ProxyServiceCaller._check_service_available(topic, wait_duration)

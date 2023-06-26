@@ -62,10 +62,10 @@ class ProxySubscriberCached:
                 try:
                     ProxySubscriberCached._topics[topic] = None
                     topic_dict['callbacks'] = {}
-                    topic_dict['subscriber'].destroy()
+                    ProxySubscriberCached._node.destroy_subscription(topic_dict['subscription'])
                 except Exception as exc:  # pylint: disable=W0703
                     Logger.error(f"Something went wrong during shutdown of proxy subscriber for "
-                                 f"{topic}!\n%s", str(exc))
+                                 f"{topic}!\n{type(exc)} - {exc}")
 
             print("Shutdown proxy subscriber  ...")
             ProxySubscriberCached._topics.clear()
@@ -115,7 +115,7 @@ class ProxySubscriberCached:
             sub = ProxySubscriberCached._node.create_subscription(msg_type, topic,
                                                                   partial(cls._callback, topic=topic), qos)
 
-            ProxySubscriberCached._topics[topic] = {'subscriber': sub,
+            ProxySubscriberCached._topics[topic] = {'subscription': sub,
                                                     'last_msg': None,
                                                     'buffered': buffered,
                                                     'msg_queue': [],
@@ -125,9 +125,9 @@ class ProxySubscriberCached:
             Logger.localinfo(f"Created subscription for {topic} with message type {msg_type.__name__}!")
 
         else:
-            if msg_type is not ProxySubscriberCached._topics[topic]['subscriber'].msg_type:
+            if msg_type is not ProxySubscriberCached._topics[topic]['subscription'].msg_type:
                 # Change in required msg_type for topic name  - update subscription with new type
-                if msg_type.__name__ == ProxySubscriberCached._topics[topic]['subscriber'].msg_type.__name__:
+                if msg_type.__name__ == ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__:
                     # Same message type name, so likely due to reloading Python module on behavior change
                     # Since we don't throw TypeErrors based on isinstance, and count on Python's duck typing
                     # for callbacks, we will ignore on FlexBE side for subscribers
@@ -142,7 +142,7 @@ class ProxySubscriberCached:
                                          f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                 else:
                     Logger.info(f"Mis-matched msg_types ({msg_type.__name__} vs. "
-                                f"{ProxySubscriberCached._topics[topic]['subscriber'].msg_type.__name__})"
+                                f"{ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__})"
                                 f" for {topic} subscription (possibly due to reload of behavior)!")
                     raise TypeError("Trying to replace existing subscription with different msg type")
             else:
@@ -362,7 +362,12 @@ class ProxySubscriberCached:
 
                 if len(ProxySubscriberCached._topics[topic]['subscribers']) == 0:
                     Logger.localinfo(f'Remove proxy subscriber with no customers for {topic} ...')
-                    # Crashes Humble - ProxySubscriberCached._topics[topic]['subscriber'].destroy()
+                    try:
+                        sub = ProxySubscriberCached._topics[topic]['subscription']
+                        ProxySubscriberCached._node.destroy_subscription(sub)
+                    except Exception as exc:  # pylint: disable=W0703
+                        Logger.error("Something went wrong destroying subscription"
+                                     f" for {topic}!\n  {type(exc)} - {str(exc)}")
                     ProxySubscriberCached._topics.pop(topic)
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f'Something went wrong unsubscribing {topic} of proxy subscriber!\n%s', str(exc))

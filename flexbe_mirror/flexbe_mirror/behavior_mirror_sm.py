@@ -28,8 +28,7 @@
 
 
 """Main function to start up the FlexBE mirror of onboard statemachine."""
-import multiprocessing
-from threading import Event
+from datetime import datetime
 import rclpy
 
 from flexbe_core.proxy import shutdown_proxies
@@ -38,44 +37,64 @@ from flexbe_mirror.flexbe_mirror import FlexbeMirror
 
 def main(args=None):
     """Run main function to start up the FlexBE mirror of onboard statemachine."""
-    rclpy.init(args=args)
+    rclpy.init(args=args,
+               signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)  # We will handle shutdown
 
     mirror = FlexbeMirror()
 
-    # Use at least 2 threads, but don't hog the whole machine otherwise
-    num_threads = max(2, multiprocessing.cpu_count() - 2)
-    mirror.get_logger().info(f"Using {num_threads} threads in mirror executor ...")
-    executor = rclpy.executors.MultiThreadedExecutor(num_threads=num_threads)
+    # Use at least 2 threads to stay on top of pub/sub requirements
+    executor = rclpy.executors.MultiThreadedExecutor(num_threads=2)
     executor.add_node(mirror)
 
-    mirror.get_logger().info("Begin processing ...")
+    mirror.get_logger().info("Begin behavior mirror processing ...")
 
     # Wait for ctrl-c to stop the application
     try:
         executor.spin()
     except KeyboardInterrupt:
-        print("Keyboard interrupt! Shut the behavior mirror down!")
+        print(f"Keyboard interrupt at {datetime.now()} ! Shut the behavior mirror down!", flush=True)
     except Exception as exc:
-        print(f"Exception in mirror executor! {type(exc)}\n  {exc}")
+        print(f"Exception in mirror executor! {type(exc)}\n  {exc}", flush=True)
         import traceback
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     try:
-        print("Behavior mirror shutdown ...")
-        Event().wait(0.25)  # Allow some time for threads to stop
+        print(f"Request behavior mirror shutdown at {datetime.now()} ...", flush=True)
+        if mirror.shutdown_mirror():
+            print(f"Mirror shutdown at {datetime.now()} ...", flush=True)
+        else:
+            # Last call for clean up of any stray communications and try again
+            for _ in range(100):
+                executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+            if mirror.shutdown_mirror():
+                print(f"Mirror shutdown at {datetime.now()} ...", flush=True)
+
+    except Exception as exc:
+        print(f"Exception in behavior mirror node shutdown! {type(exc)}\n  {exc}", flush=True)
+        import traceback
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
+
+    try:
+        print(f"Shutdown proxies requested  at {datetime.now()} ...", flush=True)
         shutdown_proxies()
+
+        # Last call for clean up of any stray communications
+        for _ in range(100):
+            executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+
+        print(f"Mirror proxy  shutdown completed  at {datetime.now()} ...", flush=True)
         mirror.destroy_node()
     except Exception as exc:
-        print(f"Exception in behavior mirror node shutdown! {type(exc)}\n  {exc}")
+        print(f"Exception in behavior mirror node shutdown! {type(exc)}\n  {exc}", flush=True)
         import traceback
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
-    print("Done with behavior mirror!")
+    print(f"Done with behavior mirror at {datetime.now()}!", flush=True)
     try:
         rclpy.try_shutdown()
     except Exception as exc:  # pylint: disable=W0703
-        print(f"Exception from rclpy.try_shutdown for behavior mirror: {type(exc)}\n{exc}")
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"Exception from rclpy.try_shutdown for behavior mirror: {type(exc)}\n{exc}", flush=True)
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
 
 if __name__ == '__main__':

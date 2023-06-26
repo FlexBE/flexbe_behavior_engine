@@ -59,9 +59,10 @@ class ProxyPublisher:
             for topic, pub in ProxyPublisher._topics.items():
                 try:
                     ProxyPublisher._topics[topic] = None
-                    pub.destroy()
+                    ProxyPublisher._node.destroy_publisher(pub)
                 except Exception as exc:  # pylint: disable=W0703
-                    Logger.error(f"Something went wrong during shutdown of proxy publisher for {topic}!\n%s", str(exc))
+                    Logger.error(f"Something went wrong during shutdown of proxy publisher for {topic}!\n%s %s",
+                                 type(exc), str(exc))
 
             print("Shutdown proxy publisher  ...")
             ProxyPublisher._topics.clear()

@@ -62,7 +62,7 @@ class ProxyActionClient:
             for topic, client in ProxyActionClient._clients.items():
                 try:
                     ProxyActionClient._clients[topic] = None
-                    client.destroy()
+                    ProxyActionClient._node.destroy_client(client)
                 except Exception as exc:  # pylint: disable=W0703
                     Logger.error(f"Something went wrong during shutdown of proxy action client for {topic}!\n{str(exc)}")
 
@@ -114,7 +114,12 @@ class ProxyActionClient:
                     Logger.localinfo(f'Existing action client for {topic}'
                                      f' with same action type name, but different instance -  re-create  client!')
 
-                    # crashes Humble - ProxyActionClient._clients[topic].destroy()
+                    client = ProxyActionClient._clients[topic]
+                    try:
+                        client.destroy()
+                    except Exception as exc:
+                        Logger.localinfo(f'Exception destroying old client for {topic}'
+                                         f'{type(exc)} - {exc}')
 
                     ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
                     ProxyActionClient._check_topic_available(topic, wait_duration)

@@ -32,11 +32,11 @@
 """Class defining state machine executive for onboard control."""
 
 from ast import literal_eval as cast
-
 import contextlib
+from datetime import datetime
+import inspect
 import os
 import sys
-import inspect
 import tempfile
 import threading
 import time
@@ -117,6 +117,37 @@ class FlexbeOnboard(Node):
         thread = threading.Thread(target=self._behavior_execution, args=[msg])
         thread.daemon = True
         thread.start()
+
+    def behavior_shutdown(self):
+        """Destroy any active behavior state machines to force proper shutdown."""
+        try:
+            print(f"    Shutting down onboard behavior engine at {datetime.now()} ...", flush=True)
+            with self._switch_lock:
+                if self._running:
+                    assert self.be is not None, "Must have an active behavior here!"
+                    self._switching = True
+                    self.be.preempt()
+
+                    print("    Waiting for existing behavior to terminate ...", flush=True)
+                    return True  # Active behavior needs to quit
+
+            return False  # No active behavior
+
+        except Exception as exc:  # pylint: disable=W0703
+            print(f"Exception shutting down onboard behaviors {type(exc)}\n   {exc}", flush=True)
+            import traceback
+            print(traceback.format_exc().replace("%", "%%"))
+
+    def verify_no_active_behaviors(self, timeout=0.5):
+        """Verify no active behaviors."""
+        run_locked = self._run_lock.acquire(timeout=timeout)
+        if run_locked:
+            assert self.be is None, "Run lock with old behavior active?"
+            self._run_lock.release()
+            print(f"    All onboard behaviors are stopped at {datetime.now()}!", flush=True)
+            return True
+        else:
+            return False
 
     # =================== #
     # Main execution loop #
