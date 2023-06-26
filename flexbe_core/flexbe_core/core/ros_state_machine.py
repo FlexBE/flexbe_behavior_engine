@@ -30,7 +30,7 @@
 
 
 """A state machine to interface with ROS."""
-
+from rclpy.duration import Duration
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 from flexbe_core.core.state_machine import StateMachine
 
@@ -56,9 +56,7 @@ class RosStateMachine(StateMachine):
     def wait(self, seconds=None):
         """Wait for designated ROS clock time to keep APPROXIMATELY on scheduled tic rate."""
         if seconds is not None and seconds > 0:
-            rate = RosStateMachine._node.create_rate(1 / seconds, RosStateMachine._node.get_clock())
-            rate.sleep()  # Uses ROS node clock, so may be sim_time!
-            RosStateMachine._node.destroy_rate(rate)
+            self._node.get_clock().sleep_for(Duration(seconds=seconds))
 
     def _enable_ros_control(self):
         self._is_controlled = True
