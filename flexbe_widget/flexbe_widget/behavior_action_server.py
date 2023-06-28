@@ -80,14 +80,14 @@ class BehaviorActionServer:
             goal_handle.canceled()
 
         self._node.get_logger().info('Received a new request to start behavior: %s' % goal.behavior_name)
-        be_id, behavior = self._behavior_lib.find_behavior(goal.behavior_name)
-        if be_id is None:
+        be_key, behavior = self._behavior_lib.find_behavior(goal.behavior_name)
+        if be_key is None:
             self._node.get_logger().error("Deny goal: Did not find behavior with requested name %s" % goal.behavior_name)
             self._current_goal.canceled()
             return
 
         be_selection = BehaviorSelection()
-        be_selection.behavior_id = be_id
+        be_selection.behavior_key = be_key
         be_selection.autonomy_level = 255
         try:
             for k, v in zip(goal.arg_keys, goal.arg_values):
@@ -122,13 +122,13 @@ class BehaviorActionServer:
         be_selection.input_values = goal.input_values
 
         # check for local modifications of the behavior to send them to the onboard behavior
-        be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_id)
+        be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
         with open(be_filepath_new, "r") as f:
             be_content_new = f.read()
 
-        be_filepath_old = self._behavior_lib.get_sourcecode_filepath(be_id, add_tmp=True)
+        be_filepath_old = self._behavior_lib.get_sourcecode_filepath(be_key, add_tmp=True)
         if not os.path.isfile(be_filepath_old):
-            be_selection.behavior_checksum = zlib.adler32(be_content_new.encode()) & 0x7fffffff
+            be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
         else:
             with open(be_filepath_old, "r") as f:
                 be_content_old = f.read()
@@ -141,7 +141,7 @@ class BehaviorActionServer:
                                                                        index_end=a1,
                                                                        new_content=content))
 
-            be_selection.behavior_checksum = zlib.adler32(be_content_new.encode()) & 0x7fffffff
+            be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
 
         # reset state before starting new behavior
         self._current_state = None

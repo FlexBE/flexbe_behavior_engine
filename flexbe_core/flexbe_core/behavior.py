@@ -42,7 +42,7 @@ class Behavior:
         """Call this superclass constructor first when overriding it with your behavior."""
         self._state_machine = None
         self.name = "unnamed behavior"
-        self.beh_id = 0
+        self.beh_id = 0  # Behavior id checksum assigned by processing the file contents
 
         self.contains = {}
         self._behaviors = {}

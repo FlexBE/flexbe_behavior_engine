@@ -1,7 +1,20 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+* rework timing and sync (significant change to handling, enables proper use_sim_time)
+* use inst_id for proxy subscribers (change to API)
+* add colcon test pytests; copyright and license info; pep257, flake8, and pylint cleanup
+* Merge team-vigir PR165 user data service
+* Merge pull request #11 from grejj/ros2-devel
+  Added destroy rate calls to clear up rate resources (This was replaced by items 2 and 3 above)
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * FlexbeOnboard is-a Node
 * Includes changes sync check handling
@@ -9,12 +22,11 @@ Changelog for package flexbe_onboard
 * Updated status messages
 * Update script_dir in setup.cfg
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

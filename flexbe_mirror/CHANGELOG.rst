@@ -1,18 +1,28 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* Activate mirror in new thread on receipt of new structure (prevent deadlock)
+* Add periodic heartbeat message to show seconds timestamp as Int32
+* Modify shutdown handling for clean stop
+* custom mirror_state_machine; faster polling loop; sync handling;
+* pep257, flake8, pylint cleanup
+* Merge pull request #11 from grejj/ros2-devel
+  Added destroy rate calls to clear up rate resources (undone by first item changes)
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Includes changes sync check handling
 * Update script_dir in setup.cfg
 * Update heartbeat
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

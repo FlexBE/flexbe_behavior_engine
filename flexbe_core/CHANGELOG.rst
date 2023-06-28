@@ -1,26 +1,41 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+* modify sync handling and execute loop timing
+* add proxy tf listener
+* Require 'inst_id' for ProxySubscriber setup (change from 'id')
+* flake8, pep257, pylint cleanup; licenses and copyright
+* Pull request #154
+* Pull request #163
+* Pull request #153 Modification
+* Merge pull request #11 from grejj/ros2-devel
+  Added destroy rate calls to clear up rate resources (undone by item 2 above)
+
 2.1.1 (2022-09-12)
+------------------
 * ProxyServiceCaller changes
   * fix issue #1
   * wait_duration handling
   * connect without service being available
   * misc cleanup
-------------------
 
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Includes changes sync check handling
 * Label proxy subscribers by instance id and handle instance type changes
 * Update proxy action client handling
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

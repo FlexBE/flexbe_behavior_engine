@@ -45,6 +45,17 @@ class BehaviorLibrary:
         self._node = node
         Logger.initialize(node)
         self.parse_packages()
+        self.dump_packages()
+
+    def dump_packages(self):
+        """Dump to screen for debugging."""
+        print("\n\n------------------ Available Behaviors Workspace (sorted by assigned key) ------------------", flush=True)
+        sorted_keys = list(self._behavior_lib.keys())
+        sorted_keys.sort()
+        for be_key in sorted_keys:
+            data = self._behavior_lib[be_key]
+            print(f"{be_key:10d} : {data['class']:36s} - {data['name']:36s} - {data['file']:30s} - {data['package']}")
+        print("-----------------------------------------------------------------------------------------\n\n", flush=True)
 
     def parse_packages(self):
         """Parse all ROS2 packages to update the internal behavior library."""
@@ -82,29 +93,33 @@ class BehaviorLibrary:
                 exct = mrt.find("executable")
                 if pkg is not None and exct.get("package_path").split(".")[0] != pkg:
                     continue  # ignore if manifest not in specified package
-                be_id = zlib.adler32(exct.get("package_path").encode()) & 0x7fffffff
-                self._behavior_lib[be_id] = {
+                be_key = zlib.adler32(exct.get("package_path").encode()) & 0x7fffffff
+                if be_key in self._behavior_lib:
+                    raise KeyError(f"Invalid behavior id key={be_key} for {exct.get('package_path')} "
+                                   f"- already exists for {self._behavior_lib[be_key]['package']}")
+
+                self._behavior_lib[be_key] = {
                     "name": mrt.get("name"),
                     "package": ".".join(exct.get("package_path").split(".")[:-1]),
                     "file": exct.get("package_path").split(".")[-1],
                     "class": exct.get("class")
                 }
 
-    def get_behavior(self, be_id):
+    def get_behavior(self, be_key):
         """
         Provide the library entry corresponding to the given ID.
 
-        @type be_id: int
-        @param be_id: Behavior ID to look up.
+        @type be_key: int
+        @param be_key: Behavior ID key to look up.
 
         @return Corresponding library entry or None if not found.
         """
         try:
-            return self._behavior_lib[be_id]
+            return self._behavior_lib[be_key]
         except KeyError:
-            Logger.logwarn(f"Did not find ID {be_id} in libary, updating...")
+            Logger.logwarn(f"Did not find ID {be_key} in libary, updating...")
             self.parse_packages()
-            return self._behavior_lib.get(be_id, None)
+            return self._behavior_lib.get(be_key, None)
 
     def find_behavior(self, be_name):
         """
@@ -113,7 +128,7 @@ class BehaviorLibrary:
         @type be_name: string
         @param be_name: Behavior ID to look up.
 
-        @return Tuple (be_id, be_entry) corresponding to the name or (None, None) if not found.
+        @return Tuple (be_key, be_entry) corresponding to the name or (None, None) if not found.
         """
         def __find_behavior():
             return next((id, be) for (id, be)
@@ -122,7 +137,7 @@ class BehaviorLibrary:
         try:
             return __find_behavior()
         except StopIteration:
-            Logger.logwarn("Did not find behavior '%s' in libary, updating..." % be_name)
+            Logger.logwarn("Did not find behavior '%s' in current libary, updating..." % be_name)
             self.parse_packages()
             try:
                 return __find_behavior()
@@ -138,19 +153,19 @@ class BehaviorLibrary:
         """
         return len(self._behavior_lib)
 
-    def get_sourcecode_filepath(self, be_id, add_tmp=False):
+    def get_sourcecode_filepath(self, be_key, add_tmp=False):
         """
         Construct a file path to the source code of corresponding to the given ID.
 
-        @type be_id: int
-        @param be_id: Behavior ID to look up.
+        @type be_key: int
+        @param be_key: Behavior ID to look up.
 
         @type add_tmp: bool
         @param add_tmp: Append "_tmp" to the file to consider a temporary version.
 
         @return String containing the absolute path to the source code file.
         """
-        be_entry = self.get_behavior(be_id)
+        be_entry = self.get_behavior(be_key)
         if be_entry is None:
             # rely on get_behavior to handle/log missing package
             return None

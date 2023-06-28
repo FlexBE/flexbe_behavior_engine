@@ -1,18 +1,25 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* Initiate start up launch in thread safe manner with future (prevent deadlock)
+* Add periodic heartbeat message for number of seconds as Int32
+* Modify to used behavior_id (checksum) and behavior_key consistently
+* package updates; pylint, flake8, and pep257 cleanup
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Modify launcher scripts
 * BehaviorLauncher is-a Node
 * Update script_dir in setup.cfg
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

@@ -30,12 +30,13 @@
 
 
 """Node to launch FlexBE behaviors."""
+
+from datetime import datetime
 import difflib
 import getopt
 import os
 import sys
 import threading
-import time
 import yaml
 import zlib
 
@@ -43,11 +44,11 @@ import rclpy
 from rclpy.node import Node
 from rosidl_runtime_py import get_interface_path
 
-from std_msgs.msg import String
+from std_msgs.msg import Int32, String
 
 from flexbe_msgs.msg import BehaviorModification, BehaviorRequest, BehaviorSelection, BEStatus, ContainerStructure
 
-from flexbe_core import BehaviorLibrary
+from flexbe_core import BehaviorLibrary, Logger
 
 
 class BehaviorLauncher(Node):
@@ -61,17 +62,29 @@ class BehaviorLauncher(Node):
 
         self._ready_event = threading.Event()
 
-        self._sub = self.create_subscription(BehaviorRequest, "flexbe/request_behavior", self._callback, 100)
+        self._sub = self.create_subscription(BehaviorRequest, "flexbe/request_behavior", self._request_callback, 100)
         self._version_sub = self.create_subscription(String, "flexbe/ui_version", self._version_callback, 100)
+        self._status_sub = self.create_subscription(BEStatus, "flexbe/status", self._status_callback, 100)
 
         self._pub = self.create_publisher(BehaviorSelection, "flexbe/start_behavior", 100)
         self._status_pub = self.create_publisher(BEStatus, "flexbe/status", 100)
-        self._status_sub = self.create_subscription(BEStatus, "flexbe/status", self._status_callback, 100)
         self._mirror_pub = self.create_publisher(ContainerStructure, "flexbe/mirror/structure", 100)
+        self._heartbeat_pub = self.create_publisher(Int32, 'flexbe/launcher/heartbeat', 2)
 
         self._behavior_lib = BehaviorLibrary(self)
 
+        # Require periodic events in case behavior is not connected to allow orderly shutdown
+        self._heartbeat_timer = self.create_timer(2.0, self.heartbeat_timer_callback)
+
         self.get_logger().info("%d behaviors available, ready for start request." % self._behavior_lib.count_behaviors())
+
+    def heartbeat_timer_callback(self):
+        """
+        Allow monitoring of Launcher liveness.
+
+        Guarantee some event triggers wake up so that we can catch Ctrl-C in case where no active messages are available.
+        """
+        self._heartbeat_pub.publish(Int32(data=self.get_clock().now().seconds_nanoseconds()[0]))
 
     def _status_callback(self, msg):
         if msg.code in [BEStatus.READY, BEStatus.FINISHED, BEStatus.FAILED, BEStatus.ERROR, BEStatus.RUNNING, BEStatus.STARTED]:
@@ -80,18 +93,18 @@ class BehaviorLauncher(Node):
         else:
             self.get_logger().info(f"BE status code={msg.code} received ")
 
-    def _callback(self, msg):
+    def _request_callback(self, msg):
         self.get_logger().info("Got message from request behavior")
-        be_id, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
-        if be_id is None:
+        be_key, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
+        if be_key is None:
             self.get_logger().error("Did not find behavior with requested name: %s" % msg.behavior_name)
             self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
             return
 
-        self.get_logger().info("Request for behavior " + str(behavior["name"]))
+        self.get_logger().info(f"""Request for behavior '{str(behavior["name"])}' with key={be_key} ...""")
 
         be_selection = BehaviorSelection()
-        be_selection.behavior_id = be_id
+        be_selection.behavior_key = be_key
         be_selection.autonomy_level = msg.autonomy_level
         try:
             for k, v in zip(msg.arg_keys, msg.arg_values):
@@ -112,8 +125,9 @@ class BehaviorLauncher(Node):
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
-        except Exception as e:
-            self.get_logger().warn('Failed to parse and substitute behavior arguments, will use direct input.\n%s' % str(e))
+        except Exception as exc:
+            self.get_logger().warn("Failed to parse and substitute behavior arguments, "
+                                   f"will use direct input.\n {type(exc)} - {str(exc)}")
             be_selection.arg_keys = msg.arg_keys
             be_selection.arg_values = msg.arg_values
 
@@ -126,7 +140,7 @@ class BehaviorLauncher(Node):
         be_structure.containers = msg.structure
 
         try:
-            be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_id)
+            be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
         except Exception:  # pylint: disable=W0703
             self.get_logger().error("Could not find behavior package '%s'" % (behavior["package"]))
             self.get_logger().info("Have you built and updated your setup after creating the behavior?")
@@ -136,11 +150,11 @@ class BehaviorLauncher(Node):
             be_content_new = f.read()
 
         self.get_logger().info("Check for behavior change ...")
-        be_filepath_old = self._behavior_lib.get_sourcecode_filepath(be_id, add_tmp=True)
+        be_filepath_old = self._behavior_lib.get_sourcecode_filepath(be_key, add_tmp=True)
         if not os.path.isfile(be_filepath_old):
-            be_selection.behavior_checksum = zlib.adler32(be_content_new.encode()) & 0x7fffffff
+            be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
             if msg.autonomy_level != 255:
-                be_structure.behavior_id = be_selection.behavior_checksum
+                be_structure.behavior_id = be_selection.behavior_id
                 self._mirror_pub.publish(be_structure)
             self._ready_event.clear()  # require a new ready signal after publishing
             self._pub.publish(be_selection)
@@ -158,14 +172,15 @@ class BehaviorLauncher(Node):
                                                                    index_end=a1,
                                                                    new_content=content))
 
-        be_selection.behavior_checksum = zlib.adler32(be_content_new.encode()) & 0x7fffffff
+        be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
         if msg.autonomy_level != 255:
-            be_structure.behavior_id = be_selection.behavior_checksum
+            be_structure.behavior_id = be_selection.behavior_id
             self._mirror_pub.publish(be_structure)
 
         self._ready_event.clear()  # require a new ready signal after publishing
         self._pub.publish(be_selection)
-        self.get_logger().info("New behavior published - start!")
+        self.get_logger().info(f"New behavior key={be_selection.behavior_key} published "
+                               f"with checksum id = {be_selection.behavior_id}- start!")
 
     def _version_callback(self, msg):
         vui = self._parse_version(msg.data)
@@ -221,11 +236,21 @@ def behavior_launcher_main(node_args=None):
                 autonomy = int(arg)
     ignore_args = ['__node', '__log']  # auto-set by roslaunch
 
+    print("Set up behavior_launcher ROS connections ...", flush=True)
     node_args = sys.argv[stop_index:]
-    rclpy.init(args=node_args)
+    rclpy.init(args=node_args,
+               signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)  # We will handle shutdown
+
     launcher = BehaviorLauncher()
+    executor = rclpy.executors.MultiThreadedExecutor(num_threads=2)
+    executor.add_node(launcher)
 
     if behavior != "":
+        print(f"Set up behavior_launcher with '{behavior}' ...", flush=True)
+        for _ in range(100):
+            # Let stuff get going before launching behavior request
+            executor.spin_once(timeout_sec=0.001)
+
         request = BehaviorRequest(behavior_name=behavior, autonomy_level=autonomy)
         for arg in args:
             if ':=' not in arg:
@@ -235,31 +260,47 @@ def behavior_launcher_main(node_args=None):
                 continue
             request.arg_keys.append('/' + key)
             request.arg_values.append(val)
-        time.sleep(0.2)  # wait for publishers...
-        launcher._callback(request)
+        print(f"Add callback request for '{behavior}' ...", flush=True)
+        executor.spin_once(timeout_sec=0.001)
 
-    # Wait for ctrl-c to stop the application
+        # Set up a callable as a future task so we don't block before starting to spin
+        def initial_request():
+            return launcher._request_callback(request)
+        future = executor.create_task(initial_request)
+    else:
+        future = None
+
     try:
-        rclpy.spin(launcher)
+        # Wait for ctrl-c to stop the application
+        if future:
+            print("Run initial request of behavior_launcher spinner ...", flush=True)
+            executor.spin_until_future_complete(future, timeout_sec=10.0)
+            if future.done():
+                Logger.info("Initial behavior launcher request is sent!")
+            else:
+                Logger.error("Initial request failed to send - timed out before complete!")
+
+        print("Start behavior_launcher spinner ...", flush=True)
+        executor.spin()
     except KeyboardInterrupt:
-        print("Keyboard interrupt!  Shut the behavior launcher down!")
+        print(f"Keyboard interrupt request  at {datetime.now()} - ! Shut the behavior launcher down!", flush=True)
     except Exception as exc:
-        print(f"Exception in behavior launcher executor! {type(exc)}\n  {exc}")
+        print(f"Exception in executor       at {datetime.now()} - ! {type(exc)}\n  {exc}", flush=True)
         import traceback
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     try:
         launcher.destroy_node()
     except Exception as exc:  # pylint: disable=W0703
-        print(f"Exception from destroy behavior launcher node: {type(exc)}\n{exc}")
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"Exception from destroy behavior launcher node at {datetime.now()}: {type(exc)}\n{exc}", flush=True)
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
-    print("Done with behavior launcher!")
+    print(f"Done with behavior launcher at {datetime.now()}!", flush=True)
     try:
         rclpy.try_shutdown()
     except Exception as exc:  # pylint: disable=W0703
-        print(f"Exception from rclpy.try_shutdown for behavior launcher: {type(exc)}\n{exc}")
-        print(f"{traceback.format_exc().replace('%', '%%')}")
+        print(f"Exception from rclpy.try_shutdown for behavior launcher: {type(exc)}\n{exc}", flush=True)
+        print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
 
 if __name__ == '__main__':
