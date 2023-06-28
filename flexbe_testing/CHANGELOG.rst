@@ -1,17 +1,21 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* update to support pytest unittest cases via colcon test; pylint, flake8, and pep257 cleanup
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Update script_dir in setup.cfg
 * Use instance id for proxy subscribers
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

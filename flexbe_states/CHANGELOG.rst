@@ -1,17 +1,23 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* update to use flexbe_testing with colcon test; pylint, flake8, pep257 cleanup
+* Merge pull request #8 from AravindaDP/ros2-devel
+  fix: subscriber_state.py
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Use instance id for proxy subscribers
 * Update script_dir in setup.cfg
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
 
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

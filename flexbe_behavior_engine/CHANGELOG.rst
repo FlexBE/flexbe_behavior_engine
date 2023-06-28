@@ -1,16 +1,30 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.2.0 (2023-06-29)
+------------------
+* [flexbe_core, flexbe_onboard, flexbe_mirror, flexbe_widget]
+  - Use behavior_key and behavior_id for consistency
+  - rework mirror and be_launcher to prevent deadlocks
+  - add heartbeat messages to mirror and launcher
+  - pep257 and flake8 cleanup
+* [flexbe_msgs] Add comments and modify BehaviorSelection message to use 
+  behavior_key and behavior_id for consistency with other messages
+* update README links; tweak LICENSE and package info
+* Modify shutdown handling for clean stop
+* Modify wait() handling to avoid creating a rate object
+
 2.1.0 (2022-08-02)
+------------------
 * ROS 2 Humble release
 * Includes changes sync check handling
 * Add formatted traceback to local log for behavior errors
 * Tested under Ubuntu 22.04 and ROS Humble
-------------------
+
 2.0.0 (2022-02-22)
+------------------
 * Initial ROS 2 "foxy" release based on ROS 1 commit a343c657
 * Includes changes to concurrent state and sleep handling
-------------------
 
 1.3.1 (2020-12-11)
 ------------------

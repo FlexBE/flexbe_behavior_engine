@@ -8,26 +8,34 @@ jobs:
   test:
     strategy:
       matrix:
-        ros: [foxy]
+        ros: [humble] #, iron, rolling]
         include:
-          - os: ubuntu-20.04
-            ros: foxy
-            python: python3
+        - os: ubuntu-22.04
+          ros: humble
+          python: python3
+          ci_branch: humble
+        # - os: ubuntu-22.04
+        #   ros: iron
+        #   ci_branch: ros2-devel
+        #   python: python3
+        # - os: ubuntu-22.04
+        #   ros: rolling
+        #   python: python3
+        #   ci_branch: ros2-devel
 
     runs-on: ${{ matrix.os }}
     env:
       ROS_DISTRO: ${{ matrix.ros }}
       PYTHON: ${{ matrix.python }}
-
+      CI_BRANCH: ${{ matrix.ci_branch }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - name: Prepare CI
         run: |
-          git clone https://github.com/FlexBE/flexbe_ci.git ~/flexbe_ci
+          git clone -b $CI_BRANCH https://github.com/FlexBE/flexbe_ci.git ~/flexbe_ci
           source ~/flexbe_ci/setup.bash $ROS_DISTRO
-
       - name: Install ROS
         run: ~/flexbe_ci/ci_scripts/install_ros.bash
       - name: Setup Workspace

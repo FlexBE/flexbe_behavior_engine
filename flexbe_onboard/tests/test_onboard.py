@@ -123,9 +123,9 @@ class TestOnboard(unittest.TestCase):
         self.assertStatus(BEStatus.READY, 1, "BE is ready")
 
         # send simple behavior request without checksum
-        be_id, _ = self.lib.find_behavior("Log Behavior Test")
+        be_key, _ = self.lib.find_behavior("Log Behavior Test")
         request = BehaviorSelection()
-        request.behavior_id = be_id
+        request.behavior_key = be_key
         request.autonomy_level = 255
 
         self.clear_extra_heartbeat_ready_messages()
@@ -138,8 +138,8 @@ class TestOnboard(unittest.TestCase):
         self.assertStatus(BEStatus.ERROR, 2, "Error - checksum test")
 
         # send valid simple behavior request
-        with open(self.lib.get_sourcecode_filepath(be_id)) as f:
-            request.behavior_checksum = zlib.adler32(f.read().encode()) & 0x7fffffff
+        with open(self.lib.get_sourcecode_filepath(be_key)) as f:
+            request.behavior_id = zlib.adler32(f.read().encode()) & 0x7fffffff
         self.sub.enable_buffer('flexbe/log')
 
         self.clear_extra_heartbeat_ready_messages()
@@ -158,16 +158,16 @@ class TestOnboard(unittest.TestCase):
 
         # send valid complex behavior request
         self.node.get_logger().info("Request to find (INVALID) complex behavior ...")
-        be_id, _ = self.lib.find_behavior("Complex Behavior Test")
+        be_key, _ = self.lib.find_behavior("Complex Behavior Test")
         request = BehaviorSelection()
-        request.behavior_id = be_id
+        request.behavior_key = be_key
         request.autonomy_level = 255
         request.arg_keys = ['param']
         request.arg_values = ['value_2']
         request.input_keys = ['data']
         request.input_values = ['2']
 
-        with open(self.lib.get_sourcecode_filepath(be_id)) as f:
+        with open(self.lib.get_sourcecode_filepath(be_key)) as f:
             content = f.read()
         self.node.get_logger().info("Request behavior modification of (INVALID) complex behavior ...")
         modifications = [('INVALID', 'core'), ('raise ValueError("TODO: Remove!")', '')]
@@ -180,7 +180,7 @@ class TestOnboard(unittest.TestCase):
         self.node.get_logger().info("Modified modified behavior ...")
         self.node.get_logger().info(content)
         self.node.get_logger().info(30 * "=" + "\n\n")
-        request.behavior_checksum = zlib.adler32(content.encode()) & 0x7fffffff
+        request.behavior_id = zlib.adler32(content.encode()) & 0x7fffffff
 
         self.clear_extra_heartbeat_ready_messages()
 
