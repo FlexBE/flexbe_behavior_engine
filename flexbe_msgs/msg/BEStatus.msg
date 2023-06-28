@@ -16,7 +16,7 @@ uint8 READY = 20
 uint8 RUNNING = 30
 
 builtin_interfaces/Time stamp
-int32 behavior_id
+int32 behavior_id  # id (checksum) of particular behavior encoding
 uint8 code
 
 string[] args

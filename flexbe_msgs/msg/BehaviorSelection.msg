@@ -1,5 +1,5 @@
-int32 behavior_id
-int32 behavior_checksum
+int32 behavior_key  # This is id key in behavior library
+int32 behavior_id   # checksum id of particular behavior encoding
 
 uint8 autonomy_level
 string[] arg_keys
