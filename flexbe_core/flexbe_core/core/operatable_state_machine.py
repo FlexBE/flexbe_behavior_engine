@@ -266,9 +266,9 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo("<-- Sent attach confirm.")
 
     def _mirror_structure_callback(self, msg):
-        Logger.localinfo(f"--> Creating behavior structure for mirror...\n  {msg}")
+        Logger.localinfo(f"--> Creating behavior structure for mirror id={msg.data} ...")
         self._pub.publish('flexbe/mirror/structure', self._build_structure_msg())
-        Logger.localinfo("<-- Sent behavior structure for mirror.")
+        Logger.localinfo("<-- Sent behavior structure to mirror.")
         # enable control of states since a mirror is listening
         self._enable_ros_control()
 

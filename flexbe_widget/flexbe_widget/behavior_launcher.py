@@ -94,14 +94,15 @@ class BehaviorLauncher(Node):
             self.get_logger().info(f"BE status code={msg.code} received ")
 
     def _request_callback(self, msg):
-        self.get_logger().info("Got message from request behavior")
+        self.get_logger().info(f"Got message from request behavior for {msg.behavior_name}")
         be_key, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
         if be_key is None:
             self.get_logger().error("Did not find behavior with requested name: %s" % msg.behavior_name)
             self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
             return
 
-        self.get_logger().info(f"""Request for behavior '{str(behavior["name"])}' with key={be_key} ...""")
+        self.get_logger().info(f"""Processing request using behavior '{behavior["name"]}' """
+                               f"""from package='{behavior["package"]}' with key={be_key} ...""")
 
         be_selection = BehaviorSelection()
         be_selection.behavior_key = be_key

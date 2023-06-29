@@ -409,7 +409,7 @@ class FlexbeOnboard(Node):
                                                                          and member.__module__ == package.__name__))
                 beclass = clsmembers[0][1]
                 be = beclass(self)
-            self.get_logger().info('Behavior ' + be.name + ' created.')
+                self.get_logger().info(f"Created behavior '{be.name}' from package '{behavior['package']}'.")
         except Exception as exc:
             Logger.logerr('Exception caught in behavior definition:\n%s\n'
                           'See onboard terminal for more information.' % str(exc))
