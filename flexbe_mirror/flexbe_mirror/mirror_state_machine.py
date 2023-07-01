@@ -66,7 +66,7 @@ class MirrorStateMachine(PreemptableStateMachine):
                         self._last_deep_state_name = None
 
             if outcome is not None:
-                Logger.loginfo(f"MirrorStateMachine {self.name} spin() - done with outcome={outcome}")
+                Logger.localinfo(f"MirrorStateMachine {self.name} spin() - done with outcome={outcome}")
                 break
 
             # Process fast independent of simulation time in order to keep up with onboard

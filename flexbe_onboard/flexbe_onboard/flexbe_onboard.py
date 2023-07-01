@@ -107,7 +107,7 @@ class FlexbeOnboard(Node):
         self._ready_counter = 0
         self._heartbeat = self.create_timer(1.0, self._heartbeat_worker)
 
-        Logger.loginfo('\033[92m--- Behavior Engine ready for first behavior! ---\033[0m')
+        Logger.localinfo('\033[92m--- Behavior Engine ready for first behavior! ---\033[0m')
         self._pub.publish(self.status_topic, BEStatus(stamp=self.get_clock().now().to_msg(),
                                                       code=BEStatus.READY))
 
@@ -172,7 +172,7 @@ class FlexbeOnboard(Node):
                 self._pub.publish(self.feedback_topic, CommandFeedback(command="switch", args=['failed']))
             else:
                 # self._pub.publish(self.status_topic, BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
-                Logger.loginfo('\033[92m--- Behavior Engine ready to try again! ---\033[0m')
+                Logger.localinfo('\033[92m--- Behavior Engine ready to try again! ---\033[0m')
                 self._ready_counter = 6  # Trigger heartbeat to republish READY within 4 seconds
             return
 
@@ -250,7 +250,7 @@ class FlexbeOnboard(Node):
             result = None
             try:
                 Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} ready, begin startup ...')
-                Logger.loginfo('BE Starting [%s : %s]' % (be.name, beh_sel_msg.behavior_id))
+                Logger.loginfo('Onboard Behavior Engine starting [%s : %s]' % (be.name, beh_sel_msg.behavior_id))
                 self.be.confirm()
                 Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} confirmation.')
                 args = [self.be.requested_state_path] if self.be.requested_state_path is not None else []
@@ -276,7 +276,7 @@ class FlexbeOnboard(Node):
                                                               code=BEStatus.FAILED))
                 Logger.logerr(f'Behavior execution for {self.be.name}: {self.be.beh_id} failed!\n%s' % str(exc))
                 import traceback
-                Logger.loginfo(f'''{traceback.format_exc().replace("%", "%%")}''')  # Avoid single % in string
+                Logger.localinfo(f'''{traceback.format_exc().replace("%", "%%")}''')  # Avoid single % in string
                 result = result or "exception"  # only set result if not executed
 
             # done, remove left-overs like the temporary behavior file
@@ -295,7 +295,7 @@ class FlexbeOnboard(Node):
                                  f" with result {str(result)}")
                 self._pub.publish(self.status_topic, BEStatus(stamp=self.get_clock().now().to_msg(),
                                                               code=BEStatus.READY))
-                Logger.loginfo('\033[92m--- Behavior Engine finished - ready for more! ---\033[0m')
+                Logger.localinfo('\033[92m--- Behavior Engine finished - ready for more! ---\033[0m')
 
             Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
             self._running = False
