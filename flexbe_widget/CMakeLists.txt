@@ -3,7 +3,6 @@ project(flexbe_widget)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rclpy REQUIRED)
 
 install(PROGRAMS
     bin/be_action_server
