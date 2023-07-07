@@ -16,10 +16,10 @@
     <url type="website">http://ros.org/wiki/flexbe_core</url>
     <url type="bugtracker">https://github.com/FlexBE/flexbe_behavior_engine/issues</url>
 
-    <exec_depend>rclpy</exec_depend>
-    <exec_depend>flexbe_core</exec_depend>
-    <exec_depend>flexbe_msgs</exec_depend>
-    <exec_depend>launch_ros</exec_depend>
+    <depend>rclpy</depend>
+    <depend>flexbe_core</depend>
+    <depend>flexbe_msgs</depend>
+    <depend>launch_ros</depend>
 
     <test_depend>ament_copyright</test_depend>
     <test_depend>ament_flake8</test_depend>
@@ -27,6 +27,7 @@
     <test_depend>python3-pytest</test_depend>
     <test_depend>std_msgs</test_depend>
     <test_depend>ament_cmake_pytest</test_depend>
+    <test_depend>launch_testing</test_depend>
 
     <buildtool_depend>ament_cmake</buildtool_depend>
     <buildtool_depend>ament_cmake_python</buildtool_depend>

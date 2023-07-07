@@ -13,14 +13,14 @@
   <url>http://ros.org/wiki/flexbe</url>
   <url type="bugtracker">https://github.com/FlexBE/flexbe_behavior_engine/issues</url>
 
-  <exec_depend>flexbe_core</exec_depend>
-  <exec_depend>flexbe_input</exec_depend>
-  <exec_depend>flexbe_mirror</exec_depend>
-  <exec_depend>flexbe_msgs</exec_depend>
-  <exec_depend>flexbe_onboard</exec_depend>
-  <exec_depend>flexbe_states</exec_depend>
-  <exec_depend>flexbe_testing</exec_depend>
-  <exec_depend>flexbe_widget</exec_depend>
+  <depend>flexbe_core</depend>
+  <depend>flexbe_input</depend>
+  <depend>flexbe_mirror</depend>
+  <depend>flexbe_msgs</depend>
+  <depend>flexbe_onboard</depend>
+  <depend>flexbe_states</depend>
+  <depend>flexbe_testing</depend>
+  <depend>flexbe_widget</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
