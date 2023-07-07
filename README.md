@@ -1,7 +1,7 @@
 # FlexBE Behavior Engine
 
 FlexBE is a high-level behavior engine coordinating the capabilities of a robot in order to solve complex tasks.
-Behaviors are modeled as hierarchical state machines (HFSM) where states correspond to active actions 
+Behaviors are modeled as hierarchical state machines (HFSM) where states correspond to active actions
 and transitions describe the reaction to outcomes.
 Main advantage over similar approaches is the good operator integration and an
 intuitive user interface.
@@ -12,6 +12,8 @@ The user interface features a runtime control interface as well as a graphical e
 Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)) for further information, tutorials, application examples, and much more.
 
 ![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg?branch=ros2-devel)
+
+![ROS Build Farm](https://build.ros2.org/job/Hdev__flexbe_behavior_engine__ubuntu_jammy_amd64/badge/icon)
 
 ## Installation
 
