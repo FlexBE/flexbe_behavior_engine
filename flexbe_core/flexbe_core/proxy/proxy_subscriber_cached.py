@@ -177,24 +177,12 @@ class ProxySubscriberCached:
         if ProxySubscriberCached._topics[topic]['buffered']:
             ProxySubscriberCached._topics[topic]['msg_queue'].append(msg)
 
-        # if len(ProxySubscriberCached._topics[topic]['callbacks']) > 0 and "heartbeat" not in topic:
-        #         Logger.localinfo(f"-- process {len(ProxySubscriberCached._topics[topic]['callbacks'])}"
-        #                          f" local callbacks for {topic} ...")
-
         for inst_id, callback in ProxySubscriberCached._topics[topic]['callbacks'].items():
             try:
-                # if "heartbeat" not in topic:
-                #     Logger.localinfo(f"  -- process callback {callback.__name__} @ {inst_id} for {topic}")
                 callback(msg)
-                # if "heartbeat" not in topic:
-                #     Logger.localinfo(f"  -- processed callback {callback.__name__} @ {inst_id} for {topic}")
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f"Exception in callback for {topic}: "
                              f"{callback.__module__}  {callback.__name__} @ {inst_id} \n {exc} ")
-
-        # if len(ProxySubscriberCached._topics[topic]['callbacks']) > 0 and "heartbeat" not in topic:
-        #         Logger.localinfo(f"-- processed {len(ProxySubscriberCached._topics[topic]['callbacks'])}"
-        #                          f" local callbacks for {topic} ...")
 
     @classmethod
     def set_callback(cls, topic, callback, inst_id=-1):
@@ -361,13 +349,12 @@ class ProxySubscriberCached:
                                      f"from proxy! ({len(ProxySubscriberCached._topics[topic]['callbacks'])} remaining)")
 
                 if len(ProxySubscriberCached._topics[topic]['subscribers']) == 0:
-                    Logger.localinfo(f'Remove proxy subscriber with no customers for {topic} ...')
-                    try:
-                        sub = ProxySubscriberCached._topics[topic]['subscription']
-                        ProxySubscriberCached._node.destroy_subscription(sub)
-                    except Exception as exc:  # pylint: disable=W0703
-                        Logger.error("Something went wrong destroying subscription"
-                                     f" for {topic}!\n  {type(exc)} - {str(exc)}")
-                    ProxySubscriberCached._topics.pop(topic)
+                        Logger.localinfo(f"Proxy subscriber has no remaining customers for {topic}\n"
+                                         f"    Destroying subscription at node causes crash in Humble "
+                                         f"for both Cyclone and Fast DDS,\n"
+                                         f"    and recreating subscription later causes multiple callbacks per "
+                                         f"published message,\n    so just leave existing subscription in place for now!")
+                        # This has potential to leave topics from old behaviors active
+                        ProxySubscriberCached.disable_buffer(topic)  # Stop buffering until someone asks for it again
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f'Something went wrong unsubscribing {topic} of proxy subscriber!\n%s', str(exc))
