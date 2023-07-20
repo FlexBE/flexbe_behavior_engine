@@ -155,7 +155,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         """
         if self._inner_sync_request:
             if self.id is None:
-                Logger.localerr(f"Sync requested - but why processing here - self.id is None!")
+                Logger.localerr("Sync requested - but why processing here - self.id is None!")
 
             msg = BehaviorSync()
             msg.behavior_id = self.id
@@ -168,7 +168,7 @@ class OperatableStateMachine(PreemptableStateMachine):
                         current_label = "None"
 
                     Logger.localinfo(f"Sync request processed by {self.id} {self.name} with "
-                                f"current state={current_label} (deep state = {deep_state.name})")
+                                     f"current state={current_label} (deep state = {deep_state.name})")
                     msg.current_state_checksum = zlib.adler32(deep_state.path.encode()) & 0x7fffffff
 
                 else:
