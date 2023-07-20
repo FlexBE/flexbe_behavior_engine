@@ -108,6 +108,7 @@ class ProxyActionClient:
         if topic not in ProxyActionClient._clients:
             ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
             ProxyActionClient._check_topic_available(topic, wait_duration)
+
         else:
             if action_type is not ProxyActionClient._clients[topic]._action_type:
                 if action_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
@@ -127,7 +128,7 @@ class ProxyActionClient:
                     raise TypeError("Trying to replace existing action client with different action type")
 
     @classmethod
-    def send_goal(cls, topic, goal):
+    def send_goal(cls, topic, goal, wait_duration=0.0):
         """
         Call action on the given topic.
 
@@ -136,8 +137,11 @@ class ProxyActionClient:
 
         @type goal: action goal
         @param goal: The request to send to the action server.
+
+        @type wait_duration: float seconds
+        @param wait_duration: How long to wait for server
         """
-        if not ProxyActionClient._check_topic_available(topic):
+        if not ProxyActionClient._check_topic_available(topic, wait_duration=wait_duration):
             raise ValueError(f'Cannot send goal for action client {topic}: Topic not available.')
         # reset previous results
         ProxyActionClient._result[topic] = None
@@ -296,7 +300,7 @@ class ProxyActionClient:
         ProxyActionClient._current_goal[topic] = None
 
     @classmethod
-    def _check_topic_available(cls, topic, wait_duration=1):
+    def _check_topic_available(cls, topic, wait_duration=0.1):
         """
         Check whether a topic is available.
 
@@ -308,25 +312,29 @@ class ProxyActionClient:
         """
         client = ProxyActionClient._clients.get(topic)
         if client is None:
-            Logger.logerr("Action client %s not yet registered, need to add it first!" % topic)
+            Logger.logerr("Action client '%s' is not yet registered, need to add it first!" % topic)
             return False
-        tmr = Timer(.5, ProxyActionClient._print_wait_warning, [topic])
-        tmr.start()
+
+        if wait_duration > 2.0:
+            tmr = Timer(.5, ProxyActionClient._print_wait_warning, [topic])
+            tmr.start()
+
         available = client.wait_for_server(wait_duration)
 
         warning_sent = False
-        try:
-            tmr.cancel()
-        except Exception:  # pylint: disable=W0703
-            # already printed the warning
-            warning_sent = True
+        if wait_duration > 2.0:
+            try:
+                tmr.cancel()
+            except Exception:  # pylint: disable=W0703
+                # already printed the warning
+                warning_sent = True
 
         if not available:
-            Logger.logerr("Action client %s timed out!" % topic)
+            Logger.logerr(f"Action client '{topic}' not available - timed out after {wait_duration:.3f} seconds!")
             return False
 
         if warning_sent:
-            Logger.loginfo("Finally found action client %s..." % (topic))
+            Logger.loginfo(f"Finally found action client '{topic}'!")
 
         return True
 
