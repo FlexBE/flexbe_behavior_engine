@@ -48,6 +48,7 @@ class FlexBEInput:
     """Enable operator inputs to onboard behavior."""
 
     def __init__(self, node):
+        """Provide relay from onboard to OCS."""
         # onboard connection
         self._node = node
         self._as = ComplexActionServer(node=node,
