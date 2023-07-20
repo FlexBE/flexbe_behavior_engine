@@ -182,8 +182,8 @@ class FlexbeMirror(Node):
             if self._sm:
                 Logger.loginfo('Mirror built for checksum id = {self._active_id}')
             else:
-                Logger.logwarn(f'Error processing mirror structure for behavior checksum id = {struct_msg.behavior_id}'
-                               f', requesting a new one from onboard ...')
+                Logger.localwarn(f'Error processing mirror structure for behavior checksum id = {struct_msg.behavior_id}')
+                Logger.logwarn('Requesting a new mirror structure from onboard ...')
                 self._pub.publish('flexbe/request_mirror_structure', Int32(data=struct_msg.behavior_id))
                 self._active_id = struct_msg.behavior_id
                 return
@@ -221,8 +221,8 @@ class FlexbeMirror(Node):
             self._wait_stopping()
 
             if self._running:
-                Logger.logwarn(f"Tried to start mirror for id={msg.behavior_id} while "
-                               f"mirror for id={self._active_id} is already running, will ignore.")
+                Logger.localwarn(f"Tried to start mirror for id={msg.behavior_id} while "
+                                 f"mirror for id={self._active_id} is already running, will ignore.")
                 return
 
             if len(msg.args) > 0:
@@ -238,7 +238,7 @@ class FlexbeMirror(Node):
                     self._struct_buffer = self._struct_buffer[1:]
                     if struct.behavior_id == self._active_id:
                         self._mirror_state_machine(struct)
-                        Logger.loginfo('Mirror built for checksum %s.' % self._active_id)
+                        Logger.localinfo(f"Mirror built for checksum '{self._active_id}'")
                     else:
                         Logger.logwarn('Discarded mismatching buffered structure for checksum %d'
                                        % (struct.behavior_id))
@@ -247,8 +247,8 @@ class FlexbeMirror(Node):
             #                      f"request updated structure from onboard!")
 
             if self._sm is None:
-                Logger.logwarn(f'Missing correct mirror structure for starting behavior checksum id ={msg.behavior_id}'
-                               f', requesting from onboard ...')
+                Logger.localwarn(f'Missing correct mirror structure for starting behavior checksum id ={msg.behavior_id}')
+                Logger.logwarn('Requesting mirror structure from onboard ...')
                 self._pub.publish('flexbe/request_mirror_structure', Int32(data=msg.behavior_id))
                 self._active_id = msg.behavior_id
                 return
@@ -396,8 +396,8 @@ class FlexbeMirror(Node):
                 if self._sm:
                     Logger.loginfo('Mirror built for behavior checksum id = {msg.behavior_id}.')
                 else:
-                    Logger.logwarn(f'Missing correct mirror structure for restarting behavior checksum id ={msg.behavior_id}'
-                                   f', requesting from onboard ...')
+                    Logger.localwarn(f'Missing correct mirror structure for restarting behavior checksum id ={msg.behavior_id}')
+                    Logger.logwarn('Requesting mirror structure from onboard ...')
                     self._pub.publish('flexbe/request_mirror_structure', Int32(data=msg.behavior_id))
                     self._active_id = msg.behavior_id
                     return

@@ -349,12 +349,12 @@ class ProxySubscriberCached:
                                      f"from proxy! ({len(ProxySubscriberCached._topics[topic]['callbacks'])} remaining)")
 
                 if len(ProxySubscriberCached._topics[topic]['subscribers']) == 0:
-                        Logger.localinfo(f"Proxy subscriber has no remaining customers for {topic}\n"
-                                         f"    Destroying subscription at node causes crash in Humble "
-                                         f"for both Cyclone and Fast DDS,\n"
-                                         f"    and recreating subscription later causes multiple callbacks per "
-                                         f"published message,\n    so just leave existing subscription in place for now!")
-                        # This has potential to leave topics from old behaviors active
-                        ProxySubscriberCached.disable_buffer(topic)  # Stop buffering until someone asks for it again
+                    Logger.localinfo(f"Proxy subscriber has no remaining customers for {topic}\n"
+                                     f"    Destroying subscription at node causes crash in Humble "
+                                     f"for both Cyclone and Fast DDS,\n"
+                                     f"    and recreating subscription later causes multiple callbacks per "
+                                     f"published message,\n    so just leave existing subscription in place for now!")
+                    # This has potential to leave topics from old behaviors active
+                    ProxySubscriberCached.disable_buffer(topic)  # Stop buffering until someone asks for it again
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f'Something went wrong unsubscribing {topic} of proxy subscriber!\n%s', str(exc))

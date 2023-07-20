@@ -39,7 +39,8 @@
 
 from flexbe_core import Behavior, Autonomy, OperatableStateMachine
 from flexbe_states.log_state import LogState as flexbe_states__LogState
-from flexbe_states.wait_state import WaitState
+from flexbe_states.wait_state import WaitState as flexbe_states__WaitState
+
 # Additional imports can be added inside the following tags
 # [MANUAL_IMPORT]
 
@@ -63,7 +64,7 @@ class LogBehaviorTestSM(Behavior):
         super(LogBehaviorTestSM, self).__init__()
         self.name = 'Log Behavior Test'
         self.node = node
-        WaitState.initialize_ros(node)
+        flexbe_states__WaitState.initialize_ros(node)
         flexbe_states__LogState.initialize_ros(node)
         OperatableStateMachine.initialize_ros(node)
 
@@ -95,7 +96,7 @@ class LogBehaviorTestSM(Behavior):
                                        autonomy={'done': Autonomy.Off})
             # x:30 y:90
             OperatableStateMachine.add('Wait',
-                                       WaitState(wait_time=1.0),
+                                       flexbe_states__WaitState(wait_time=1.0),
                                        transitions={'done': 'finished'},
                                        autonomy={'done': Autonomy.Off})
 

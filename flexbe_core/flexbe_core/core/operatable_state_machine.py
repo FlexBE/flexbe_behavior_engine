@@ -35,9 +35,10 @@ import zlib
 from std_msgs.msg import Empty, UInt8, Int32
 from flexbe_msgs.msg import Container, ContainerStructure, BehaviorSync, CommandFeedback
 
-from flexbe_core.core.user_data import UserData
+from flexbe_core.core.state_machine import StateMachineError
 from flexbe_core.core.operatable_state import OperatableState
 from flexbe_core.core.preemptable_state_machine import PreemptableStateMachine
+from flexbe_core.core.user_data import UserData
 from flexbe_core.logger import Logger
 from flexbe_core.state_logger import StateLogger
 
@@ -153,28 +154,32 @@ class OperatableStateMachine(PreemptableStateMachine):
         since it requires additional 8 byte + header update bandwith and time to restart mirror
         """
         if self._inner_sync_request:
-            deep_state = self.get_deep_state()
-            if deep_state is not None:
-                if self.id is None:
-                    Logger.error(f"Inner sync requested by {self.current_state_label} "
-                                 f"({deep_state.name})- but why processing here?")
-                    self.parent._inner_sync_request = True
-                    self._inner_sync_request = False  # Clear after passing upstream
-                else:
-                    Logger.warning(f"Sync request processed by {self.id} {self.name} with "
-                                   f"current state={self.current_state_label} ({deep_state.name})")
-                    msg = BehaviorSync()
-                    msg.behavior_id = self.id
-                    msg.current_state_checksum = zlib.adler32(deep_state.path.encode()) & 0x7fffffff
-                    self._pub.publish('flexbe/mirror/sync', msg)
-                    self._inner_sync_request = False
-                    self._pub.publish('flexbe/command_feedback', CommandFeedback(command="sync", args=[]))
-                    Logger.localinfo("<-- Sent synchronization message for mirror.")
+            if self.id is None:
+                Logger.localerr("Sync requested - but why processing here - self.id is None!")
 
-            else:
-                Logger.warning(f"Inner sync requested for {self.name} :"
-                               f" {self.current_state_label} - no deep state!?'")
-                self._inner_sync_request = False
+            msg = BehaviorSync()
+            msg.behavior_id = self.id
+            try:
+                deep_state = self.get_deep_state()
+                if deep_state is not None:
+                    try:
+                        current_label = self.current_state_label
+                    except StateMachineError:  # pylint: disable=W0703
+                        current_label = "None"
+
+                    Logger.localinfo(f"Sync request processed by {self.id} {self.name} with "
+                                     f"current state={current_label} (deep state = {deep_state.name})")
+                    msg.current_state_checksum = zlib.adler32(deep_state.path.encode()) & 0x7fffffff
+
+                else:
+                    Logger.localwarn(f"Inner sync requested for {self.name} : - no active deep state!'")
+            except Exception as exc:  # pylint: disable=W0703
+                Logger.localerr(f"Inner sync requested by {self.id} - encountered error {type(exc)}:\n  {exc}")
+
+            self._inner_sync_request = False
+            self._pub.publish('flexbe/mirror/sync', msg)
+            self._pub.publish('flexbe/command_feedback', CommandFeedback(command="sync", args=[]))
+            Logger.localinfo("<-- Sent synchronization message for mirror.")
         else:
             Logger.error('Inner sync processed for %s - but no sync request flag?' % (self.name))
 
@@ -266,9 +271,9 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo("<-- Sent attach confirm.")
 
     def _mirror_structure_callback(self, msg):
-        Logger.localinfo(f"--> Creating behavior structure for mirror...\n  {msg}")
+        Logger.localinfo(f"--> Creating behavior structure for mirror id={msg.data} ...")
         self._pub.publish('flexbe/mirror/structure', self._build_structure_msg())
-        Logger.localinfo("<-- Sent behavior structure for mirror.")
+        Logger.localinfo("<-- Sent behavior structure to mirror.")
         # enable control of states since a mirror is listening
         self._enable_ros_control()
 
