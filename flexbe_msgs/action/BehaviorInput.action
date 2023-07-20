@@ -1,15 +1,25 @@
 # If desired, custom request types can be defined and choosen here
 uint8 request_type
 
+# Basic types (used by input_action_server, but otherwise optional)
+uint8 REQUEST_INT          = 0  # Single integer value
+uint8 REQUEST_FLOAT        = 1  # Float
+uint8 REQUEST_2D           = 2  # List of 2 floats
+uint8 REQUEST_3D           = 3  # List of 3 floats
+uint8 REQUEST_4D           = 4  # List of 4 floats (e.g. quaternion)
+uint8 REQUEST_POSE         = 10 # Geometry message pose
+uint8 REQUEST_POSE_STAMPED = 11 # Geometry message pose stamped
+
+
 # Request message displayed to the operator
 # Provide context information, i.e. for which purpose the data is required.
 string msg
 
 ---
 
-uint8 RESULT_OK 		= 0
-uint8 RESULT_FAILED		= 1
-uint8 RESULT_ABORTED	= 2
+uint8 RESULT_OK         = 0
+uint8 RESULT_FAILED     = 1
+uint8 RESULT_ABORTED    = 2
 
 # Indicates if the request has been successful
 uint8 result_code
@@ -19,3 +29,5 @@ uint8 result_code
 string data
 
 ---
+
+

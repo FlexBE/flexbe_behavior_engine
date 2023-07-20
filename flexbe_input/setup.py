@@ -22,7 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'flexbe_input = flexbe_input.bin.flexbe_input:main'
+            'flexbe_input = flexbe_input.bin.flexbe_input:main',
+            'input_action_server = flexbe_input.input_action_server:main'
         ]
     },
 )

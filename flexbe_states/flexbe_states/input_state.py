@@ -28,7 +28,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-
+import ast
 import pickle
 
 from flexbe_core import EventState, Logger
@@ -42,15 +42,15 @@ class InputState(EventState):
 
     Requests of different types, such as requesting a waypoint, a template, or a pose, can be specified.
 
-    -- request 	uint8 		One of the custom-defined values to specify the type of request.
-    -- message 	string 		Message displayed to the operator to let him know what to do.
+    -- request  uint8       One of the custom-defined values to specify the type of request.
+    -- message  string      Message displayed to the operator to let him know what to do.
 
-    #> data 	object 		The data provided by the operator. The exact type depends on the request.
+    #> data     object      The data provided by the operator. The exact type depends on the request.
 
-    <= received 			Returned as soon as valid data is available.
-    <= aborted 				The operator declined to provide the requested data.
-    <= no_connection 		No request could be sent to the operator.
-    <= data_error 			Data has been received, but could not be deserialized successfully.
+    <= received             Returned as soon as valid data is available.
+    <= aborted              The operator declined to provide the requested data.
+    <= no_connection        No request could be sent to the operator.
+    <= data_error           Data has been received, but could not be deserialized successfully.
     """
 
     def __init__(self, request, message):
@@ -60,13 +60,13 @@ class InputState(EventState):
         self._action_topic = 'flexbe/behavior_input'
         ProxyActionClient.initialize(InputState._node)
         self._client = ProxyActionClient({self._action_topic: BehaviorInput})
-
         self._request = request
         self._message = message
         self._connected = True
         self._received = False
 
     def execute(self, userdata):
+
         if not self._connected:
             return 'no_connection'
         if self._received:
@@ -78,11 +78,15 @@ class InputState(EventState):
                 userdata.data = None
                 return 'aborted'
             else:
+                # Attempt to load data and convert it to the proper format.
                 try:
-                    response_data = pickle.loads(result.data)
+                    # Convert string to pickle byte array and load
+                    input_data = ast.literal_eval(result.data)
+                    response_data = pickle.loads(input_data)
+                    Logger.localinfo(f" InputState returned {type(response_data)} : {response_data}")
                     userdata.data = response_data
-                except Exception as e:
-                    Logger.logwarn('Was unable to load provided data:\n%s' % str(e))
+                except Exception as exc:  # pylint: disable=W0703
+                    Logger.logwarn(f"Was unable to load provided data:\n    '{result.data}'\n    {str(exc)}")
                     userdata.data = None
                     return 'data_error'
 
@@ -94,10 +98,13 @@ class InputState(EventState):
     def on_enter(self, userdata):
         self._received = False
 
+        # Retrive the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal()
+        # Retrive the request type and message from goal.
         action_goal.request_type = self._request
         action_goal.msg = self._message
 
+        # Attempt to send the goal.
         try:
             self._client.send_goal(self._action_topic, action_goal)
         except Exception as e:
