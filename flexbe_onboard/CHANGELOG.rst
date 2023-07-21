@@ -1,6 +1,14 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* flake8 cleanup; make test consistent
+* protect against build farm timing issue
+* updates to dependencies for ROS build farm
+* clean up some spam to FlexBE App console and just send to local terminal and log
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
 2.2.0 (2023-06-29)
 ------------------
 * Modify to used behavior_id (checksum) and behavior_key consistently

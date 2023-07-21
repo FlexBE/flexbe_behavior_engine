@@ -9,7 +9,7 @@ PACKAGE_NAME = 'flexbe_states'
 
 setup(
     name=PACKAGE_NAME,
-    version='2.2.0',
+    version='2.3.0',
     packages=find_packages(),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),

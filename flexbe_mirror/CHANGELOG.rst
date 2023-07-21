@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* flake8 cleanup; make test consistent
+* protect against build farm timing issue
+* updates to dependencies for ROS build farm
+* clean up some spam to FlexBE App console and just send to local terminal and log
+
 2.2.0 (2023-06-29)
 ------------------
 * Activate mirror in new thread on receipt of new structure (prevent deadlock)

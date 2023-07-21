@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* add input_action_server with UI and update handling inside input_state
+  * WARNING: This change to input_state.py may require changes to how data is being sent
+* add timeout and use wait duration to action client calls
+* Updates to dependencies for ROS build farm
+
 2.2.0 (2023-06-29)
 ------------------
 * update to use flexbe_testing with colcon test; pylint, flake8, pep257 cleanup

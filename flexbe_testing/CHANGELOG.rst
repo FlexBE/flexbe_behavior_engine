@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+* remove rclpy from CMakeLists.txt
+* remove unnecessary rclcpp depends
+
 2.2.0 (2023-06-29)
 ------------------
 * update to support pytest unittest cases via colcon test; pylint, flake8, and pep257 cleanup
