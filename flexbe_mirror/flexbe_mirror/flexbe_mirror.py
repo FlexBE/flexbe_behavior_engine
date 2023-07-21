@@ -164,14 +164,14 @@ class FlexbeMirror(Node):
             self._wait_stopping()
 
             if self._running:
-                Logger.logwarn(f'Received a new mirror structure for checksum id={struct_msg.behavior_id} '
-                               f'while mirror is already running with active id={self._active_id}; '
-                               'adding to buffer for later')
+                Logger.localwarn(f'Received a new mirror structure for checksum id={struct_msg.behavior_id} '
+                                 f'while mirror is already running with active id={self._active_id}; '
+                                 'adding to buffer for later')
                 self._struct_buffer.append(struct_msg)
                 return
             elif self._active_id not in (BehaviorSync.INVALID, struct_msg.behavior_id):
-                Logger.logwarn(f'Received mirror structure id={struct_msg.behavior_id} that does '
-                               f'not match active id = {self._active_id} - will ignore!')
+                Logger.localwarn(f'Received mirror structure id={struct_msg.behavior_id} that does '
+                                 f'not match active id = {self._active_id} - will ignore!')
                 return
 
             # At this point, either active_id is invalid or same behavior checksum id
@@ -180,7 +180,7 @@ class FlexbeMirror(Node):
             self._struct_buffer = []
             self._mirror_state_machine(struct_msg)
             if self._sm:
-                Logger.loginfo('Mirror built for checksum id = {self._active_id}')
+                Logger.localinfo(f'Mirror built for checksum id = {self._active_id}')
             else:
                 Logger.localwarn(f'Error processing mirror structure for behavior checksum id = {struct_msg.behavior_id}')
                 Logger.logwarn('Requesting a new mirror structure from onboard ...')
@@ -191,8 +191,8 @@ class FlexbeMirror(Node):
             self._running = True  # Ready to start execution, so flag it as so before releasing sync
 
         # Release sync lock and execute the mirror
-        Logger.loginfo(f'--> Mirror - begin execution of '
-                       f'active mirror for checksum id = {struct_msg.behavior_id}')
+        Logger.localinfo(f'--> Mirror - begin execution of '
+                         f'active mirror for checksum id = {struct_msg.behavior_id}')
 
         try:
             self._execute_mirror()
@@ -285,7 +285,7 @@ class FlexbeMirror(Node):
                 self._wait_stop_running()
 
             else:
-                Logger.loginfo('No onboard behavior is active.')
+                Logger.localinfo('No onboard behavior is active.')
 
             self._active_id = BehaviorSync.INVALID
             self._sm = None
@@ -293,7 +293,7 @@ class FlexbeMirror(Node):
             self._sub.remove_last_msg(self._outcome_topic, clear_buffer=True)
 
             if msg is not None and msg.code != BEStatus.SWITCHING:
-                Logger.loginfo('\033[92m--- Behavior Mirror ready! ---\033[0m')
+                Logger.localinfo('\033[92m--- Behavior Mirror ready! ---\033[0m')
 
             # self.get_logger().info('--> Mirror - stopped mirror for '
             #                        f'checksum id={msg.behavior_id} - ready to release sync lock ...')
@@ -362,18 +362,18 @@ class FlexbeMirror(Node):
 
     def _wait_stop_running(self):
         PreemptableState.preempt = True
-        running_cnt = 0
+        running_cnt = 1
         while self._running:
-            if running_cnt % 49 == 0:
+            if running_cnt % 50 == 0:
                 Logger.logwarn('Waiting for another mirror to stop ...')
             running_cnt += 1
             self._timing_event.wait(0.02)  # Use system time for polling check, never sim_time
         Logger.loginfo('Mirror stopped running !')
 
     def _wait_stopping(self):
-        stopping_cnt = 0
+        stopping_cnt = 1
         while self._stopping:
-            if stopping_cnt % 49 == 0:
+            if stopping_cnt % 50 == 0:
                 Logger.logwarn(f'Waiting for another mirror with {self._active_id} to stop ...')
             stopping_cnt += 1
             self._timing_event.wait(0.02)  # use wall clock not sim time
@@ -394,7 +394,7 @@ class FlexbeMirror(Node):
             try:
                 self._mirror_state_machine(self._current_struct)
                 if self._sm:
-                    Logger.loginfo('Mirror built for behavior checksum id = {msg.behavior_id}.')
+                    Logger.loginfo(f'Mirror built for behavior checksum id = {msg.behavior_id}.')
                 else:
                     Logger.localwarn(f'Missing correct mirror structure for restarting behavior checksum id ={msg.behavior_id}')
                     Logger.logwarn('Requesting mirror structure from onboard ...')
@@ -433,8 +433,8 @@ class FlexbeMirror(Node):
             except Exception:  # pylint: disable=W0703
                 # Likely the loggers are dead if we ctrl-C'd during active behavior
                 # so just try a simple print
-                print('\n(_execute_mirror Traceback): Caught exception on preempt:\n%s' % str(exc))
-                print(traceback.format_exc().replace("%", "%%"))
+                print('\n(_execute_mirror Traceback): Caught exception on preempt:\n%s' % str(exc), flush=True)
+                print(traceback.format_exc().replace("%", "%%"), flush=True)
             result = 'preempted'
 
         self._running = False

@@ -121,19 +121,35 @@ class BehaviorLibrary:
             self.parse_packages()
             return self._behavior_lib.get(be_key, None)
 
-    def find_behavior(self, be_name):
+    def find_behavior(self, be_identifier):
         """
         Search for a behavior with the given name and returns it along with its ID.
 
-        @type be_name: string
-        @param be_name: Behavior ID to look up.
+        @type be_identifier: string
+        @param be_identifier: Behavior identifier in form of package/"Behavior Name"
 
         @return Tuple (be_key, be_entry) corresponding to the name or (None, None) if not found.
         """
-        def __find_behavior():
-            return next((id, be) for (id, be)
-                        in self._behavior_lib.items()
-                        if be["name"] == be_name)
+
+        if "/" in be_identifier:
+            # Identifier in the form of package/Name
+            # where only first slash delineates package
+            be_split = be_identifier.split("/")
+            be_package, be_name = be_split[0], "/".join(be_split[1:])
+
+            def __find_behavior():
+                return next((id, be) for (id, be)
+                            in self._behavior_lib.items()
+                            if be["name"] == be_name and be["package"] == be_package)
+        else:
+            # Accept older form of only Name, but this will return the first matching name!
+            be_package = None
+            be_name = be_identifier
+
+            def __find_behavior():
+                return next((id, be) for (id, be)
+                            in self._behavior_lib.items()
+                            if be["name"] == be_name)  # Returns first matching name regardless of package
         try:
             return __find_behavior()
         except StopIteration:

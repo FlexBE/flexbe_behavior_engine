@@ -113,7 +113,7 @@ class ConcurrencyContainer(OperatableStateMachine):
         # thus, as a quick fix, explicitly request sync again on any output
         self._inner_sync_request = True
         self._current_state = None
-        Logger.warning('ConcurrencyContainer %s returning outcome %s (request inner sync)' % (self.name, str(outcome)))
+        Logger.localwarn('ConcurrencyContainer %s returning outcome %s (request inner sync)' % (self.name, str(outcome)))
         return outcome
 
     def _execute_single_state(self, state, force_exit=False):
