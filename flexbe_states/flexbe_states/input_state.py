@@ -44,7 +44,7 @@ class InputState(EventState):
 
     -- request  uint8       One of the custom-defined values to specify the type of request.
     -- message  string      Message displayed to the operator to let him know what to do.
-    -- timeout  float       Timeout in seconds
+    -- timeout  float       Timeout in seconds to wait for server to be available.
 
     #> data     object      The data provided by the operator. The exact type depends on the request.
 
