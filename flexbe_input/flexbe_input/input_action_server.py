@@ -70,12 +70,12 @@ class InputActionServer(Node):
 
         @return prompt, instance type, number of elements
         """
-        # Thse are the only types handled by this primitive UI
+        # Thse are the only types handled by this simple UI
         types = {BehaviorInput.Goal.REQUEST_INT: ("int", int, 1),
                  BehaviorInput.Goal.REQUEST_FLOAT: ("float", (float, int), 1),  # int acceptable for desired float
-                 BehaviorInput.Goal.REQUEST_2D: ("list of 2 floats", list, 2),
-                 BehaviorInput.Goal.REQUEST_3D: ("list of 3 floats", list, 3),
-                 BehaviorInput.Goal.REQUEST_4D: ("list of 4 floats", list, 4),
+                 BehaviorInput.Goal.REQUEST_2D: ("list of 2 numbers", (list, tuple), 2),  # allow either list or tuple
+                 BehaviorInput.Goal.REQUEST_3D: ("list of 3 numbers", (list, tuple), 3),  # e.g., "[1, 2]", "(1, 2)", or "1, 2"
+                 BehaviorInput.Goal.REQUEST_4D: ("list of 4 numbers", (list, tuple), 4),
                  }
 
         if request_type in types:
