@@ -195,12 +195,17 @@ class ProxyActionClient:
     @classmethod
     def is_available(cls, topic):
         """
-        Check if the client on the given action topic is available.
+        Check if the client and server for the given action topic is available.
 
         @type topic: string
         @param topic: The topic of interest.
         """
-        return ProxyActionClient._check_topic_available(topic)
+        client = ProxyActionClient._clients.get(topic)
+        if client is None:
+            Logger.logerr("Action client '%s' is not yet registered, need to add it first!" % topic)
+            return False
+
+        return client.server_is_ready()
 
     @classmethod
     def has_result(cls, topic):
@@ -330,14 +335,14 @@ class ProxyActionClient:
                 warning_sent = True
 
         if not available:
-            Logger.logerr(f"Action client '{topic}' not available - timed out after {wait_duration:.3f} seconds!")
+            Logger.logerr(f"Action client/server '{topic}' is not available - timed out after {wait_duration:.3f} seconds!")
             return False
 
         if warning_sent:
-            Logger.loginfo(f"Finally found action client '{topic}'!")
+            Logger.loginfo(f"Finally found action client/server '{topic}'!")
 
         return True
 
     @classmethod
     def _print_wait_warning(cls, topic):
-        Logger.logwarn("Waiting for action client %s..." % (topic))
+        Logger.logwarn(f"Waiting for action client/server for '{topic}'")

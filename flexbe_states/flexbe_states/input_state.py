@@ -44,6 +44,7 @@ class InputState(EventState):
 
     -- request  uint8       One of the custom-defined values to specify the type of request.
     -- message  string      Message displayed to the operator to let him know what to do.
+    -- timeout  float       Timeout in seconds
 
     #> data     object      The data provided by the operator. The exact type depends on the request.
 
@@ -53,15 +54,16 @@ class InputState(EventState):
     <= data_error           Data has been received, but could not be deserialized successfully.
     """
 
-    def __init__(self, request, message):
+    def __init__(self, request, message, timeout=1.0):
         """Construct instance."""
         super(InputState, self).__init__(outcomes=['received', 'aborted', 'no_connection', 'data_error'],
                                          output_keys=['data'])
         self._action_topic = 'flexbe/behavior_input'
         ProxyActionClient.initialize(InputState._node)
-        self._client = ProxyActionClient({self._action_topic: BehaviorInput})
+        self._client = ProxyActionClient({self._action_topic: BehaviorInput}, wait_duration=0.0)
         self._request = request
         self._message = message
+        self._timeout = timeout
         self._connected = True
         self._received = False
 
@@ -106,7 +108,7 @@ class InputState(EventState):
 
         # Attempt to send the goal.
         try:
-            self._client.send_goal(self._action_topic, action_goal)
+            self._client.send_goal(self._action_topic, action_goal, wait_duration=self._timeout)
         except Exception as e:
             Logger.logwarn('Was unable to send data request:\n%s' % str(e))
             self._connected = False

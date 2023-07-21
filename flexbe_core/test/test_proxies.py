@@ -267,9 +267,9 @@ class TestProxies(unittest.TestCase):
         server = ActionServer(self.node, BehaviorExecution, topic1, execute_cb)
 
         ProxyActionClient.initialize(self.node)
-        client = ProxyActionClient({topic1: BehaviorExecution})
+        client = ProxyActionClient({topic1: BehaviorExecution}, wait_duration=1.0)
         self.assertFalse(client.has_result(topic1))
-        client.send_goal(topic1, BehaviorExecution.Goal())
+        client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
 
         end_time = time.time() + 10
         while time.time() < end_time:
@@ -281,7 +281,7 @@ class TestProxies(unittest.TestCase):
         result = client.get_result(topic1)
         self.assertEqual(result.outcome, 'ok')
 
-        client.send_goal(topic1, BehaviorExecution.Goal())
+        client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
 
         # end_time = time.time() + 2
         while not client.has_result(topic1):
