@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* add input_action_server with UI and update handling inside input_state
+  * WARNING: This change to input_state.py may require changes to how data is being sent
+* Updates to dependencies for ROS build farm
+
 2.2.0 (2023-06-29)
 ------------------
 * pep257, flake8, and pylint cleanup

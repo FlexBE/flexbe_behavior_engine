@@ -1,6 +1,14 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+* remove rclpy from CMakeLists.txt
+* remove unnecessary rclcpp depends
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
 2.2.0 (2023-06-29)
 ------------------
 * Initiate start up launch in thread safe manner with future (prevent deadlock)

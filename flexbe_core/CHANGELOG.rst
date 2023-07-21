@@ -1,6 +1,18 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* add wait_duration to proxy action client send goal and other tweaks
+  * This change could reducing waiting. If you need longer wait time, specify wait_duration
+* make action client is_available check current status not wait
+* flake8 cleanup; make test consistent; protect against build farm timing issue
+* cleanup; modify handling of existing subscriptions
+* Updates to dependencies for ROS build farm
+* Modify sync messaging to avoid issue if not active state when behavior shuts down
+* clean up some spam to FlexBE app console
+* include package name in behavior request (requires flexbe_app 3.1+) to allow duplicate behavior names in packages
+
 2.2.0 (2023-06-29)
 ------------------
 * Modify to used behavior_id (checksum) and behavior_key consistently

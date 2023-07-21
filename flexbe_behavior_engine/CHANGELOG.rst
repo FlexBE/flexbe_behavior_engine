@@ -1,6 +1,11 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.0 (2023-07-20)
+------------------
+* update CMakeLists cmake_minimum_version
+* Updates to dependencies for ROS build farm
+
 2.2.0 (2023-06-29)
 ------------------
 * [flexbe_core, flexbe_onboard, flexbe_mirror, flexbe_widget]
