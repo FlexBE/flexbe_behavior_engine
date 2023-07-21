@@ -52,6 +52,13 @@ class InputState(EventState):
     <= aborted              The operator declined to provide the requested data.
     <= no_connection        No request could be sent to the operator.
     <= data_error           Data has been received, but could not be deserialized successfully.
+
+    Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
+        Warning: The pickle module is not secure against erroneous or maliciously constructed data. 
+        Never unpickle data received from an untrusted or unauthenticated source.
+
+    If using this state to accept user input, it is up to the user to protect their network from untrusted data!
+
     """
 
     def __init__(self, request, message, timeout=1.0):
@@ -82,9 +89,14 @@ class InputState(EventState):
             else:
                 # Attempt to load data and convert it to the proper format.
                 try:
-                    # Convert string to pickle byte array and load
+                    # Convert string to byte array and load using pickle
                     input_data = ast.literal_eval(result.data)
+
+                    # Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
+                    #     Warning: The pickle module is not secure against erroneous or maliciously constructed data.
+                    #     Never unpickle data received from an untrusted or unauthenticated source.
                     response_data = pickle.loads(input_data)
+
                     Logger.localinfo(f" InputState returned {type(response_data)} : {response_data}")
                     userdata.data = response_data
                 except Exception as exc:  # pylint: disable=W0703
@@ -105,6 +117,7 @@ class InputState(EventState):
         # Retrive the request type and message from goal.
         action_goal.request_type = self._request
         action_goal.msg = self._message
+        Logger.loghint(f"Onboard requests '{self._message}'")
 
         # Attempt to send the goal.
         try:
