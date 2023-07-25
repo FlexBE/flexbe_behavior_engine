@@ -4,79 +4,141 @@ if [ $# != 1 ]; then
   exit 2
 fi
 
+
+# Check the desired directory
+# Note, someone may want to put this in another folder, so it 
+#       is not necessarily incorrect to run from different folder
+if [[ ":$WORKSPACE_ROOT/src:" != ":$PWD:" ]]; then
+  echo -e "\e[93mNormally we run this command from the \$WORKSPACE_ROOT/src folder.\e[0m"
+  echo -e "\e[93m  not ${PWD}\e[0m"
+  while true; do
+    read -p "Do you want to continue at current location? (yes/no) " yn
+    case $yn in 
+      yes|Yes|y|Y|YES ) 
+        break;;
+      no|No|n|N|NO ) 
+          while true; do
+            read -p "Do you want to change to \$WORKSPACE_ROOT/src and continue? (yes/no) " yn
+            case $yn in 
+              yes|Yes|y|Y|YES ) 
+                cd ${WORKSPACE_ROOT}/src
+                if [[ ":$WORKSPACE_ROOT/src:" != *":$PWD"* ]]; then
+                  echo "Invalid folder ${PWD} - quit!"
+                  exit
+                fi
+                echo "Continuing from ${PWD} ..."
+                break;;
+              no|No|n|N|NO ) 
+                echo -e "\e[93mChange to appropriate directory and retry!\e[0m";
+                exit;;
+              * ) echo invalid response;;
+            esac
+          done
+        echo -e "\e[93mChange to appropriate directory and retry!\e[0m";
+        exit;;
+      * ) echo invalid response;;
+    esac
+  done
+  echo ""
+fi
+
 name=$1
-echo -e "Will initialize new behaviors repo \e[1m${name}_behaviors\033[0m ..."
-
+echo -e "\e[96mInitializing new behaviors repo \e[1m${name}_behaviors ...\033[0m"
 echo ""
-echo -e "\e[96m(1/4) Checking package dependencies...\033[0m"
-#PACKAGES_TO_INSTALL="ros-${ROS_DISTRO}-rosbridge-server"
-#echo "Require: $PACKAGES_TO_INSTALL" | sed -e "s/ /\n - /g"
-#dpkg -s $PACKAGES_TO_INSTALL 2>/dev/null >/dev/null || sudo apt-get -y install $PACKAGES_TO_INSTALL
-echo "Done"
-
-echo ""
-echo -e "\e[96m(2/4) Fetching project structure...\033[0m"
+echo -e "\e[96m(2/5) Fetching project structure...\033[0m"
 git clone https://github.com/FlexBE/flexbe_project_behaviors.git ${name}_behaviors
+if [ ! $? -eq 0 ]; then
+    echo -e "\e[92mFailed to clone the structure!\033[0m"
+    exit
+fi
+
 cd ${name}_behaviors
- # use new ROS 2 flexbe_app workspace layout, remove when merged into master
+
+echo -e "\e[96mSet up for ROS 2 development ...\033[0m"
 git fetch
-git checkout ros2-devel-alpha
+git checkout ros2-devel  # use new ROS 2 flexbe_app workspace layout, remove when merged into main
 
 echo ""
-echo -e "\e[96m(3/4) Configuring project template...\033[0m"
+echo -e "\e[96m(3/5) Configuring project template...\033[0m"
+
+# update the flexbe_states folder
 sed -i -e "s/PROJECT_flexbe_states/${name}_flexbe_states/g" \
-  PROJECT_flexbe_states/CMakeLists.txt \
+  PROJECT_flexbe_states/CHANGELOG.rst \
   PROJECT_flexbe_states/package.xml \
-  PROJECT_flexbe_states/test/example_state.test \
   PROJECT_flexbe_states/setup.py \
-  PROJECT_flexbe_states/setup.cfg
+  PROJECT_flexbe_states/setup.cfg \
+  PROJECT_flexbe_states/tests/example_state.test \
+  PROJECT_flexbe_states/tests/example_action_state.test \
+  PROJECT_flexbe_states/tests/run_colcon_test.py \
+  PROJECT_flexbe_states/tests/run_tests.launch.py
 
 mv PROJECT_flexbe_states/PROJECT_flexbe_states PROJECT_flexbe_states/${name}_flexbe_states
 mv PROJECT_flexbe_states/resource/PROJECT_flexbe_states PROJECT_flexbe_states/resource/${name}_flexbe_states
 mv PROJECT_flexbe_states ${name}_flexbe_states
 
+# update the flexbe_behaviors folder
 sed -i -e "s/PROJECT_flexbe_behaviors/${name}_flexbe_behaviors/g" \
+  PROJECT_flexbe_behaviors/bin/copy_behavior \
+  PROJECT_flexbe_behaviors/CHANGELOG.rst \
   PROJECT_flexbe_behaviors/CMakeLists.txt \
   PROJECT_flexbe_behaviors/package.xml \
+  PROJECT_flexbe_behaviors/manifest/example_behavior.xml \
+  PROJECT_flexbe_behaviors/manifest/example_action_state_behavior.xml \
   PROJECT_flexbe_behaviors/setup.py \
-  PROJECT_flexbe_behaviors/setup.cfg \
-  PROJECT_flexbe_behaviors/manifest/example_behavior.xml
+  PROJECT_flexbe_behaviors/setup.cfg
+
+sed -i -e "s/PROJECT/${name}/g" PROJECT_flexbe_behaviors/bin/copy_behavior 
 
 mv PROJECT_flexbe_behaviors/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/${name}_flexbe_behaviors
 mv PROJECT_flexbe_behaviors/resource/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/resource/${name}_flexbe_behaviors
 mv PROJECT_flexbe_behaviors ${name}_flexbe_behaviors
 
-rm README.md
-echo -e "# ${name}_behaviors\r\nThis repo contains all ${name}-specific states and behaviors." >> README.md
-echo "Done"
+# Handle the meta-package folder
+sed -i -e "s/PROJECT/${name}/g" \
+  PROJECT_behaviors/CMakeLists.txt \
+  PROJECT_behaviors/package.xml \
+  PROJECT_behaviors/CHANGELOG.rst
+
+mv PROJECT_behaviors${name}_behaviors
+
+sed -i -e "s/PROJECT/${name}/g" README.md
 
 echo ""
-echo -e "\e[96m(4/4) Initializing new repository...\033[0m"
+echo -e "\e[96m(4/5) Removing the original git repository...\033[0m"
 rm -rf .git
-git init
-git add .
-git commit -m "Initial commit"
 
-echo ""
-echo -e "\e[92mCongratulations\033[0m, your new repository  \e[1m${name}_behaviors\033[0m  is ready to be pushed!"
-echo -e "Please run the following commands to push it:"
-echo -e "  git remote add origin [your_repo_url]"
-echo -e "  git push origin master"
-echo ""
-echo -e "Your new repository already contains an example behavior and examples for writing own states:"
-echo -e "  rosed ${name}_flexbe_states example_state.py"
-echo -e "  rosed ${name}_flexbe_states example_action_state.py"
+while true; do
+  read -p "(5/5) Do you want to initialize a new Git repository for this project? (yes/no) " yn
+
+  case $yn in 
+    yes|Yes|y|Y|YES ) 
+      echo -e "\e[96m(5/5) Initializing new repository...\033[0m";
+      git init -b main
+      git add .
+      git commit -m "Initial commit"
+      echo ""
+      echo -e "\e[92mCongratulations\033[0m, your new repository  \e[1m${name}_behaviors\033[0m  is ready to be pushed!"
+      echo -e "Please run the following commands to push it:"
+      echo -e "  git remote add origin [your_repo_url]"
+      echo -e "  git push origin main"
+      echo ""
+      break;;
+    no|No|n|N|NO ) echo "Skipping git initialization!";
+      break;;
+    * ) echo invalid response;;
+  esac
+done
+
 echo ""
 echo -e "Clone the following repository for a user interface (editor + runtime control) for FlexBE:"
 echo -e "  git clone https://github.com/FlexBE/flexbe_app.git"
 echo ""
-echo -e "\e[96mMake sure to build your workspace.\033[0m"
+echo -e "Consider running rosdep to update any missing dependencies ..."
+echo -e "  rosdep install --from-paths src --ignore-src -r -y"
 echo ""
-
-cd ..
-if [[ ":$ROS_PACKAGE_PATH:" != *":$PWD"* ]]; then
-  echo -e "\e[93mThe repository is not on the ROS_PACKAGE_PATH.\e[0m"
-  echo -e "Run the following command if this was not on purpose:"
-  echo -e "  roscd && cd ../src && mv $PWD/${name}_behaviors ${name}_behaviors"
-  echo ""
-fi
+echo -e "\e[96mMake sure to build your workspace using colcon and run setup.bash as usual.\033[0m"
+echo ""
+echo -e "\e[92mSee the README.md for more information about this project.\033[0m"
+echo ""
+echo -e "\e[92mFinished!\033[0m"
+cd ..  # Back to the starting point
