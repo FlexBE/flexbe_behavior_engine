@@ -1,9 +1,19 @@
 #!/bin/bash
-if [ $# != 1 ]; then
+if [ $# -lt 1 ]; then
   echo -e "\e[93mPlease provide your desired project name as argument.\033[0m"
   exit 2
 fi
 
+if [ $# -ne 2 ]; then
+    interactive=true
+else
+    if [ $2 = "--non-interactive" ]; then
+        echo "Running in non-interactive mode for CI tests ..."
+        interactive=false
+    else
+        interactive=true
+    fi
+fi
 
 # Check the desired directory
 # Note, someone may want to put this in another folder, so it 
@@ -11,7 +21,7 @@ fi
 if [[ ":$WORKSPACE_ROOT/src:" != ":$PWD:" ]]; then
   echo -e "\e[93mNormally we run this command from the \$WORKSPACE_ROOT/src folder.\e[0m"
   echo -e "\e[93m  not ${PWD}\e[0m"
-  while true; do
+  while $interactive; do
     read -p "Do you want to continue at current location? (yes/no) " yn
     case $yn in 
       yes|Yes|y|Y|YES ) 
@@ -107,7 +117,7 @@ echo ""
 echo -e "\e[96m(4/5) Removing the original git repository...\033[0m"
 rm -rf .git
 
-while true; do
+while $interactive; do
   read -p "(5/5) Do you want to initialize a new Git repository for this project? (yes/no) " yn
 
   case $yn in 
