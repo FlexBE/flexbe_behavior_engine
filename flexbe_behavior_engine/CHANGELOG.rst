@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+* Update flexbe_ci.yml for actions/checkout@v3 
+
 2.3.0 (2023-07-20)
 ------------------
 * update CMakeLists cmake_minimum_version

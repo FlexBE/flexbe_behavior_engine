@@ -1,6 +1,16 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+* modify input to allow lists or tuples (or just csv numbers)
+* add pickle warning
+* post user prompt as hint to FlexBE log.
+* tweak the timeout description
+* use wait duration in input_state
+* modify is_available for current status check not wait
+* update action client test
+
 2.3.0 (2023-07-20)
 ------------------
 * add input_action_server with UI and update handling inside input_state
