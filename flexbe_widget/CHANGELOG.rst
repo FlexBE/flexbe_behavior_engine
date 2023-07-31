@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+* add non-interactive mode to create_repo for CI
+* update create_repo script for new ros2-devel release of https://github.com/FlexBE/flexbe_project_behaviors
+* merge from ros2-devel to reduce spam and missing package handling
+
 2.3.0 (2023-07-20)
 ------------------
 * update CMakeLists cmake_minimum_version

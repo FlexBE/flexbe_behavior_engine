@@ -1,6 +1,9 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+
 2.3.0 (2023-07-20)
 ------------------
 * add defined request types for BehaviorInput

@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+* merge from ros2-devel to reduce spam and missing package handling
+
 2.3.0 (2023-07-20)
 ------------------
 * flake8 cleanup; make test consistent

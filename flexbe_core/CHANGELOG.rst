@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.1 (2023-07-31)
+------------------
+* merge from ros2-devel to reduce spam and missing package handling
+
 2.3.0 (2023-07-20)
 ------------------
 * add wait_duration to proxy action client send goal and other tweaks
