@@ -1,21 +1,35 @@
 path: flexbe_states.subscriber_state
 class: SubscriberState
 
-launch: "from launch import LaunchDescription; from launch.actions import ExecuteProcess; def generate_launch_description():  return LaunchDescription([ExecuteProcess(cmd=['ros2', 'topic', 'pub', '/test', 'geometry_msgs/Pose', 'position: {x: 6.4}'])])"
+# Note: Need exec to get 'def generate_launch_description' on one line properly without syntax error
+launch: "from launch import LaunchDescription;from launch.actions import ExecuteProcess;exec('''def generate_launch_description():    return LaunchDescription([ExecuteProcess(cmd=['ros2', 'topic', 'pub', '/test', 'geometry_msgs/Pose', '{position: {x: 6.4}}'])])''')"
 
 wait_cond: rclpy.wait_for_message.wait_for_message('/test', __import__('geometry_msgs').msg.Pose)
 
 params:
-    topic: //test
+    topic: /test
     msg_type: geometry_msgs/Pose
     blocking: True
 
-#output:
-#    message: !!python/object/new:geometry_msgs.msg.Pose
-#        state:
-#        - !!python/object/new:geometry_msgs.msg.Point
-#            state: [6.4, 0.0, 0.0]
-#        - !!python/object/new:geometry_msgs.msg.Quaternion
-#            state: [0.0, 0.0, 0.0, 0.0]
+output:
+    message: !!python/object/new:geometry_msgs.msg._pose.Pose
+        state: !!python/tuple
+        - null
+        - _check_fields: false
+          _orientation: !!python/object/new:geometry_msgs.msg._quaternion.Quaternion
+                state: !!python/tuple
+                - null
+                - _check_fields: false
+                  _w: 1.0
+                  _x: 0.0
+                  _y: 0.0
+                  _z: 0.0
+          _position: !!python/object/new:geometry_msgs.msg._point.Point
+                state: !!python/tuple
+                - null
+                - _check_fields: false
+                  _x: 6.4
+                  _y: 0.0
+                  _z: 0.0
 
 outcome: received

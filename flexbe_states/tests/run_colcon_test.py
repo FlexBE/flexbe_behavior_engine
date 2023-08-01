@@ -93,6 +93,13 @@ class TestFlexBEStates(PyTester):
         """Run FlexBE unit test given .test file."""
         self.run_test("subscriber_state_unavailable")
 
+    # # #### issues with pub/yaml loading Pose - subscriber_state_pose
+    # # ##### Not launching and handling properly - skip for now
+    # def test_subscriber_state_pose(self):
+    #     """Run FlexBE unit test given .test file."""
+    #     # This test requires longer wait than normal
+    #     self.run_test("subscriber_state_pose", timeout_sec=1.5, max_cnt=5000)
+
     def test_wait_state_short(self):
         """
         Run FlexBE unit test given .test file.
@@ -102,5 +109,4 @@ class TestFlexBEStates(PyTester):
         self.run_test("wait_state_short", timeout_sec=1.5, max_cnt=5000)
 
     # Tests with issues
-    # # #### issues with pub/yaml loading Pose - subscriber_state_pose
     # # ### ros2 bag issues  - log_state_msg

@@ -5,7 +5,11 @@ params:
     first_arg: 5
 
 input:
-    second_arg: !!python/object/new:std_msgs.msg.Int32 {state: {"data": 2}}
+    second_arg: !!python/object/new:std_msgs.msg._int32.Int32
+        state: !!python/tuple
+        - null
+        - _check_fields: false
+          _data: 2
 
 output:
     output_value: 7
