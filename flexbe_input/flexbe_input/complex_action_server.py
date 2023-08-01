@@ -30,6 +30,8 @@
 # Author: Brian Wright.
 # Based on C++ simple_action_server.h by Eitan Marder-Eppstein
 
+import queue
+
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.duration import Duration
@@ -37,8 +39,6 @@ from rclpy.duration import Duration
 import threading
 import traceback
 from flexbe_core import Logger
-
-import six
 
 
 def nop_cb(goal_handle):
@@ -63,7 +63,7 @@ class ComplexActionServer:
     def __init__(self, node, name, ActionSpec, execute_cb=None, auto_start=False):
         self.node = node
         self.goals_received_ = 0
-        self.goal_queue_ = six.moves.queue.Queue()
+        self.goal_queue_ = queue.Queue()
 
         self.new_goal = False
 
@@ -94,7 +94,7 @@ class ComplexActionServer:
         self.action_server = ActionServer(node,
                                           action_type=ActionSpec,
                                           action_name=name,
-                                          execute_callback=None,
+                                          execute_callback=nop_cb,
                                           goal_callback=self.internal_goal_callback,
                                           cancel_callback=self.internal_preempt_callback)
 
@@ -203,7 +203,7 @@ class ComplexActionServer:
         loop_duration = Duration(seconds=0.1)
 
         while (rclpy.ok()):
-            Logger.logdebug("SAS: execute")
+            Logger.logdebug("ComplexActionServer: execute")
 
             with self.terminate_mutex:
                 if (self.need_to_terminate):
