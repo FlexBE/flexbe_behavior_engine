@@ -8,16 +8,16 @@ jobs:
   test:
     strategy:
       matrix:
-        ros: [humble] #, iron, rolling]
+        ros: [iron] #, rolling]
         include:
-        - os: ubuntu-22.04
-          ros: humble
-          python: python3
-          ci_branch: ros2-devel
         # - os: ubuntu-22.04
-        #   ros: iron
-        #   ci_branch: ros2-devel
+        #   ros: humble
         #   python: python3
+        #   ci_branch: ros2-devel
+        - os: ubuntu-22.04
+          ros: iron
+          ci_branch: iron
+          python: python3
         # - os: ubuntu-22.04
         #   ros: rolling
         #   python: python3
