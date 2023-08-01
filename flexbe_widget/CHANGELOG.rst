@@ -1,6 +1,9 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.2 (2023-08-01)
+------------------
+
 2.3.1 (2023-07-31)
 ------------------
 * add non-interactive mode to create_repo for CI

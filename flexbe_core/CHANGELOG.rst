@@ -1,6 +1,9 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.2 (2023-08-01)
+------------------
+
 2.3.1 (2023-07-31)
 ------------------
 * merge from ros2-devel to reduce spam and missing package handling

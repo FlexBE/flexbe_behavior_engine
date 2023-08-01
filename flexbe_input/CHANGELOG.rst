@@ -1,6 +1,11 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.2 (2023-08-01)
+------------------
+* use standard queue for complex_action_server
+* remove python-six dependency
+
 2.3.1 (2023-07-31)
 ------------------
 * modify input to allow lists or tuples (or just csv numbers); add pickle warning; post user prompt as hint to FlexBE log.
