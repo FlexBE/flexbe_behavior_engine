@@ -114,7 +114,8 @@ class ProxyPublisher:
                     # Same message type name, so likely due to reloading Python module on behavior change
                     Logger.localinfo(f'Existing publisher for {topic} with same message type name,'
                                      ' but different instance - re-create publisher!')
-                    # crashes Humble - ProxyPublisher._node.destroy_publisher(ProxyPublisher._topics[topic])
+                    ProxyPublisher._node.executor.create_task(ProxyPublisher.destroy_publisher,
+                                                              ProxyPublisher._topics[topic], topic)
                     qos = qos or QOS_DEFAULT
                     ProxyPublisher._topics[topic] = ProxyPublisher._node.create_publisher(msg_type, topic, qos)
                 else:
@@ -243,3 +244,16 @@ class ProxyPublisher:
             rate.wait(polling_rate)  # Use system time for polling, not ROS possibly sim_time
         del rate
         return False
+
+    @classmethod
+    def destroy_publisher(cls, pub, topic):
+        """Handle publisher destruction from within the executor threads."""
+        try:
+            if ProxyPublisher._node.destroy_publisher(pub):
+                Logger.localinfo(f'Destroyed the proxy publisher for {topic} ({id(pub)})!')
+            else:
+                Logger.localwarn(f'Some issue destroying the proxy publisher for {topic}!')
+            del pub
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.error("Something went wrong destroying proxy publisher"
+                         f" for {topic}!\n  {type(exc)} - {str(exc)}")

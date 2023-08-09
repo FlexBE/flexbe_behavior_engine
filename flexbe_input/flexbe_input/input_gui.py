@@ -36,6 +36,7 @@ class InputGUI(QMainWindow):
 
     Instances of this class should be created in input_action_server.py.
     """
+
     def __init__(self, prompt):
         QMainWindow.__init__(self)
 

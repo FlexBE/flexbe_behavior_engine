@@ -64,7 +64,11 @@ class BehaviorLibrary:
             pkg = parse_package(os.path.join(pkg_path, 'share', pkg_name))
             for export in pkg.exports:
                 if export.tagname == "flexbe_behaviors":
-                    self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
+                    try:
+                        self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
+                    except KeyError as exc:
+                        print(f"Error : duplicate behavior name found in {pkg_name} \n  {exc}", flush=True)
+                        raise exc
 
     def _add_behavior_manifests(self, path, pkg=None):
         """
@@ -130,7 +134,6 @@ class BehaviorLibrary:
 
         @return Tuple (be_key, be_entry) corresponding to the name or (None, None) if not found.
         """
-
         if "/" in be_identifier:
             # Identifier in the form of package/Name
             # where only first slash delineates package

@@ -43,7 +43,7 @@ def main(args=None):
     mirror = FlexbeMirror()
 
     # Use at least 2 threads to stay on top of pub/sub requirements
-    executor = rclpy.executors.MultiThreadedExecutor(num_threads=2)
+    executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(mirror)
 
     print("Begin behavior mirror processing ...", flush=True)
