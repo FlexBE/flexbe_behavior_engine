@@ -115,12 +115,9 @@ class ProxyActionClient:
                     Logger.localinfo(f'Existing action client for {topic}'
                                      f' with same action type name, but different instance -  re-create  client!')
 
+                    # Destroy the existing client in executor thread
                     client = ProxyActionClient._clients[topic]
-                    try:
-                        client.destroy()
-                    except Exception as exc:
-                        Logger.localinfo(f'Exception destroying old client for {topic}'
-                                         f'{type(exc)} - {exc}')
+                    ProxyActionClient._node.executor.create_task(ProxyActionClient.destroy_client, client, topic)
 
                     ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
                     ProxyActionClient._check_topic_available(topic, wait_duration)
@@ -346,3 +343,16 @@ class ProxyActionClient:
     @classmethod
     def _print_wait_warning(cls, topic):
         Logger.logwarn(f"Waiting for action client/server for '{topic}'")
+
+    @classmethod
+    def destroy_client(cls, client, topic):
+        """Handle client destruction from within the executor threads."""
+        try:
+            if ProxyActionClient._node.destroy_client(client):
+                Logger.localinfo(f'Destroyed the proxy action client for {topic} ({id(client)})!')
+            else:
+                Logger.localwarn(f'Some issue destroying the proxy action client for {topic}!')
+            del client
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.error("Something went wrong destroying proxy action client"
+                         f" for {topic}!\n  {type(exc)} - {str(exc)}")

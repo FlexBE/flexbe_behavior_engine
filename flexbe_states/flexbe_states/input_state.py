@@ -54,7 +54,7 @@ class InputState(EventState):
     <= data_error           Data has been received, but could not be deserialized successfully.
 
     Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
-        Warning: The pickle module is not secure against erroneous or maliciously constructed data. 
+        Warning: The pickle module is not secure against erroneous or maliciously constructed data.
         Never unpickle data received from an untrusted or unauthenticated source.
 
     If using this state to accept user input, it is up to the user to protect their network from untrusted data!

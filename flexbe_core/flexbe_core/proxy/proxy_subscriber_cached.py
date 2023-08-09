@@ -338,23 +338,38 @@ class ProxySubscriberCached:
         if topic in ProxySubscriberCached._topics:
 
             try:
-                if inst_id in ProxySubscriberCached._topics[topic]['subscribers']:
-                    ProxySubscriberCached._topics[topic]['subscribers'].remove(inst_id)
+                topic_dict = ProxySubscriberCached._topics[topic]
+                if inst_id in topic_dict['subscribers']:
+                    topic_dict['subscribers'].remove(inst_id)
                     Logger.localinfo(f"Unsubscribed {topic} from proxy! "
-                                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])} remaining)")
+                                     f"({len(topic_dict['subscribers'])} remaining)")
 
-                if inst_id in ProxySubscriberCached._topics[topic]['callbacks']:
-                    ProxySubscriberCached._topics[topic]['callbacks'].pop(inst_id)
+                if inst_id in topic_dict['callbacks']:
+                    topic_dict['callbacks'].pop(inst_id)
                     Logger.localinfo(f"Removed callback from proxy subscription for {topic} "
-                                     f"from proxy! ({len(ProxySubscriberCached._topics[topic]['callbacks'])} remaining)")
+                                     f"from proxy! ({len(topic_dict['callbacks'])} remaining)")
 
-                if len(ProxySubscriberCached._topics[topic]['subscribers']) == 0:
-                    Logger.localinfo(f"Proxy subscriber has no remaining customers for {topic}\n"
-                                     f"    Destroying subscription at node causes crash in Humble "
-                                     f"for both Cyclone and Fast DDS,\n"
-                                     f"    and recreating subscription later causes multiple callbacks per "
-                                     f"published message,\n    so just leave existing subscription in place for now!")
-                    # This has potential to leave topics from old behaviors active
-                    ProxySubscriberCached.disable_buffer(topic)  # Stop buffering until someone asks for it again
+                remaining_subscribers = len(topic_dict['subscribers'])
+                remaining_callbacks = len(topic_dict['callbacks'])
+                if remaining_subscribers == 0:
+                    assert remaining_callbacks == 0, "Must have at least one subscriber tracked for every callback!"
+                    sub = topic_dict['subscription']
+                    ProxySubscriberCached._topics.pop(topic)
+                    ProxySubscriberCached._node.executor.create_task(ProxySubscriberCached.destroy_subscription,
+                                                                     sub, topic)
+
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f'Something went wrong unsubscribing {topic} of proxy subscriber!\n%s', str(exc))
+
+    @classmethod
+    def destroy_subscription(cls, sub, topic):
+        """Handle subscription destruction from within the executor threads."""
+        try:
+            if ProxySubscriberCached._node.destroy_subscription(sub):
+                Logger.localinfo(f'Destroyed the proxy subscription for {topic} ({id(sub)})!')
+            else:
+                Logger.localwarn(f'Some issue destroying the proxy subscription for {topic}!')
+            del sub
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.error("Something went wrong destroying subscription"
+                         f" for {topic}!\n  {type(exc)} - {str(exc)}")
