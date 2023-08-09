@@ -287,10 +287,12 @@ class OperatableStateMachine(PreemptableStateMachine):
                 state._notify_start()
 
     def _notify_stop(self):
+        self.on_stop()
         for state in self._states:
             if isinstance(state, OperatableState):
                 state.on_stop()
             if isinstance(state, OperatableStateMachine):
+                state.on_stop()
                 state._notify_stop()
             if state._is_controlled:
                 state._disable_ros_control()

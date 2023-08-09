@@ -67,6 +67,10 @@ class PreemptableStateMachine(LockableStateMachine):
             Logger.localinfo(f'Preempting {self.name}!')
             PreemptableState.preempt = True
 
+    def on_stop(self):
+        # No other SM classes have on_stop, so no call to super().on_stop
+        self._sub.unsubscribe_topic(self._preempt_topic, inst_id=id(self))
+
     @staticmethod
     def add(label, state, transitions=None, remapping=None):
         transitions[PreemptableState._preempted_name] = PreemptableStateMachine._preempted_name

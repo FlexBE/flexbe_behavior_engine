@@ -30,7 +30,6 @@
 """Script for starting the onboard behavior engine."""
 
 from datetime import datetime
-import multiprocessing
 import rclpy
 
 from flexbe_core.proxy import shutdown_proxies
@@ -44,10 +43,7 @@ def main(args=None):
 
     onboard = FlexbeOnboard()
 
-    # Use at least 2 threads, but don't hog the whole machine otherwise
-    num_threads = max(2, multiprocessing.cpu_count() - 2)
-    onboard.get_logger().info(f"Using {num_threads} threads in executor ...")
-    executor = rclpy.executors.MultiThreadedExecutor(num_threads=num_threads)
+    executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(onboard)
 
     onboard.get_logger().info("Begin processing onboard behavior engine ...")
