@@ -29,7 +29,7 @@
 
 """Simplified state for use with FlexBE UI State machine mirror."""
 
-from std_msgs.msg import String, UInt8
+from std_msgs.msg import String
 
 from flexbe_core import EventState
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
@@ -52,8 +52,9 @@ class MirrorState(EventState):
 
         self._outcome_topic = 'flexbe/mirror/outcome'
 
+        # Allow access to standard proxies
         self._pub = ProxyPublisher()
-        self._sub = ProxySubscriberCached({self._outcome_topic: UInt8}, inst_id=id(self))
+        self._sub = ProxySubscriberCached()
 
     def execute(self, userdata):
         if self._sub.has_buffered(self._outcome_topic):
@@ -65,3 +66,6 @@ class MirrorState(EventState):
     def on_enter(self, userdata):
         self._pub.publish('flexbe/behavior_update',
                           String(data="/" + "/".join(self._target_path.split("/")[1:])))
+
+    def on_stop(self):
+        """Call when mirror SM stops."""

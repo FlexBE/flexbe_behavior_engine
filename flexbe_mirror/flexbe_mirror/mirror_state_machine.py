@@ -37,6 +37,7 @@ import rclpy
 from flexbe_core import Logger
 from flexbe_core.core import PreemptableStateMachine
 from flexbe_msgs.msg import BehaviorSync
+from flexbe_mirror.mirror_state import MirrorState
 
 
 class MirrorStateMachine(PreemptableStateMachine):
@@ -73,6 +74,18 @@ class MirrorStateMachine(PreemptableStateMachine):
             self._timing_event.wait(0.001)
 
         return outcome
+
+    def destroy(self):
+        Logger.localinfo(f'Destroy mirror state machine {self.name} ...')
+        self._notify_stop()
+
+    def _notify_stop(self):
+        self.on_stop()
+        for state in self._states:
+            if isinstance(state, MirrorState):
+                state.on_stop()
+            if isinstance(state, MirrorStateMachine):
+                state._notify_stop()
 
     def get_latest_status(self):
         """
