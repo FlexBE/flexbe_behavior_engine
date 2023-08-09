@@ -64,12 +64,6 @@ class FlexbeMirror(Node):
         PreemptableStateMachine.initialize_ros(self)
         LockableStateMachine.initialize_ros(self)
 
-        # set up proxys for sm <--> GUI communication
-        # publish topics
-        self._pub = ProxyPublisher({'flexbe/behavior_update': String,
-                                    'flexbe/request_mirror_structure': Int32})
-        self._heartbeat_pub = self.create_publisher(Int32, 'flexbe/mirror/heartbeat', 2)
-
         self._timing_event = threading.Event()  # Used for wait timer
         self._running = False
         self._stopping = False
@@ -80,19 +74,29 @@ class FlexbeMirror(Node):
         self._sync_lock = threading.Lock()
         self._state_checksums = {}
 
-        self._outcome_topic = 'flexbe/mirror/outcome'
+        # set up pub/sub sm <--> GUI communication of mirror
+        # publish topics
+        self._heartbeat_pub = self.create_publisher(Int32, 'flexbe/mirror/heartbeat', 2)
+        self._request_struct_pub = self.create_publisher(Int32, 'flexbe/request_mirror_structure', 2)
 
-        # listen for mirror message
+        # listen for mirror control messages using standard subscriptions
+        self._status_sub = self.create_subscription(BEStatus, 'flexbe/status', self._status_callback, 10)
+        self._struct_sub = self.create_subscription(ContainerStructure, 'flexbe/mirror/structure',
+                                                    self._mirror_structure_callback, 10)
+        self._sync_sub = self.create_subscription(BehaviorSync, 'flexbe/mirror/sync', self._sync_callback, 10)
+        self._preempt_sub = self.create_subscription(Empty, 'flexbe/mirror/preempt', self._preempt_callback, 10)
+        self._onboard_heartbeat_sub = self.create_subscription(BehaviorSync, 'flexbe/heartbeat', self._heartbeat_callback, 10)
+        self._sync_heartbeat_mismatch_counter = 0
+
+        self._outcome_topic = 'flexbe/mirror/outcome'
+        self._update_topic = 'flexbe/behavior_update'
+        # Use proxy publisher/subscriber for access in states
+        # but just initialize here once for all
+        self._beh_update_pub = ProxyPublisher({self._update_topic: String})
+
         self._sub = ProxySubscriberCached()
         self._sub.subscribe(self._outcome_topic, UInt8, inst_id=id(self))
         self._sub.enable_buffer(self._outcome_topic)
-
-        self._sub.subscribe('flexbe/status', BEStatus, self._status_callback, inst_id=id(self))
-        self._sub.subscribe('flexbe/mirror/structure', ContainerStructure, self._mirror_structure_callback, inst_id=id(self))
-        self._sub.subscribe('flexbe/mirror/sync', BehaviorSync, self._sync_callback, inst_id=id(self))
-        self._sub.subscribe('flexbe/mirror/preempt', Empty, self._preempt_callback, inst_id=id(self))
-        self._sub.subscribe('flexbe/heartbeat', BehaviorSync, self._heartbeat_callback, inst_id=id(self))
-        self._sync_heartbeat_mismatch_counter = 0
 
         # no clean way to wait for publisher to be ready...
         Logger.loginfo('--> Mirror - setting up publishers and subscribers ...')
@@ -184,7 +188,7 @@ class FlexbeMirror(Node):
             else:
                 Logger.localwarn(f'Error processing mirror structure for behavior checksum id = {struct_msg.behavior_id}')
                 Logger.logwarn('Requesting a new mirror structure from onboard ...')
-                self._pub.publish('flexbe/request_mirror_structure', Int32(data=struct_msg.behavior_id))
+                self._request_struct_pub.publish(Int32(data=struct_msg.behavior_id))
                 self._active_id = struct_msg.behavior_id
                 return
 
@@ -249,7 +253,7 @@ class FlexbeMirror(Node):
             if self._sm is None:
                 Logger.localwarn(f'Missing correct mirror structure for starting behavior checksum id ={msg.behavior_id}')
                 Logger.logwarn('Requesting mirror structure from onboard ...')
-                self._pub.publish('flexbe/request_mirror_structure', Int32(data=msg.behavior_id))
+                self._request_struct_pub.publish(Int32(data=msg.behavior_id))
                 self._active_id = msg.behavior_id
                 return
 
@@ -271,18 +275,20 @@ class FlexbeMirror(Node):
             if self._sm is not None and self._running:
                 if msg is not None and msg.code == BEStatus.FINISHED:
                     Logger.loginfo('Onboard behavior finished successfully.')
-                    self._pub.publish('flexbe/behavior_update', String())
+                    self._beh_update_pub.publish(self._update_topic, String())
                 elif msg is not None and msg.code == BEStatus.SWITCHING:
                     self._starting_path = None
                     Logger.loginfo('Onboard performing behavior switch.')
                 elif msg is not None and msg.code == BEStatus.READY:
                     Logger.loginfo('Onboard engine just started, stopping currently running mirror.')
-                    self._pub.publish('flexbe/behavior_update', String())
+                    self._beh_update_pub.publish(self._update_topic, String())
                 elif msg is not None:
                     Logger.logwarn('Onboard behavior failed!')
-                    self._pub.publish('flexbe/behavior_update', String())
+                    self._beh_update_pub.publish(self._update_topic, String())
 
                 self._wait_stop_running()
+
+                self._sm.destroy()
 
             else:
                 Logger.localinfo('No onboard behavior is active.')
@@ -398,7 +404,7 @@ class FlexbeMirror(Node):
                 else:
                     Logger.localwarn(f'Missing correct mirror structure for restarting behavior checksum id ={msg.behavior_id}')
                     Logger.logwarn('Requesting mirror structure from onboard ...')
-                    self._pub.publish('flexbe/request_mirror_structure', Int32(data=msg.behavior_id))
+                    self._request_struct_pub.publish(Int32(data=msg.behavior_id))
                     self._active_id = msg.behavior_id
                     return
 
@@ -426,6 +432,7 @@ class FlexbeMirror(Node):
         try:
             result = self._sm.spin()
             Logger.loginfo(f"Mirror for active id = {self._active_id} finished with result '{result}'")
+            self._sm.destroy()
         except Exception as exc:
             try:
                 Logger.logerr('\n(_execute_mirror Traceback): Caught exception on preempt:\n%s' % str(exc))
