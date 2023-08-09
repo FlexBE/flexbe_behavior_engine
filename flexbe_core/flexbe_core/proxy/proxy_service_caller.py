@@ -115,11 +115,8 @@ class ProxyServiceCaller:
                 if srv_type.__name__ == ProxyServiceCaller._services[topic].srv_type.__name__:
                     Logger.localinfo(f'Existing service for {topic} with same message type name,'
                                      f' but different instance - re-create service!')
-                    try:
-                        ProxyServiceCaller._node.destroy_client(ProxyServiceCaller._services[topic])
-                    except Exception as exc:  # pylint: disable=W0703
-                        Logger.error("Something went wrong destroying service client"
-                                     f" for {topic}!\n  {type(exc)} - {exc}")
+                    ProxyServiceCaller._node.executor.create_task(ProxyServiceCaller.destroy_service,
+                                                                  ProxyServiceCaller._services[topic], topic)
 
                     ProxyServiceCaller._services[topic] = ProxyServiceCaller._node.create_client(srv_type, topic)
                     if isinstance(wait_duration, float):
@@ -294,3 +291,16 @@ class ProxyServiceCaller:
     @classmethod
     def _print_wait_warning(cls, topic):
         Logger.warning("Waiting for service %s..." % (topic))
+
+    @classmethod
+    def destroy_service(cls, srv, topic):
+        """Handle service client destruction from within the executor threads."""
+        try:
+            if ProxyServiceCaller._node.destroy_client(srv):
+                Logger.localinfo(f'Destroyed the proxy service caller for {topic} ({id(srv)})!')
+            else:
+                Logger.localwarn(f'Some issue destroying the proxy service caller for {topic}!')
+            del srv
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.error("Something went wrong destroying service caller"
+                         f" for {topic}!\n  {type(exc)} - {str(exc)}")
