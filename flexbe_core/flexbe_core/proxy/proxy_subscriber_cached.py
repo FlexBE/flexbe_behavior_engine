@@ -70,7 +70,6 @@ class ProxySubscriberCached:
             print("Shutdown proxy subscriber  ...")
             ProxySubscriberCached._topics.clear()
             ProxySubscriberCached._persistant_topics.clear()
-            ProxySubscriberCached._node = None
 
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy subscriber !\n{str(exc)}')
@@ -156,7 +155,8 @@ class ProxySubscriberCached:
                                      f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
 
         # Register the local callback for topic message
-        cls.set_callback(topic, callback, inst_id)
+        if callback is not None:
+            cls.set_callback(topic, callback, inst_id)
 
     @classmethod
     def _callback(cls, msg, topic):
@@ -173,16 +173,18 @@ class ProxySubscriberCached:
             Logger.localinfo(f"-- invalid topic={topic} for callback!")
             return
 
-        ProxySubscriberCached._topics[topic]['last_msg'] = msg
-        if ProxySubscriberCached._topics[topic]['buffered']:
-            ProxySubscriberCached._topics[topic]['msg_queue'].append(msg)
-
-        for inst_id, callback in ProxySubscriberCached._topics[topic]['callbacks'].items():
-            try:
-                callback(msg)
-            except Exception as exc:  # pylint: disable=W0703
-                Logger.error(f"Exception in callback for {topic}: "
-                             f"{callback.__module__}  {callback.__name__} @ {inst_id} \n {exc} ")
+        try:
+            ProxySubscriberCached._topics[topic]['last_msg'] = msg
+            if ProxySubscriberCached._topics[topic]['buffered']:
+                ProxySubscriberCached._topics[topic]['msg_queue'].append(msg)
+            for inst_id, callback in ProxySubscriberCached._topics[topic]['callbacks'].items():
+                try:
+                    callback(msg)
+                except Exception as exc:  # pylint: disable=W0703
+                    Logger.error(f"Exception in callback for {topic}: "
+                                f"{callback.__module__}  {callback.__name__} @ {inst_id} \n {exc} ")
+        except KeyError:
+                    Logger.error(f"Error: {topic} is no longer available for processing callback! ")
 
     @classmethod
     def set_callback(cls, topic, callback, inst_id=-1):
@@ -203,16 +205,24 @@ class ProxySubscriberCached:
             return
 
         if callback is not None:
+            ProxySubscriberCached._node.executor.create_task(cls.__set_callback, topic, callback, inst_id)
+
+    @classmethod
+    def __set_callback(cls, topic, callback, inst_id):
+        """Set callback in executor thread."""
+        try:
             if inst_id not in ProxySubscriberCached._topics[topic]['callbacks']:
                 ProxySubscriberCached._topics[topic]['callbacks'][inst_id] = callback
                 Logger.localinfo(f"   Set local callback {callback.__name__} of "
-                                 f"{len(ProxySubscriberCached._topics[topic]['callbacks'])} for {topic}!")
+                                    f"{len(ProxySubscriberCached._topics[topic]['callbacks'])} for {topic}!")
             else:
                 Logger.localinfo("Update existing callback "
-                                 f"{ProxySubscriberCached._topics[topic]['callbacks'][inst_id].__name__} with "
-                                 f"{callback.__name__} of {len(ProxySubscriberCached._topics[topic]['callbacks'])}"
-                                 f" for {topic}!")
+                                    f"{ProxySubscriberCached._topics[topic]['callbacks'][inst_id].__name__} with "
+                                    f"{callback.__name__} of {len(ProxySubscriberCached._topics[topic]['callbacks'])}"
+                                    f" for {topic}!")
                 ProxySubscriberCached._topics[topic]['callbacks'][inst_id] = callback
+        except KeyError:
+            Logger.localwarn("Error: topic {topic} is not longer available - cannot set callback!")
 
     @classmethod
     def enable_buffer(cls, topic):
@@ -307,9 +317,13 @@ class ProxySubscriberCached:
         """
         if topic in ProxySubscriberCached._persistant_topics:
             return
-        ProxySubscriberCached._topics[topic]['last_msg'] = None
-        if clear_buffer:
-            ProxySubscriberCached._topics[topic]['msg_queue'] = []
+
+        try:
+            ProxySubscriberCached._topics[topic]['last_msg'] = None
+            if clear_buffer:
+                ProxySubscriberCached._topics[topic]['msg_queue'] = []
+        except KeyError:
+            Logger.localwarn(f"remove_last_msg: {topic} is not available!")
 
     @classmethod
     def make_persistant(cls, topic):
@@ -343,20 +357,18 @@ class ProxySubscriberCached:
                     topic_dict['subscribers'].remove(inst_id)
                     Logger.localinfo(f"Unsubscribed {topic} from proxy! "
                                      f"({len(topic_dict['subscribers'])} remaining)")
-
-                if inst_id in topic_dict['callbacks']:
-                    topic_dict['callbacks'].pop(inst_id)
-                    Logger.localinfo(f"Removed callback from proxy subscription for {topic} "
-                                     f"from proxy! ({len(topic_dict['callbacks'])} remaining)")
-
-                remaining_subscribers = len(topic_dict['subscribers'])
-                remaining_callbacks = len(topic_dict['callbacks'])
-                if remaining_subscribers == 0:
-                    assert remaining_callbacks == 0, "Must have at least one subscriber tracked for every callback!"
-                    sub = topic_dict['subscription']
-                    ProxySubscriberCached._topics.pop(topic)
-                    ProxySubscriberCached._node.executor.create_task(ProxySubscriberCached.destroy_subscription,
-                                                                     sub, topic)
+                    
+                    remaining_subscribers = len(topic_dict['subscribers'])
+                    if remaining_subscribers == 0:
+                        ProxySubscriberCached._topics.pop(topic)  # remove from list of valid topics
+                        sub = topic_dict['subscription']
+                        ProxySubscriberCached._node.executor.create_task(ProxySubscriberCached.destroy_subscription,
+                                                                        sub, topic)
+                    elif inst_id in topic_dict['callbacks']:
+                            # Remove callback in executor thread to avoid changing size during callback
+                            ProxySubscriberCached._node.executor.create_task(topic_dict['callbacks'].pop, inst_id)
+                            Logger.localinfo(f"Removed callback from proxy subscription for {topic} "
+                                            f"from proxy! ({len(topic_dict['callbacks'])} remaining)")
 
             except Exception as exc:  # pylint: disable=W0703
                 Logger.error(f'Something went wrong unsubscribing {topic} of proxy subscriber!\n%s', str(exc))
