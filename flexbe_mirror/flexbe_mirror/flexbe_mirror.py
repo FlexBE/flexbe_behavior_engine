@@ -268,7 +268,8 @@ class FlexbeMirror(Node):
 
     def _stop_mirror(self, msg):
         self.get_logger().info('--> Mirror - request to stop mirror for '
-                               f'checksum id={msg.behavior_id} - waiting for sync lock ...')
+                               f'checksum id={msg.behavior_id if isinstance(msg, BEStatus) else None} '
+                               f'- waiting for sync lock ...')
         with self._sync_lock:
             # self.get_logger().info(f'--> Mirror - stopping mirror for checksum id={msg.behavior_id} with sync lock ...')
             self._stopping = True
