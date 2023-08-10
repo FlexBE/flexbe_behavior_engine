@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.3 (2023-08-09)
+------------------
+* streamline pub/sub for mirror
+* cleanup on behavior shutdown
+* destroy sub/pub/client in executor thread
+* use SingleThreadedExecutor without callback groups
+
 2.3.2 (2023-08-01)
 ------------------
 

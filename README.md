@@ -14,6 +14,8 @@ Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)
 ![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg?branch=ros2-devel)
 
 Humble ![ROS Build Farm](https://build.ros2.org/job/Hdev__flexbe_behavior_engine__ubuntu_jammy_amd64/badge/icon)
+Iron ![ROS Build Farm](https://build.ros2.org/job/Idev__flexbe_behavior_engine__ubuntu_jammy_amd64/badge/icon)
+Rolling ![ROS Build Farm](https://build.ros2.org/job/Rdev__flexbe_behavior_engine__ubuntu_jammy_amd64/badge/icon)
 
 ## Installation
 

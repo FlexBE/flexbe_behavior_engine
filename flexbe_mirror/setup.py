@@ -7,7 +7,7 @@ PACKAGE_NAME = 'flexbe_mirror'
 
 setup(
     name=PACKAGE_NAME,
-    version='2.3.2',
+    version='2.3.3',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
