@@ -21,7 +21,7 @@ jobs:
         - os: ubuntu-22.04
           ros: rolling
           python: python3
-          ci_branch: ros2-devel
+          ci_branch: rolling
 
     runs-on: ${{ matrix.os }}
     env:

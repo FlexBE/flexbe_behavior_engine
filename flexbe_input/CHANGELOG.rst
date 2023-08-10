@@ -1,6 +1,13 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2.3.3 (2023-08-09)
+------------------
+* destroy sub/pub/client in executor thread
+* use SingleThreadedExecutor without callback groups
+* use basic pub/sub for onboard
+* cleanup
+
 2.3.2 (2023-08-01)
 ------------------
 * use standard queue for complex_action_server
