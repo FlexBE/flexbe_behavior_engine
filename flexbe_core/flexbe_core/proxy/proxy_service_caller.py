@@ -71,7 +71,6 @@ class ProxyServiceCaller:
 
             print("Shutdown proxy service caller  ...")
             ProxyServiceCaller._results.clear()
-            ProxyServiceCaller._node = None
 
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy service caller !\n{str(exc)}')

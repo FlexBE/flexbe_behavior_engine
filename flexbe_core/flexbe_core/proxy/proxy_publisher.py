@@ -66,7 +66,6 @@ class ProxyPublisher:
 
             print("Shutdown proxy publisher  ...")
             ProxyPublisher._topics.clear()
-            ProxyPublisher._node = None
 
         except Exception as exc:  # pylint: disable=W0703
             Logger.error(f'Something went wrong during shutdown of proxy publisher !\n{str(exc)}')
