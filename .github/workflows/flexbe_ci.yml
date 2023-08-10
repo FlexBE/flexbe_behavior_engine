@@ -8,7 +8,7 @@ jobs:
   test:
     strategy:
       matrix:
-        ros: [humble] #, iron, rolling]
+        ros: [humble]
         include:
         - os: ubuntu-22.04
           ros: humble
