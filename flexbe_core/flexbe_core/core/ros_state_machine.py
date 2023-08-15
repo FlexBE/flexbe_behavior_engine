@@ -31,6 +31,7 @@
 
 """A state machine to interface with ROS."""
 from rclpy.duration import Duration
+
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 from flexbe_core.core.state_machine import StateMachine
 
@@ -53,17 +54,30 @@ class RosStateMachine(StateMachine):
         self._pub = ProxyPublisher()
         self._sub = ProxySubscriberCached()
 
-    def wait(self, seconds=None):
-        """Wait for designated ROS clock time to keep APPROXIMATELY on scheduled tic rate."""
+    def _notify_start(self):
+        """Call when state machine starts up."""
+
+    def _notify_stop(self):
+        """Call when state machine shuts down."""
+
+    def wait(self, seconds=None, context=None):
+        """
+        Wait for designated ROS clock time to keep APPROXIMATELY on scheduled tic rate.
+
+        @param seconds - floating point seconds to sleep
+        @param context - rclpy Context, normally None for default context, but specific context used in testing
+        """
         if seconds is not None and seconds > 0:
-            self._node.get_clock().sleep_for(Duration(seconds=seconds))
+            self._node.get_clock().sleep_for(Duration(seconds=seconds), context=context)
 
     def _enable_ros_control(self):
-        self._is_controlled = True
-        for state in self._states:
-            state._enable_ros_control()
+        if not self._is_controlled:
+            self._is_controlled = True
+            for state in self._states:
+                state._enable_ros_control()
 
     def _disable_ros_control(self):
-        self._is_controlled = False
-        for state in self._states:
-            state._disable_ros_control()
+        if self._is_controlled:
+            self._is_controlled = False
+            for state in self._states:
+                state._disable_ros_control()

@@ -52,9 +52,9 @@ class ProxyTransformListener:
     def shutdown():
         """Shut down this proxy by reseting the transform listener."""
         try:
-            print("Shutdown proxy transform listener  ...")
             ProxyTransformListener._listener = None
             ProxyTransformListener._buffer = None
+            print("Shutdown proxy transform listener - finished!")
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy transform listener  !\n{str(exc)}')
 

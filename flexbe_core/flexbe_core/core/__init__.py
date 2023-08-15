@@ -46,6 +46,7 @@ from .preemptable_state import PreemptableState  # noqa: F401
 from .operatable_state import OperatableState  # noqa: F401
 from .event_state import EventState  # noqa: F401
 
+from .state_map import StateMap  # noqa: F401
 from .user_data import UserData  # noqa: F401
 
 __all__ = [
@@ -63,5 +64,6 @@ __all__ = [
     'PreemptableState',
     'OperatableState',
     'EventState',
+    'StateMap',
     'UserData'
 ]

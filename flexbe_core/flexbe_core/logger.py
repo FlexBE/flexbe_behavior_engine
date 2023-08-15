@@ -33,6 +33,7 @@
 
 from rclpy.node import Node
 
+from flexbe_core.core.topics import Topics
 from flexbe_msgs.msg import BehaviorLog
 
 
@@ -45,15 +46,13 @@ class Logger:
     REPORT_ERROR = BehaviorLog.ERROR
     REPORT_DEBUG = BehaviorLog.DEBUG
 
-    LOGGING_TOPIC = 'flexbe/log'
-
     _pub = None
     _node = None
 
     @staticmethod
     def initialize(node: Node):
         Logger._node = node
-        Logger._pub = node.create_publisher(BehaviorLog, Logger.LOGGING_TOPIC, 100)
+        Logger._pub = node.create_publisher(BehaviorLog, Topics._BEHAVIOR_LOGGING_TOPIC, 100)
 
     @staticmethod
     def log(text: str, severity: int):
@@ -74,15 +73,15 @@ class Logger:
         if severity == Logger.REPORT_INFO:
             Logger._node.get_logger().info(text)
         elif severity == Logger.REPORT_WARN:
-            Logger._node.get_logger().warning(text)
+            Logger._node.get_logger().warning(f"\033[93m{text}\033[0m")
         elif severity == Logger.REPORT_HINT:
-            Logger._node.get_logger().info('\033[94mBehavior Hint: %s\033[0m' % text)
+            Logger._node.get_logger().info(f"\033[94mBehavior Hint: {text}\033[0m")
         elif severity == Logger.REPORT_ERROR:
-            Logger._node.get_logger().error(text)
+            Logger._node.get_logger().error(f"\033[91m{text}\033[0m")
         elif severity == Logger.REPORT_DEBUG:
-            Logger._node.get_logger().debug(text)
+            Logger._node.get_logger().debug(f"\033[92m{text}\033[0m")
         else:
-            Logger._node.get_logger().debug(text + ' (unknown log level %s)' % str(severity))
+            Logger._node.get_logger().debug(f"\033[95m{text}\033[91m(unknown log level {str(severity)})\033[0m")
 
     # NOTE: Below text strings can only have single % symbols if they are being treated
     # as format strings with appropriate arguments (otherwise replace with %% for simple string without args)

@@ -48,13 +48,13 @@ from std_msgs.msg import Int32, String
 
 from flexbe_msgs.msg import BehaviorModification, BehaviorRequest, BehaviorSelection, BEStatus, ContainerStructure
 
-from flexbe_core import BehaviorLibrary, Logger
+from flexbe_core import BehaviorLibrary, Logger, MIN_UI_VERSION
+from flexbe_core.core import StateMap
+from flexbe_core.core.topics import Topics
 
 
 class BehaviorLauncher(Node):
     """Node to launch FlexBE behaviors."""
-
-    MIN_VERSION = '2.2.0'
 
     def __init__(self):
         # Initiate the Node class's constructor and give it a name
@@ -62,14 +62,14 @@ class BehaviorLauncher(Node):
 
         self._ready_event = threading.Event()
 
-        self._sub = self.create_subscription(BehaviorRequest, "flexbe/request_behavior", self._request_callback, 100)
-        self._version_sub = self.create_subscription(String, "flexbe/ui_version", self._version_callback, 100)
-        self._status_sub = self.create_subscription(BEStatus, "flexbe/status", self._status_callback, 100)
+        self._sub = self.create_subscription(BehaviorRequest, Topics._REQUEST_BEHAVIOR_TOPIC, self._request_callback, 100)
+        self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC, self._version_callback, 1)
+        self._status_sub = self.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_callback, 100)
 
-        self._pub = self.create_publisher(BehaviorSelection, "flexbe/start_behavior", 100)
-        self._status_pub = self.create_publisher(BEStatus, "flexbe/status", 100)
-        self._mirror_pub = self.create_publisher(ContainerStructure, "flexbe/mirror/structure", 100)
-        self._heartbeat_pub = self.create_publisher(Int32, 'flexbe/launcher/heartbeat', 2)
+        self._pub = self.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
+        self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 100)
+        self._mirror_pub = self.create_publisher(ContainerStructure, Topics._MIRROR_STRUCTURE_TOPIC, 100)
+        self._heartbeat_pub = self.create_publisher(Int32, Topics._LAUNCHER_HEARTBEAT_TOPIC, 2)
 
         self._behavior_lib = BehaviorLibrary(self)
 
@@ -94,6 +94,18 @@ class BehaviorLauncher(Node):
             self.get_logger().info(f"BE status code={msg.code} received ")
 
     def _request_callback(self, msg):
+        """Process request in separate thread to avoid blocking callbacks."""
+        if not self._ready_event.is_set():
+            Logger.logerr("Behavior engine is not ready - cannot process start request!")
+        else:
+            # self._ready_event.clear()  # require a new ready signal after publishing
+            # thread = threading.Thread(target=self._process_request, args=[msg])
+            # thread.daemon = True
+            # thread.start()
+            # Not waiting in process request, so safe to not block callback
+            self._process_request(msg)
+
+    def _process_request(self, msg):
         self.get_logger().info(f"Got message from request behavior for {msg.behavior_name}")
         be_key, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
         if be_key is None:
@@ -132,19 +144,20 @@ class BehaviorLauncher(Node):
             be_selection.arg_keys = msg.arg_keys
             be_selection.arg_values = msg.arg_values
 
-        # wait until Behavior Engine status is BEStatus.READY
-        self.get_logger().info("Wait for Behavior Engine ...")
-        self._ready_event.wait()
-        self.get_logger().info("   BE is ready!")
-
+        container_map = StateMap()
         be_structure = ContainerStructure()
         be_structure.containers = msg.structure
+        for container in be_structure.containers:
+            # self.get_logger().info(f"BELauncher: request_callback: adding container {container.path} ...")
+            container_map.add_state(container.path, container)
+        # self.get_logger().info(f"BELauncher: request_callback: {msg.structure}")
 
         try:
             be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
         except Exception:  # pylint: disable=W0703
             self.get_logger().error("Could not find behavior package '%s'" % (behavior["package"]))
             self.get_logger().info("Have you built and updated your setup after creating the behavior?")
+            self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
             return
 
         with open(be_filepath_new, "r") as f:
@@ -156,6 +169,7 @@ class BehaviorLauncher(Node):
             be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
             if msg.autonomy_level != 255:
                 be_structure.behavior_id = be_selection.behavior_id
+                # self.get_logger().info(f"BELauncher: request_callback publish structure : {be_structure}")
                 self._mirror_pub.publish(be_structure)
             self._ready_event.clear()  # require a new ready signal after publishing
             self._pub.publish(be_selection)
@@ -178,21 +192,22 @@ class BehaviorLauncher(Node):
             be_structure.behavior_id = be_selection.behavior_id
             self._mirror_pub.publish(be_structure)
 
-        self._ready_event.clear()  # require a new ready signal after publishing
+        self._ready_event.clear()  # Force a new ready message before processing
         self._pub.publish(be_selection)
         self.get_logger().info(f"New behavior key={be_selection.behavior_key} published "
                                f"with checksum id = {be_selection.behavior_id}- start!")
 
     def _version_callback(self, msg):
-        vui = self._parse_version(msg.data)
-        vex = self._parse_version(BehaviorLauncher.MIN_VERSION)
+        vui = BehaviorLauncher._parse_version(msg.data)
+        vex = BehaviorLauncher._parse_version(MIN_UI_VERSION)
         if vui < vex:
-            self.get_logger().warn('FlexBE App needs to be updated!\n'
-                                   f'Require at least version {BehaviorLauncher.MIN_VERSION}, '
-                                   f' but you have {msg.data}\n'
-                                   'Please update the flexbe_app software.')
+            Logger.logwarn('FlexBE App needs to be updated!\n'
+                           f'Behavior launcher requires at least version {MIN_UI_VERSION}, '
+                           f' but you have {msg.data}\n'
+                           'Please update the flexbe_app software.')
 
-    def _parse_version(self, v):
+    @staticmethod
+    def _parse_version(v):
         result = 0
         offset = 1
         for n in reversed(v.split('.')):
@@ -243,7 +258,7 @@ def behavior_launcher_main(node_args=None):
                signal_handler_options=rclpy.signals.SignalHandlerOptions.NO)  # We will handle shutdown
 
     launcher = BehaviorLauncher()
-    executor = rclpy.executors.MultiThreadedExecutor(num_threads=2)
+    executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(launcher)
 
     if behavior != "":

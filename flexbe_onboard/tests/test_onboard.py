@@ -41,6 +41,7 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
 from flexbe_onboard import FlexbeOnboard
+from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxySubscriberCached
 
 from flexbe_msgs.msg import BehaviorSelection, BEStatus, BehaviorLog, BehaviorModification
@@ -60,8 +61,8 @@ class TestOnboard(unittest.TestCase):
 
         ProxySubscriberCached.initialize(self.node)
 
-        self.sub = ProxySubscriberCached({'flexbe/status': BEStatus,
-                                          'flexbe/log': BehaviorLog},
+        self.sub = ProxySubscriberCached({Topics._ONBOARD_STATUS_TOPIC: BEStatus,
+                                          Topics._BEHAVIOR_LOGGING_TOPIC: BehaviorLog},
                                          inst_id=id(self))
         # make sure that behaviors can be imported
         data_folder = os.path.dirname(os.path.realpath(__file__))
@@ -90,22 +91,22 @@ class TestOnboard(unittest.TestCase):
             # Spin both nodes as needed
             self.executor.spin_once(timeout_sec=0.01)
             time.sleep(0.1)
-            if self.sub.has_msg('flexbe/status'):
+            if self.sub.has_msg(Topics._ONBOARD_STATUS_TOPIC):
                 break
         else:
             raise AssertionError('Did not receive a status as required.')
-        msg = self.sub.get_last_msg('flexbe/status')
-        self.sub.remove_last_msg('flexbe/status')
+        msg = self.sub.get_last_msg(Topics._ONBOARD_STATUS_TOPIC)
+        self.sub.remove_last_msg(Topics._ONBOARD_STATUS_TOPIC)
         self.node.get_logger().info(f"assertStatus: msg= {str(msg)} expected={expected} - {message}?")
         self.assertEqual(msg.code, expected, msg=message)
         return msg
 
     def clear_extra_heartbeat_ready_messages(self):
-        while self.sub.has_msg('flexbe/status'):
-            msg = self.sub.get_last_msg('flexbe/status')
+        while self.sub.has_msg(Topics._ONBOARD_STATUS_TOPIC):
+            msg = self.sub.get_last_msg(Topics._ONBOARD_STATUS_TOPIC)
             if msg.code == BEStatus.READY:
                 self.node.get_logger().info(f"clearing READY msg={str(msg)}")
-                self.sub.remove_last_msg('flexbe/status')  # Clear any heartbeat start up messages
+                self.sub.remove_last_msg(Topics._ONBOARD_STATUS_TOPIC)  # Clear any heartbeat start up messages
             else:
                 break
             self.executor.spin_once(timeout_sec=0.01)
@@ -113,7 +114,7 @@ class TestOnboard(unittest.TestCase):
     def test_onboard_behaviors(self):
         self.executor.spin_once(timeout_sec=1)
 
-        behavior_pub = self.node.create_publisher(BehaviorSelection, 'flexbe/start_behavior', 1)
+        behavior_pub = self.node.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 1)
         # wait for publisher2
         end_time = time.time() + 3.0
         while time.time() < end_time:
@@ -140,7 +141,7 @@ class TestOnboard(unittest.TestCase):
         # send valid simple behavior request
         with open(self.lib.get_sourcecode_filepath(be_key)) as f:
             request.behavior_id = zlib.adler32(f.read().encode()) & 0x7fffffff
-        self.sub.enable_buffer('flexbe/log')
+        self.sub.enable_buffer(Topics._BEHAVIOR_LOGGING_TOPIC)
 
         self.clear_extra_heartbeat_ready_messages()
 
@@ -151,8 +152,8 @@ class TestOnboard(unittest.TestCase):
         self.assertStatus(BEStatus.STARTED, 1, "Started simple log behavior")
         self.assertStatus(BEStatus.FINISHED, 3, "Finished simple log behavior")
         behavior_logs = []
-        while self.sub.has_buffered('flexbe/log'):
-            behavior_logs.append(self.sub.get_from_buffer('flexbe/log').text)
+        while self.sub.has_buffered(Topics._BEHAVIOR_LOGGING_TOPIC):
+            behavior_logs.append(self.sub.get_from_buffer(Topics._BEHAVIOR_LOGGING_TOPIC).text)
             self.executor.spin_once(timeout_sec=0.1)
         self.assertIn('Test data', behavior_logs)
 
@@ -197,8 +198,8 @@ class TestOnboard(unittest.TestCase):
         while time.time() < end_time:
             self.executor.spin_once(timeout_sec=0.05)
 
-        while self.sub.has_buffered('flexbe/log'):
-            behavior_logs.append(self.sub.get_from_buffer('flexbe/log').text)
+        while self.sub.has_buffered(Topics._BEHAVIOR_LOGGING_TOPIC):
+            behavior_logs.append(self.sub.get_from_buffer(Topics._BEHAVIOR_LOGGING_TOPIC).text)
         self.assertIn('value_2', behavior_logs)
 
         self.clear_extra_heartbeat_ready_messages()
@@ -221,8 +222,8 @@ class TestOnboard(unittest.TestCase):
         while time.time() < end_time:
             self.executor.spin_once(timeout_sec=0.1)
 
-        while self.sub.has_buffered('flexbe/log'):
-            behavior_logs.append(self.sub.get_from_buffer('flexbe/log').text)
+        while self.sub.has_buffered(Topics._BEHAVIOR_LOGGING_TOPIC):
+            behavior_logs.append(self.sub.get_from_buffer(Topics._BEHAVIOR_LOGGING_TOPIC).text)
             self.executor.spin_once(timeout_sec=0.1)
         self.assertIn('value_1', behavior_logs)
         self.node.get_logger().info("Done onboard testing!")

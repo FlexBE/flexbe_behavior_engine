@@ -34,6 +34,7 @@
 from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
 
 from flexbe_core.core.ros_state import RosState
+from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 
 
@@ -51,15 +52,13 @@ class ManuallyTransitionableState(RosState):
 
         self._force_transition = False
         self._manual_transition_requested = None
-        self._feedback_topic = 'flexbe/command_feedback'
-        self._transition_topic = 'flexbe/command/transition'
 
     def _manually_transitionable_execute(self, *args, **kwargs):
         self._manual_transition_requested = None
-        if self._is_controlled and self._sub.has_buffered(self._transition_topic):
-            command_msg = self._sub.get_from_buffer(self._transition_topic)
-            self._pub.publish(self._feedback_topic, CommandFeedback(command="transition",
-                                                                    args=[command_msg.target, self.name]))
+        if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
+            command_msg = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                              CommandFeedback(command="transition", args=[command_msg.target, self.name]))
             if command_msg.target != self.name:
                 Logger.logwarn("Requested outcome for state %s but active state is %s" %
                                (command_msg.target, self.name))
@@ -74,11 +73,14 @@ class ManuallyTransitionableState(RosState):
         return self.__execute(*args, **kwargs)
 
     def _enable_ros_control(self):
-        super()._enable_ros_control()
-        self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._transition_topic, OutcomeRequest, inst_id=id(self))
-        self._sub.enable_buffer(self._transition_topic)
+        if not self._is_controlled:
+            super()._enable_ros_control()
+            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
+            self._sub.subscribe(Topics._CMD_TRANSITION_TOPIC, OutcomeRequest, inst_id=id(self))
+            self._sub.enable_buffer(Topics._CMD_TRANSITION_TOPIC)
 
     def _disable_ros_control(self):
-        super()._disable_ros_control()
-        self._sub.unsubscribe_topic(self._transition_topic, inst_id=id(self))
+        if self._is_controlled:
+            super()._disable_ros_control()
+            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+            self._sub.unsubscribe_topic(Topics._CMD_TRANSITION_TOPIC, inst_id=id(self))

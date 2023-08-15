@@ -57,10 +57,15 @@ class SubscriberState(EventState):
         self._blocking = blocking
         self._clear = clear
         self._connected = False
-
+        self._sub = None
         if not self._connect():
             Logger.logwarn('Topic %s for state %s not yet available.\n'
                            'Will try again when entering the state...' % (self._topic, self.name))
+
+    def on_stop(self):
+        if self._connected:
+            ProxySubscriberCached.unsubscribe_topic(self._topic)
+            self._connected = False
 
     def execute(self, userdata):
         if not self._connected:

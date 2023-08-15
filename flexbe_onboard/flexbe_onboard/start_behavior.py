@@ -10,7 +10,8 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Philipp Schillinger, Team ViGIR,
+#      Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -73,11 +74,16 @@ def main(args=None):
             print(f"    All onboard behaviors are stopped at {datetime.now()}!", flush=True)
 
         # Last call for clean up of any stray communications
-        for _ in range(100):
+        for _ in range(50):
             executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
 
+        print(f"{datetime.now()} - onboard shutdown requested ...", flush=True)
+        onboard.onboard_shutdown()
+        for _ in range(30):
+            executor.spin_once(timeout_sec=0.001)  # allow onboard system to cleanup after itself
+
     except Exception as exc:
-        print(f"{datetime.now()} - Exception in onboard behavior shutdown! {type(exc)}\n  {exc}", flush=True)
+        print(f"{datetime.now()} - Exception in onboard shutdown! {type(exc)}\n  {exc}", flush=True)
         import traceback
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
@@ -86,14 +92,14 @@ def main(args=None):
         shutdown_proxies()
 
         # Last call for clean up of any stray communications
-        for _ in range(100):
+        for _ in range(50):
             executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
 
         print(f"Proxy  shutdown  completed  at {datetime.now()} ...", flush=True)
         onboard.destroy_node()
 
         # Last call for clean up of any stray communications
-        for _ in range(100):
+        for _ in range(50):
             executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
 
         print(f"Node destruction  completed at {datetime.now()} ...", flush=True)

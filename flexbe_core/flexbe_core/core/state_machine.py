@@ -108,7 +108,8 @@ class StateMachine(State):
             if outcome is not None:
                 break
 
-            self.sleep()
+            self.wait(seconds=self.sleep_duration)
+
         return outcome
 
     def execute(self, userdata):
@@ -117,14 +118,9 @@ class StateMachine(State):
             self._current_state = self.initial_state
             self._userdata = userdata if userdata is not None else UserData()
             self._userdata(add_from=self._own_userdata)
+            # Logger.localinfo(f"Entering StateMachine {self.name} ({self._state_id}) initial state='{self._current_state.name}'")
         outcome = self._execute_current_state()
         return outcome
-
-    def sleep(self):
-        if self._current_state is not None:
-            self.wait(seconds=self._current_state.sleep_duration)
-        else:
-            self.wait(seconds=self.sleep_duration)
 
     def _execute_current_state(self):
         with UserData(reference=self._userdata, remap=self._remappings[self._current_state.name],
@@ -145,7 +141,11 @@ class StateMachine(State):
 
             self._current_state = self._labels.get(target)
             if self._current_state is None:
+                Logger.localinfo(f" SM '{self.name}' ({self.id}) returning '{target}' ")
                 return target
+            # else:
+            #     Logger.localinfo(f" SM '{self.name}' ({self.id}) updated current state to "
+            #                      f"'{self._current_state.name}' ({self._current_state._state_id}) given outcome='{target}' ")
 
         return None
 
@@ -185,7 +185,22 @@ class StateMachine(State):
         if self._current_state is not None:
             return self._current_state.sleep_duration
 
-        return 0.
+        return 0.00005  # return some minimal wait
+
+    def get_deep_states(self):
+        """
+        Recursively look for the currently executing states.
+
+        Traverse all state machines down to the terminal child state that is not a container.
+        (Except concurrency containers, which override this method)
+
+        @return: The list of active states (not state machine)
+        """
+        if isinstance(self._current_state, StateMachine):
+            return self._current_state.get_deep_states()
+
+        # Base case is current_state is not a state machine
+        return [self._current_state] if self._current_state is not None else []  # Return as a list
 
     # consistency checks
 

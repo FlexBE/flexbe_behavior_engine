@@ -13,15 +13,15 @@ jobs:
         # - os: ubuntu-22.04
         #   ros: humble
         #   python: python3
-        #   ci_branch: ros2-devel
+        #   ci_branch: humble-pre-release
         - os: ubuntu-22.04
           ros: iron
           python: python3
-          ci_branch: ros2-devel
+          ci_branch: rolling-pre-release
         - os: ubuntu-22.04
           ros: rolling
           python: python3
-          ci_branch: ros2-devel
+          ci_branch: rolling-pre-release
 
     runs-on: ${{ matrix.os }}
     env:

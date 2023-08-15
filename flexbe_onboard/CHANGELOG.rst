@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Forthcoming
+-----------
+* Support for new state id and concurrency handling
+
 2.3.3 (2023-08-09)
 ------------------
 * destroy sub/pub/client in executor thread

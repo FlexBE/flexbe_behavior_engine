@@ -36,6 +36,7 @@ from std_msgs.msg import Bool, Empty
 from flexbe_core.core.preemptable_state import PreemptableState
 from flexbe_core.core.priority_container import PriorityContainer
 from flexbe_core.core.operatable_state import OperatableState
+from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 from flexbe_core.state_logger import StateLogger
 
@@ -58,25 +59,22 @@ class EventState(OperatableState):
         self._skipped = False
         self._paused = False
         self._last_active_container = None
-
-        self._feedback_topic = 'flexbe/command_feedback'
-        self._repeat_topic = 'flexbe/command/repeat'
-        self._pause_topic = 'flexbe/command/pause'
+        self._last_outcome = None
 
     def _event_execute(self, *args, **kwargs):
-        if self._is_controlled and self._sub.has_msg(self._pause_topic):
-            msg = self._sub.get_last_msg(self._pause_topic)
-            self._sub.remove_last_msg(self._pause_topic)
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_PAUSE_TOPIC):
+            msg = self._sub.get_last_msg(Topics._CMD_PAUSE_TOPIC)
+            self._sub.remove_last_msg(Topics._CMD_PAUSE_TOPIC)
             if msg.data:
                 Logger.localinfo("--> Pausing in state %s", self.name)
-                self._pub.publish(self._feedback_topic, CommandFeedback(command="pause"))
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="pause"))
                 self._last_active_container = PriorityContainer.active_container
                 # claim priority to propagate pause event
                 PriorityContainer.active_container = self.path
                 self._paused = True
             else:
                 Logger.localinfo("--> Resuming in state %s", self.name)
-                self._pub.publish(self._feedback_topic, CommandFeedback(command="resume"))
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="resume"))
                 PriorityContainer.active_container = self._last_active_container
                 self._last_active_container = None
                 self._paused = False
@@ -87,7 +85,9 @@ class EventState(OperatableState):
 
         if self._entering:
             self._entering = False
+            self._last_outcome = None
             self.on_enter(*args, **kwargs)
+
         if self._skipped and not PreemptableState.preempt:
             self._skipped = False
             self.on_resume(*args, **kwargs)
@@ -96,16 +96,17 @@ class EventState(OperatableState):
         outcome = self.__execute(*args, **kwargs)
 
         repeat = False
-        if self._is_controlled and self._sub.has_msg(self._repeat_topic):
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_REPEAT_TOPIC):
             Logger.localinfo("--> Repeating state %s", self.name)
-            self._sub.remove_last_msg(self._repeat_topic)
-            self._pub.publish(self._feedback_topic, CommandFeedback(command="repeat"))
+            self._sub.remove_last_msg(Topics._CMD_REPEAT_TOPIC)
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="repeat"))
             repeat = True
 
         if repeat or outcome is not None and not PreemptableState.preempt:
             self._entering = True
             self.on_exit(*args, **kwargs)
 
+        self._last_outcome = outcome
         return outcome
 
     def _notify_skipped(self):
@@ -115,18 +116,21 @@ class EventState(OperatableState):
         super()._notify_skipped()
 
     def _enable_ros_control(self):
-        super()._enable_ros_control()
-        self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._repeat_topic, Empty, inst_id=id(self))
-        self._sub.subscribe(self._pause_topic, Bool, inst_id=id(self))
+        if not self._is_controlled:
+            super()._enable_ros_control()
+            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
+            self._sub.subscribe(Topics._CMD_REPEAT_TOPIC, Empty, inst_id=id(self))
+            self._sub.subscribe(Topics._CMD_PAUSE_TOPIC, Bool, inst_id=id(self))
 
     def _disable_ros_control(self):
-        super()._disable_ros_control()
-        self._sub.unsubscribe_topic(self._repeat_topic, inst_id=id(self))
-        self._sub.unsubscribe_topic(self._pause_topic, inst_id=id(self))
-        self._last_active_container = None
-        if self._paused:
-            PriorityContainer.active_container = None
+        if self._is_controlled:
+            super()._disable_ros_control()
+            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+            self._sub.unsubscribe_topic(Topics._CMD_REPEAT_TOPIC, inst_id=id(self))
+            self._sub.unsubscribe_topic(Topics._CMD_PAUSE_TOPIC, inst_id=id(self))
+            self._last_active_container = None
+            if self._paused:
+                PriorityContainer.active_container = None
 
     # Events
     # (just implement the ones you need)

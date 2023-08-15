@@ -44,6 +44,8 @@ def _remove_duplicates(input_list):
 class State:
     """Basic FlexBE State."""
 
+    _preempted_name = 'preempted'  # Define name here, but handle logic in derived class
+
     def __init__(self, *args, **kwargs):
         self._outcomes = _remove_duplicates(kwargs.get('outcomes', []))
         io_keys = kwargs.get('io_keys', [])
@@ -52,7 +54,9 @@ class State:
         # properties of instances of a state machine
         self._name = None
         self._parent = None
+        self._state_id = None  # Assigned with structure after all states added to behavior
         self._inner_sync_request = False  # Any state can generate request, but should be rare
+        self._type = 0  # Basic states are type 0, containers have non-zero type
 
     def __str__(self):
         return self._name
@@ -99,5 +103,13 @@ class State:
         self._parent = value
 
     @property
+    def state_id(self):
+        return self._state_id
+
+    @property
     def path(self):
         return "" if self.parent is None else self.parent.path + "/" + self.name
+
+    @property
+    def type(self):
+        return self._type

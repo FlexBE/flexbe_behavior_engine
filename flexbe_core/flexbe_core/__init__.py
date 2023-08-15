@@ -45,6 +45,8 @@ from .behavior_library import BehaviorLibrary  # noqa: F401
 from .logger import Logger  # noqa: F401
 from .state_logger import StateLogger  # noqa: F401
 
+MIN_UI_VERSION = '4.0.0'  # Minimum FlexBE App or UI version required to interact with this version of flexbe_core
+
 # pylint: disable=R0903
 
 

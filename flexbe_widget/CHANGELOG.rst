@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Forthcoming
+-----------
+* flake 8 cleanup
+* fix CONSTANT style across flexbe_behavior_engine
+* use SingleThreadedExecutor
+
 2.3.3 (2023-08-09)
 ------------------
 

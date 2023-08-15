@@ -29,7 +29,7 @@
 
 """A proxy for calling actions provides a single point for all state action interfaces."""
 from functools import partial
-from threading import Timer
+from threading import Timer, Lock
 
 from rclpy.action import ActionClient
 
@@ -48,6 +48,8 @@ class ProxyActionClient:
     _result = {}
     _feedback = {}
 
+    _client_sync_lock = Lock()
+
     @staticmethod
     def initialize(node):
         """Initialize ROS setup for proxy action client."""
@@ -56,17 +58,16 @@ class ProxyActionClient:
 
     @staticmethod
     def shutdown():
-        """Shuts this proxy down by reseting all action clients."""
+        """Shuts this proxy down by resetting all action clients."""
         try:
             print(f"Shutdown proxy action clients with {len(ProxyActionClient._clients)} topics ...")
-            for topic, client in ProxyActionClient._clients.items():
+            for topic, client_dict in ProxyActionClient._clients.items():
                 try:
                     ProxyActionClient._clients[topic] = None
-                    ProxyActionClient._node.destroy_client(client)
+                    ProxyActionClient._node.destroy_client(client_dict['client'])
                 except Exception as exc:  # pylint: disable=W0703
                     Logger.error(f"Something went wrong during shutdown of proxy action client for {topic}!\n{str(exc)}")
 
-            print("Shutdown proxy action clients  ...")
             ProxyActionClient._result.clear()
             ProxyActionClient._feedback.clear()
             ProxyActionClient._cancel_current_goal.clear()
@@ -88,10 +89,15 @@ class ProxyActionClient:
         """
         if topics is not None:
             for topic, action_type in topics.items():
-                ProxyActionClient.setupClient(topic, action_type, wait_duration)
+                ProxyActionClient.setup_client(topic, action_type, wait_duration)
 
     @classmethod
     def setupClient(cls, topic, action_type, wait_duration=10):
+        Logger.localerr("Deprecated: Use ProxyActionClient.setup_client instead!")
+        cls.setup_client(topic, action_type, wait_duration=10)
+
+    @classmethod
+    def setup_client(cls, topic, action_type, wait_duration=None):
         """
         Set up an action client for calling it later.
 
@@ -104,24 +110,36 @@ class ProxyActionClient:
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for the given client if it is not available right now.
         """
-        if topic not in ProxyActionClient._clients:
-            ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
-            ProxyActionClient._check_topic_available(topic, wait_duration)
+        with cls._client_sync_lock:
+            if topic not in ProxyActionClient._clients:
+                ProxyActionClient._clients[topic] = {'client': ActionClient(ProxyActionClient._node, action_type, topic),
+                                                     'count': 1}
 
-        else:
-            if action_type is not ProxyActionClient._clients[topic]._action_type:
-                if action_type.__name__ == ProxyActionClient._clients[topic]._action_type.__name__:
-                    Logger.localinfo(f'Existing action client for {topic}'
-                                     f' with same action type name, but different instance -  re-create  client!')
+            else:
+                if action_type is not ProxyActionClient._clients[topic]['client']._action_type:
+                    if action_type.__name__ == ProxyActionClient._clients[topic]['client']._action_type.__name__:
+                        if ProxyActionClient._clients[topic]['count'] == 1:
+                            Logger.localinfo(f'Existing action client for {topic}'
+                                            f' with same action type name, but different instance -  re-create  client!')
+                        else:
+                            Logger.localwarn(f"Existing action client for {topic} with {ProxyActionClient._clients[topic]['count']} references\n"
+                                             f"    with same action type name, but different instance\n"
+                                             f"    just re-create client with 1 reference - but be warned!")
 
-                    # Destroy the existing client in executor thread
-                    client = ProxyActionClient._clients[topic]
-                    ProxyActionClient._node.executor.create_task(ProxyActionClient.destroy_client, client, topic)
+                        # Destroy the existing client in executor thread
+                        client = ProxyActionClient._clients[topic]['client']
+                        ProxyActionClient._node.executor.create_task(ProxyActionClient.destroy_client, client, topic)
 
-                    ProxyActionClient._clients[topic] = ActionClient(ProxyActionClient._node, action_type, topic)
-                    ProxyActionClient._check_topic_available(topic, wait_duration)
+                        ProxyActionClient._clients[topic] = {'client': ActionClient(ProxyActionClient._node,
+                                                                                    action_type, topic),
+                                                             'count': 1}
+                    else:
+                        raise TypeError("Trying to replace existing action client with different action type")
                 else:
-                    raise TypeError("Trying to replace existing action client with different action type")
+                    ProxyActionClient._clients[topic]['count'] = ProxyActionClient._clients[topic]['count'] + 1
+
+        if isinstance(wait_duration, (float, int)):
+            ProxyActionClient._check_topic_available(topic, wait_duration)
 
     @classmethod
     def send_goal(cls, topic, goal, wait_duration=0.0):
@@ -139,6 +157,12 @@ class ProxyActionClient:
         """
         if not ProxyActionClient._check_topic_available(topic, wait_duration=wait_duration):
             raise ValueError(f'Cannot send goal for action client {topic}: Topic not available.')
+
+        client_dict = ProxyActionClient._clients.get(topic)
+        if client_dict is None:
+            raise ValueError(f'Cannot send goal for action client {topic}: Client is not initialized.')
+        client = client_dict['client']
+
         # reset previous results
         ProxyActionClient._result[topic] = None
         ProxyActionClient._feedback[topic] = None
@@ -146,12 +170,12 @@ class ProxyActionClient:
         ProxyActionClient._has_active_goal[topic] = True
         ProxyActionClient._current_goal[topic] = None
 
-        if not isinstance(goal, ProxyActionClient._clients[topic]._action_type.Goal):
+        if not isinstance(goal, client._action_type.Goal):
             if goal.__class__.__name__ == ProxyActionClient._clients[topic]._action_type.Goal.__name__:
                 # This is the case if the same class is imported multiple times
                 # To avoid rclpy TypeErrors, we will automatically convert to the base type
                 # used in the original service/publisher clients
-                new_goal = ProxyActionClient._clients[topic]._action_type.Goal()
+                new_goal = client._action_type.Goal()
                 Logger.localinfo(f"  converting goal {str(type(new_goal))} vs. {str(type(goal))}")
                 assert new_goal.__slots__ == goal.__slots__, f"Message attributes for {topic} do not match!"
                 for attr in goal.__slots__:
@@ -164,11 +188,10 @@ class ProxyActionClient:
             new_goal = goal
 
         # send goal
-        ProxyActionClient._clients[topic].wait_for_server()
-        future = ProxyActionClient._clients[topic].send_goal_async(
-            new_goal,
-            feedback_callback=lambda f: ProxyActionClient._feedback_callback(topic, f)
-        )
+        client.wait_for_server()
+        future = client.send_goal_async(new_goal,
+                                        feedback_callback=lambda f: ProxyActionClient._feedback_callback(topic, f)
+                                       )
 
         future.add_done_callback(partial(ProxyActionClient._done_callback, topic=topic))
 
@@ -196,9 +219,14 @@ class ProxyActionClient:
         @type topic: string
         @param topic: The topic of interest.
         """
-        client = ProxyActionClient._clients.get(topic)
-        if client is None:
+        client_dict = ProxyActionClient._clients.get(topic)
+        if client_dict is None:
             Logger.logerr("Action client '%s' is not yet registered, need to add it first!" % topic)
+            return False
+        
+        client = client_dict['client']
+        if client is None:
+            Logger.logerr("Action client '%s' is not yet initialized, need to add it first!" % topic)
             return False
 
         return client.server_is_ready()
@@ -273,7 +301,11 @@ class ProxyActionClient:
         @type topic: string
         @param topic: The topic of interest.
         """
-        return ProxyActionClient._clients[topic].get_state()
+        client_dict = ProxyActionClient._clients.get(topic)
+        if client_dict is None:
+            return None
+
+        return client_dict['client'].get_state()
 
     @classmethod
     def is_active(cls, topic):
@@ -311,8 +343,8 @@ class ProxyActionClient:
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for the given client if it is not available right now.
         """
-        client = ProxyActionClient._clients.get(topic)
-        if client is None:
+        client_dict = ProxyActionClient._clients.get(topic)
+        if client_dict is None:
             Logger.logerr("Action client '%s' is not yet registered, need to add it first!" % topic)
             return False
 
@@ -320,6 +352,7 @@ class ProxyActionClient:
             tmr = Timer(.5, ProxyActionClient._print_wait_warning, [topic])
             tmr.start()
 
+        client = client_dict['client']
         available = client.wait_for_server(wait_duration)
 
         warning_sent = False
@@ -344,14 +377,41 @@ class ProxyActionClient:
         Logger.logwarn(f"Waiting for action client/server for '{topic}'")
 
     @classmethod
+    def remove_client(cls, topic):
+        """
+        Remove action client from proxy.
+
+        @type topic: string
+        @param topic: The topic to publish on.
+        """
+        client = None
+        count = -1
+        with cls._client_sync_lock:
+            if topic in ProxyActionClient._clients:
+                ProxyActionClient._clients[topic]['count'] = ProxyActionClient._clients[topic]['count'] - 1
+                count = ProxyActionClient._clients[topic]['count']
+                if count < 1:
+                    client = ProxyActionClient._clients[topic]['client']
+                    ProxyActionClient._clients.pop(topic)
+
+                    if topic in ProxyActionClient._result:
+                        ProxyActionClient._result.pop(topic)
+
+                    if topic in ProxyActionClient._feedback:
+                        ProxyActionClient._feedback.pop(topic)
+
+        if client is not None:
+            Logger.localdebug(f"Action client for '{topic}' has {count} references remaining.")
+            ProxyActionClient._node.executor.create_task(ProxyActionClient.destroy_client, client, topic)
+        else:
+            Logger.localdebug(f"Publisher for '{topic}' remains with {count} references!")
+
+    @classmethod
     def destroy_client(cls, client, topic):
         """Handle client destruction from within the executor threads."""
         try:
-            if ProxyActionClient._node.destroy_client(client):
-                Logger.localinfo(f'Destroyed the proxy action client for {topic} ({id(client)})!')
-            else:
-                Logger.localwarn(f'Some issue destroying the proxy action client for {topic}!')
             del client
+            Logger.localinfo(f'Destroyed the proxy action client for {topic}!')
         except Exception as exc:  # pylint: disable=W0703
             Logger.error("Something went wrong destroying proxy action client"
                          f" for {topic}!\n  {type(exc)} - {str(exc)}")

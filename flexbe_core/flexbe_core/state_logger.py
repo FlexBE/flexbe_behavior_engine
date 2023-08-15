@@ -44,6 +44,7 @@ from rclpy.exceptions import ParameterNotDeclaredException
 
 from std_msgs.msg import String
 
+from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher
 
 
@@ -119,7 +120,7 @@ class StateLogger:
                 },
                 'publish': {
                     'class': 'flexbe_core.state_logger.PublishBehaviorLogMessage',
-                    'topic': 'flexbe/state_logger',
+                    'topic': Topics._STATE_LOGGER_TOPIC,
                     'formatter': 'yaml'
                 }
             },
@@ -285,7 +286,7 @@ class YamlFormatter(logging.Formatter):
 class PublishBehaviorLogMessage(logging.Handler):
     """publish messages to behavior logs."""
 
-    def __init__(self, level=logging.NOTSET, topic='flexbe/state_logger'):
+    def __init__(self, level=logging.NOTSET, topic=Topics._STATE_LOGGER_TOPIC):
         super().__init__(level)
         self._topic = topic
         self._pub = ProxyPublisher({self._topic: String})

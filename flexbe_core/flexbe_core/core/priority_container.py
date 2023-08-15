@@ -41,6 +41,7 @@ class PriorityContainer(OperatableStateMachine):
     def __init__(self, conditions=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._parent_active_container = None
+        self._type = OperatableStateMachine.ContainerType.PriorityContainer.value
 
     def execute(self, *args, **kwargs):
         if (PriorityContainer.active_container is None

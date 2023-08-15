@@ -45,7 +45,7 @@ def main(args=None):
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(mirror)
 
-    print("Begin behavior mirror processing ...", flush=True)
+    mirror.get_logger().info("Begin behavior mirror processing ...")
 
     # Wait for ctrl-c to stop the application
     try:

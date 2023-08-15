@@ -12,7 +12,8 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Philipp Schillinger, Team ViGIR,
+#      Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -42,16 +43,26 @@ import threading
 import time
 import zlib
 
+try:
+    from prctl import set_name as set_thread_name
+except Exception:
+    def set_thread_name(name):
+        print("Python thread names are not visible in ps/top unless you install prctl")
+
 import rclpy
 from rclpy.exceptions import ParameterNotDeclaredException
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 
-from flexbe_core import BehaviorLibrary, Logger
-from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
+from flexbe_core import BehaviorLibrary, Logger, MIN_UI_VERSION
 from flexbe_core.core.state_machine import StateMachine
+from flexbe_core.core.topics import Topics
+from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 
 from flexbe_msgs.msg import BehaviorSelection, BehaviorSync, BEStatus, CommandFeedback, UserdataInfo
 from flexbe_msgs.srv import GetUserdata
+
+from std_msgs.msg import String
 
 
 class FlexbeOnboard(Node):
@@ -75,14 +86,23 @@ class FlexbeOnboard(Node):
         self._behavior_lib = BehaviorLibrary(self)
 
         # prepare communication
-        self.status_topic = 'flexbe/status'
-        self.feedback_topic = 'flexbe/command_feedback'
-        self.heartbeat_topic = 'flexbe/heartbeat'
-        self._feedback_pub = self.create_publisher(CommandFeedback, self.feedback_topic, 10)
-        self._heartbeat_pub = self.create_publisher(BehaviorSync, self.heartbeat_topic, 10)
-        self._status_pub = self.create_publisher(BEStatus, self.status_topic, 10)
+        # Proxy as also accessed by states
+        self._proxy_pub = ProxyPublisher({Topics._CMD_FEEDBACK_TOPIC: CommandFeedback})
+
+        # only at onboard level
+        self._heartbeat_pub = self.create_publisher(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC, 10)
+        self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 10)
+
+        latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC,
+                                                     self._version_callback, qos_profile=latching_qos)
 
         # listen for new behavior to start
+        self._start_beh_sub = self.create_subscription(BehaviorSelection,
+                                                       Topics._START_BEHAVIOR_TOPIC,
+                                                       self._behavior_callback,
+                                                       10)
+
         try:
             self._enable_clear_imports = self.get_parameter('enable_clear_imports').get_parameter_value()
         except ParameterNotDeclaredException:
@@ -96,10 +116,6 @@ class FlexbeOnboard(Node):
         self._switch_lock = threading.Lock()
         self._behavior_id = -1
         self._current_state_checksum = -1
-        self._start_beh_sub = self.create_subscription(BehaviorSelection,
-                                                       'flexbe/start_behavior',
-                                                       self._behavior_callback,
-                                                       10)
 
         self._userdata_service = self.create_service(GetUserdata, 'get_user_data', self._userdata_callback)
 
@@ -113,6 +129,24 @@ class FlexbeOnboard(Node):
 
         Logger.localinfo('\033[92m--- Behavior Engine ready for first behavior! ---\033[0m')
         self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
+
+    def _version_callback(self, msg):
+        vui = FlexbeOnboard._parse_version(msg.data)
+        vex = FlexbeOnboard._parse_version(MIN_UI_VERSION)
+        if vui < vex:
+            Logger.logwarn('FlexBE App needs to be updated!\n'
+                           f'Onboard Behavior Engine requires at least version {MIN_UI_VERSION}, '
+                           f' but you have {msg.data}\n'
+                           'Please update the flexbe_app software.')
+
+    @staticmethod
+    def _parse_version(v):
+        result = 0
+        offset = 1
+        for n in reversed(v.split('.')):
+            result += int(n) * offset
+            offset *= 100
+        return result
 
     def _behavior_callback(self, beh_sel_msg):
         self._trigger_ready = False  # We have received the behavior selection request
@@ -141,6 +175,13 @@ class FlexbeOnboard(Node):
             import traceback
             print(traceback.format_exc().replace("%", "%%"))
 
+    def onboard_shutdown(self):
+        print("Shutting down the onboard behavior executive ...", flush=True)
+        self.destroy_timer(self._heartbeat)
+        self._proxy_pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+        for _ in range(50):
+            self.executor.spin_once(timeout_sec=0.001)
+
     def verify_no_active_behaviors(self, timeout=0.5):
         """Verify no active behaviors."""
         run_locked = self._run_lock.acquire(timeout=timeout)
@@ -158,12 +199,13 @@ class FlexbeOnboard(Node):
 
     def _behavior_execution(self, beh_sel_msg):
         # sending a behavior while one is already running is considered as switching
+        set_thread_name("beh" + f"{beh_sel_msg.behavior_id}")
         if not rclpy.ok():
             self._cleanup_tempdir()
 
         if self._running:
             Logger.loginfo('--> Initiating behavior switch...')
-            self._feedback_pub.publish(CommandFeedback(command="switch", args=['received']))
+            self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="switch", args=['received']))
 
         # construct the behavior that should be executed
         Logger.localinfo(f"Prepare behavior id={beh_sel_msg.behavior_key} ({beh_sel_msg.behavior_id}) ...")
@@ -171,16 +213,16 @@ class FlexbeOnboard(Node):
         if be is None:
             Logger.logerr('Dropped behavior start request because preparation failed.')
             if self._running:
-                self._feedback_pub.publish(CommandFeedback(command="switch", args=['failed']))
+                self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="switch", args=['failed']))
             else:
                 # self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
                 Logger.localinfo('\033[92m--- Behavior Engine ready to try again! ---\033[0m')
-                self._ready_counter = 6  # Trigger heartbeat to republish READY within 4 seconds
+                self._ready_counter = 8  # Trigger heartbeat to republish READY within 2 seconds
             return
 
         # perform the behavior switch if required
-        Logger.localinfo("Behavior Engine - get switch lock to start behavior id "
-                         f"key={beh_sel_msg.behavior_key} ({beh_sel_msg.behavior_id})...")
+        # Logger.localinfo("Behavior Engine - get switch lock to start behavior id "
+        #                  f"key={beh_sel_msg.behavior_key} ({beh_sel_msg.behavior_id})...")
         with self._switch_lock:
             Logger.localinfo("Behavior Engine - got switch lock to start behavior new id "
                              f"key={beh_sel_msg.behavior_key} ({beh_sel_msg.behavior_id})...")
@@ -189,14 +231,14 @@ class FlexbeOnboard(Node):
                 self._switching = True
                 Logger.localinfo("Behavior Engine - prepare to switch current running behavior"
                                  f" {self.be.name}: id={self.be.beh_id}...")
-                self._feedback_pub.publish(CommandFeedback(command="switch", args=['start']))
+                self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="switch", args=['start']))
 
                 # ensure that switching is possible
                 if not self._is_switchable(be):
                     Logger.logerr("Dropped behavior start request for "
                                   f"key={beh_sel_msg.behavior_key} (id={beh_sel_msg.behavior_id}) "
                                   " because switching is not possible.")
-                    self._feedback_pub.publish(CommandFeedback(command="switch", args=['not_switchable']))
+                    self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command="switch", args=['not_switchable']))
                     return
 
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
@@ -204,24 +246,31 @@ class FlexbeOnboard(Node):
                                                   code=BEStatus.SWITCHING))
                 # wait if running behavior is currently starting or stopping
                 rate = threading.Event()
-                active_state = None
+                active_states = None
                 while rclpy.ok() and self._running:
-                    active_state = self.be.get_current_state()
-                    if active_state is not None or not self._running:
+                    active_states = self.be.get_current_states()
+                    if not self._running or (active_states is not None and len(active_states) > 0):
                         break
-                    rate.wait(0.01)  # As we are polling for signal, don't use ROS rate due to sim time
+                    rate.wait(0.001)  # As we are polling for signal, don't use ROS rate due to sim time
                 del rate
 
                 # extract the active state if any
-                if active_state is not None:
+                if active_states is not None:
                     Logger.localinfo(f"Behavior Engine - {self.be.name}: {self.be.beh_id} "
-                                     f"switching behaviors from active state {active_state.name} ...")
+                                     f"switching behaviors from active state {[acst.name for acst in active_states]} ...")
                     try:
-                        be.prepare_for_switch(active_state)
-                        self._feedback_pub.publish(CommandFeedback(command="switch", args=['prepared']))
+                        if len(active_states) > 1:
+                            Logger.localinfo(f"\n\nBehavior Engine - {self.be.name}: {self.be.beh_id} "
+                                             f"- switching only top level state!\n")
+                            Logger.logwarn("Switch multiple active states?")
+
+                        be.prepare_for_switch(active_states[0])
+                        self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                                CommandFeedback(command="switch", args=['prepared']))
                     except Exception as exc:
                         Logger.logerr('Failed to prepare behavior switch:\n%s' % str(exc))
-                        self._feedback_pub.publish(CommandFeedback(command="switch", args=['failed']))
+                        self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                                CommandFeedback(command="switch", args=['failed']))
                         # Let us know that old behavior is still running
                         self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
                                                           behavior_id=self.be.beh_id,
@@ -229,7 +278,7 @@ class FlexbeOnboard(Node):
                         return
                     # stop the rest
                     Logger.localinfo(f"Behavior Engine - {self.be.name}: {self.be.beh_id} - "
-                                     f"preempt active state  {active_state.name} ...")
+                                     f"preempt active state  {active_states[0].name} ...")
                     self.be.preempt()
                 else:
                     Logger.localinfo(f"Behavior Engine - {self.be.name}: {self.be.beh_id} "
@@ -246,10 +295,10 @@ class FlexbeOnboard(Node):
 
             result = None
             try:
-                Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} ready, begin startup ...')
                 Logger.loginfo('Onboard Behavior Engine starting [%s : %s]' % (be.name, beh_sel_msg.behavior_id))
                 self.be.confirm()
-                Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} confirmation.')
+                Logger.localinfo(f'    behavior {self.be.name}: {self.be.beh_id} confirmation.')
+
                 args = [self.be.requested_state_path] if self.be.requested_state_path is not None else []
                 Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} BEStatus STARTED.')
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
@@ -292,7 +341,7 @@ class FlexbeOnboard(Node):
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
                 Logger.localinfo('\033[92m--- Behavior Engine finished - ready for more! ---\033[0m')
 
-            Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
+            # Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
             self._running = False
             self._switching = False
             self.be = None
@@ -445,6 +494,8 @@ class FlexbeOnboard(Node):
 
         # build state machine
         try:
+            self.get_logger().info(f"Building state machine {beh_sel_msg.behavior_id} with "
+                                   f"autonomy level={beh_sel_msg.autonomy_level}.")
             be.set_up(beh_id=beh_sel_msg.behavior_id, autonomy_level=beh_sel_msg.autonomy_level, debug=False)
             be.prepare_for_execution(self._convert_input_data(beh_sel_msg.input_keys, beh_sel_msg.input_values))
             self.get_logger().info('State machine built.')

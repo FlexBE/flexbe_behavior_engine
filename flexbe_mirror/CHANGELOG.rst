@@ -1,6 +1,18 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Forthcoming
+-----------
+* flake8, pep257 and codestyle checks
+* reinitialize existing state machine instead of rebuilding on sync (1000x faster)
+* fix CONSTANT style across flexbe_behavior_engine
+* update with standardized topic handling
+* update ui version handling; comment out some spam
+*  publish last active state on changes
+* update behavior for UI if internal concurrent returns
+* refactor mirror handling
+* adding state_id handling; pre-building ContainerStructure to set IDs
+
 2.3.3 (2023-08-09)
 ------------------
 * streamline pub/sub for mirror

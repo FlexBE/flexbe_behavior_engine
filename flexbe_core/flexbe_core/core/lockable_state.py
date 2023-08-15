@@ -36,6 +36,7 @@ from flexbe_msgs.msg import CommandFeedback
 
 from flexbe_core.logger import Logger
 from flexbe_core.core.manually_transitionable_state import ManuallyTransitionableState
+from flexbe_core.core.topics import Topics
 
 
 class LockableState(ManuallyTransitionableState):
@@ -55,19 +56,15 @@ class LockableState(ManuallyTransitionableState):
         self._locked = False
         self._stored_outcome = None
 
-        self._feedback_topic = 'flexbe/command_feedback'
-        self._lock_topic = 'flexbe/command/lock'
-        self._unlock_topic = 'flexbe/command/unlock'
-
     def _lockable_execute(self, *args, **kwargs):
-        if self._is_controlled and self._sub.has_msg(self._lock_topic):
-            msg = self._sub.get_last_msg(self._lock_topic)
-            self._sub.remove_last_msg(self._lock_topic)
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_LOCK_TOPIC):
+            msg = self._sub.get_last_msg(Topics._CMD_LOCK_TOPIC)
+            self._sub.remove_last_msg(Topics._CMD_LOCK_TOPIC)
             self._execute_lock(msg.data)
 
-        if self._is_controlled and self._sub.has_msg(self._unlock_topic):
-            msg = self._sub.get_last_msg(self._unlock_topic)
-            self._sub.remove_last_msg(self._unlock_topic)
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_UNLOCK_TOPIC):
+            msg = self._sub.get_last_msg(Topics._CMD_UNLOCK_TOPIC)
+            self._sub.remove_last_msg(Topics._CMD_UNLOCK_TOPIC)
             self._execute_unlock(msg.data)
 
         # locked, so execute until we want to transition
@@ -105,8 +102,8 @@ class LockableState(ManuallyTransitionableState):
         else:
             found_target = self._parent.lock(target)
         # provide feedback about lock
-        self._pub.publish(self._feedback_topic, CommandFeedback(command="lock",
-                                                                args=[target, target if found_target else ""]))
+        self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                          CommandFeedback(command="lock", args=[target, target if found_target else ""]))
         if not found_target:
             Logger.logwarn(f"Wanted to lock {target}, but could not find it in current path {self.path}.")
         else:
@@ -120,23 +117,26 @@ class LockableState(ManuallyTransitionableState):
         else:
             found_target = self._parent.unlock(target)
         # provide feedback about unlock
-        self._pub.publish(self._feedback_topic, CommandFeedback(command="unlock",
-                                                                args=[target, target if found_target else ""]))
+        self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                          CommandFeedback(command="unlock", args=[target, target if found_target else ""]))
         if not found_target:
             Logger.logwarn(f"Wanted to unlock {target}, but could not find it in current path {self.path}.")
         else:
             Logger.localinfo(f"--> Unlocking in state {target}")
 
     def _enable_ros_control(self):
-        super()._enable_ros_control()
-        self._pub.createPublisher(self._feedback_topic, CommandFeedback)
-        self._sub.subscribe(self._lock_topic, String, inst_id=id(self))
-        self._sub.subscribe(self._unlock_topic, String, inst_id=id(self))
+        if not self._is_controlled:
+            super()._enable_ros_control()
+            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
+            self._sub.subscribe(Topics._CMD_LOCK_TOPIC, String, inst_id=id(self))
+            self._sub.subscribe(Topics._CMD_UNLOCK_TOPIC, String, inst_id=id(self))
 
     def _disable_ros_control(self):
-        super()._disable_ros_control()
-        self._sub.unsubscribe_topic(self._lock_topic, inst_id=id(self))
-        self._sub.unsubscribe_topic(self._unlock_topic, inst_id=id(self))
+        if self._is_controlled:
+            super()._disable_ros_control()
+            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+            self._sub.unsubscribe_topic(Topics._CMD_LOCK_TOPIC, inst_id=id(self))
+            self._sub.unsubscribe_topic(Topics._CMD_UNLOCK_TOPIC, inst_id=id(self))
 
     def is_locked(self):
         return self._locked

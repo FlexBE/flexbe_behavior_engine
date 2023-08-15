@@ -42,6 +42,7 @@ from rosidl_runtime_py import get_interface_path
 from flexbe_msgs.msg import BehaviorSelection, BehaviorModification, BEStatus
 from flexbe_msgs.action import BehaviorExecution
 from flexbe_core import BehaviorLibrary
+from flexbe_core.core.topics import Topics
 
 from std_msgs.msg import String, Empty
 
@@ -58,12 +59,13 @@ class BehaviorActionServer:
         self._current_state = None
         self._active_behavior_id = None
 
-        self._pub = self._node.create_publisher(BehaviorSelection, 'flexbe/start_behavior', 100)
-        self._preempt_pub = self._node.create_publisher(Empty, 'flexbe/command/preempt', 100)
-        self._status_pub = self._node.create_subscription(BEStatus, 'flexbe/status', self._status_cb, 100)
-        self._state_pub = self._node.create_subscription(String, 'flexbe/behavior_update', self._state_cb, 100)
+        self._pub = self._node.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
+        self._preempt_pub = self._node.create_publisher(Empty, Topics._CMD_PREEMPT_TOPIC, 100)
+        self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb, 100)
+        self._state_pub = self._node.create_subscription(String, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb, 100)
 
-        self._as = ActionServer(self._node, BehaviorExecution, 'flexbe/execute_behavior',
+        self._as = ActionServer(self._node, BehaviorExecution,
+                                Topics._EXECUTE_BEHAVIOR_ACTION,
                                 goal_callback=self._goal_cb,
                                 cancel_callback=self._preempt_cb,
                                 execute_callback=self._execute_cb)

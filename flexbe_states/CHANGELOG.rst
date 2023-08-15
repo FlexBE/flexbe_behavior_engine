@@ -1,6 +1,11 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Forthcoming
+-----------
+* add options to remove service callers and action clients
+* flake8, pep257 and codestyle checks
+
 2.3.3 (2023-08-09)
 ------------------
 * cleanup

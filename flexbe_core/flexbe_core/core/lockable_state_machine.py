@@ -49,17 +49,6 @@ class LockableStateMachine(RosStateMachine):
         super().__init__(*args, **kwargs)
         self._locked = False
 
-    def get_deep_state(self):
-        """
-        Look for the current state (traversing all state machines down to the real state).
-
-        @return: The current state (not state machine)
-        """
-        container = self
-        while isinstance(container._current_state, LockableStateMachine):
-            container = container._current_state
-        return container._current_state
-
     def _is_internal_transition(self, transition_target):
         return transition_target in self._labels
 

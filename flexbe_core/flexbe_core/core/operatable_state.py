@@ -31,11 +31,13 @@
 
 """OperatableState."""
 
-from std_msgs.msg import UInt8, String
+from std_msgs.msg import UInt32, String
 
 from flexbe_msgs.msg import OutcomeRequest
 
 from flexbe_core.core.preemptable_state import PreemptableState
+from flexbe_core.core.topics import Topics
+from flexbe_core.core.state_map import StateMap
 from flexbe_core.logger import Logger
 from flexbe_core.state_logger import StateLogger
 
@@ -57,48 +59,56 @@ class OperatableState(PreemptableState):
 
         self._last_requested_outcome = None
 
-        self._outcome_topic = 'flexbe/mirror/outcome'
-        self._request_topic = 'flexbe/outcome_request'
-        self._debug_topic = 'flexbe/debug/current_state'
-
     def _operatable_execute(self, *args, **kwargs):
         outcome = self.__execute(*args, **kwargs)
 
         if self._is_controlled:
             # reset previously requested outcome if applicable
             if self._last_requested_outcome is not None and outcome is None:
-                self._pub.publish(self._request_topic, OutcomeRequest(outcome=255, target=self.path))
+                self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
                 self._last_requested_outcome = None
 
             # request outcome because autonomy level is too low
             if not self._force_transition and (not self.parent.is_transition_allowed(self.name, outcome)
                                                or outcome is not None and self.is_breakpoint):
                 if outcome != self._last_requested_outcome:
-                    self._pub.publish(self._request_topic, OutcomeRequest(outcome=self.outcomes.index(outcome),
-                                                                          target=self.path))
+                    self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
+                                      OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.path))
                     Logger.localinfo("<-- Want result: %s > %s" % (self.name, outcome))
                     StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                     autonomy=self.parent.autonomy_level,
-                                    required=self.parent.get_required_autonomy(outcome))
+                                    required=self.parent.get_required_autonomy(outcome, self))
                     self._last_requested_outcome = outcome
                 outcome = None
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
-                outcome_index = self.outcomes.index(outcome)
-                Logger.localinfo("State result: %s > %s (%d)" % (self.name, outcome, outcome_index))
-                self._pub.publish(self._outcome_topic, UInt8(data=outcome_index))
-                self._pub.publish(self._debug_topic, String(data="%s > %s" % (self.path, outcome)))
-                if self._force_transition:
-                    StateLogger.log('flexbe.operator', self, type='forced', forced=outcome,
-                                    requested=self._last_requested_outcome)
-                self._last_requested_outcome = None
-
-        self._force_transition = False
+                self._publish_outcome(outcome)
+                self._force_transition = False
         return outcome
 
+    def _publish_outcome(self, outcome):
+        """Update the UI and logs about this outcome."""
+        # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
+        outcome_index = self.outcomes.index(outcome)
+        Logger.localinfo(f"State result: {self.name} > {outcome}")
+        self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
+        self._pub.publish(Topics._DEBUG_TOPIC, String(data="%s > %s" % (self.path, outcome)))
+        if self._force_transition:
+            StateLogger.log('flexbe.operator', self, type='forced', forced=outcome,
+                            requested=self._last_requested_outcome)
+        self._last_requested_outcome = None
+
     def _enable_ros_control(self):
-        super()._enable_ros_control()
-        self._pub.createPublisher(self._outcome_topic, UInt8)
-        self._pub.createPublisher(self._debug_topic, String)
-        self._pub.createPublisher(self._request_topic, OutcomeRequest)
+        if not self._is_controlled:
+            super()._enable_ros_control()
+            self._pub.create_publisher(Topics._OUTCOME_TOPIC, UInt32)
+            self._pub.create_publisher(Topics._DEBUG_TOPIC, String)
+            self._pub.create_publisher(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest)
+
+    def _disable_ros_control(self):
+        if self._is_controlled:
+            super()._disable_ros_control()
+            self._pub.remove_publisher(Topics._OUTCOME_TOPIC)
+            self._pub.remove_publisher(Topics._DEBUG_TOPIC)
+            self._pub.remove_publisher(Topics._OUTCOME_REQUEST_TOPIC)

@@ -75,10 +75,10 @@ class PyTester(unittest.TestCase):
         PyTester._file_path = join(package_dir, PyTester._tests_folder)
 
     def setUp(self):
-
         assert PyTester._package is not None, "Must define setUpClass() for particular test"
         assert PyTester._file_path is not None, "Must define setUpClass() for particular test"
 
+        print("setUp test and initialize ROS ...", flush=True)
         self.context = rclpy.context.Context()
         rclpy.init(context=self.context)
 
@@ -89,6 +89,7 @@ class PyTester(unittest.TestCase):
         self.node.declare_parameter("~print_debug_positive", True)
         self.node.declare_parameter("~print_debug_negative", True)
         self.node.declare_parameter("~compact_format", False)
+        self.node.get_logger().info(f"     setUp - rclpy.ok={rclpy.ok(context=self.context)} context={self.context.ok()}")
 
         initialize_proxies(self.node)
 
@@ -111,7 +112,7 @@ class PyTester(unittest.TestCase):
 
         self.executor.shutdown()
 
-        # Kill it with fire to make sure not stray published topics are available
+        # Kill it with fire to make sure no stray published topics are available
         rclpy.shutdown(context=self.context)
 
     def run_test(self, test_name, timeout_sec=None, max_cnt=50):
@@ -120,6 +121,8 @@ class PyTester(unittest.TestCase):
 
         try:
             self.node.get_logger().info(f"  Loading {test_name} from  -->{filename}")
+            self.node.get_logger().info(f"     run_test import rclpy.ok={rclpy.ok(context=self.context)} "
+                                        f"context={self.node.context.ok()}")
             with open(filename, 'r') as f:
                 config = getattr(yaml, 'unsafe_load', yaml.load)(f)
         except IOError as io_error:
@@ -132,6 +135,8 @@ class PyTester(unittest.TestCase):
         self.node.get_logger().error(f"Running test for {test_name}\n config: {config} ...")
         tester = Tester(self.node, self.executor)
         try:
+            self.node.get_logger().info(f"     run_pytest rclpy.ok={rclpy.ok(context=self.context)} "
+                                        f"context={self.node.context.ok()}")
             success = tester.run_pytest(test_name, config, timeout_sec=timeout_sec, max_cnt=max_cnt)
             self.node.get_logger().error(f"    test for {test_name} success={success}")
         except Exception as exc:  # pylint: disable=W0703
