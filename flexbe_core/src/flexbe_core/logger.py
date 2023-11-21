@@ -18,6 +18,7 @@ class Logger(object):
 
     # max number of items in last logged dict (used for log_throttle)
     MAX_LAST_LOGGED_SIZE = 1024
+    LAST_LOGGED_CLEARING_RATIO = 0.2
 
     _pub = None
 
@@ -51,8 +52,8 @@ class Logger(object):
         if len(Logger._last_logged) > Logger.MAX_LAST_LOGGED_SIZE:
             # iterate through last logged items, sorted by the timestamp (oldest last)
             for i, log in enumerate(sorted(Logger._last_logged.items(), key=lambda item: item[1], reverse=True)):
-                # remove oldest items that exceed the max logged size
-                if i > Logger.MAX_LAST_LOGGED_SIZE:
+                # remove defined percentage of oldest items
+                if i > (Logger.MAX_LAST_LOGGED_SIZE * (1 - Logger.LAST_LOGGED_CLEARING_RATIO)):
                     Logger._last_logged.pop(log[0])
 
     @staticmethod
