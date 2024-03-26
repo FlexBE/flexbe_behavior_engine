@@ -46,6 +46,7 @@ class ProxyActionClient:
     _cancel_current_goal = {}
 
     _result = {}
+    _result_status = {}
     _feedback = {}
 
     @staticmethod
@@ -68,6 +69,7 @@ class ProxyActionClient:
 
             print("Shutdown proxy action clients  ...")
             ProxyActionClient._result.clear()
+            ProxyActionClient._result_status.clear()
             ProxyActionClient._feedback.clear()
             ProxyActionClient._cancel_current_goal.clear()
             ProxyActionClient._has_active_goal.clear()
@@ -141,6 +143,7 @@ class ProxyActionClient:
             raise ValueError(f'Cannot send goal for action client {topic}: Topic not available.')
         # reset previous results
         ProxyActionClient._result[topic] = None
+        ProxyActionClient._result_status[topic] = None
         ProxyActionClient._feedback[topic] = None
         ProxyActionClient._cancel_current_goal[topic] = False
         ProxyActionClient._has_active_goal[topic] = True
@@ -181,7 +184,9 @@ class ProxyActionClient:
     @classmethod
     def _result_callback(cls, future, topic):
         result = future.result().result
+        result_status = future.result().status
         ProxyActionClient._result[topic] = result
+        ProxyActionClient._result_status[topic] = result_status
         ProxyActionClient._has_active_goal[topic] = False
 
     @classmethod
@@ -273,7 +278,7 @@ class ProxyActionClient:
         @type topic: string
         @param topic: The topic of interest.
         """
-        return ProxyActionClient._clients[topic].get_state()
+        return ProxyActionClient._result_status.get(topic)
 
     @classmethod
     def is_active(cls, topic):
