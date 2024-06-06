@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3.0.3 (2024-06-06)
+------------------
+* Update preparing for Jazzy release
+
 3.0.2 (2024-06-04)
 ------------------
 * use PySide6 for UI given more permissive license
