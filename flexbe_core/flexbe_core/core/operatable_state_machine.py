@@ -112,6 +112,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         """Calculate all state ids and prepare the ContainerStructure message."""
         self._state_map = StateMap()
         self._structure = self._build_structure_msg()
+        print(f"\x1b[94mBuilt {self._state_map}\x1b[0m", flush=True)
 
     def _build_structure_msg(self):
         """Create a message to describe the structure of this state machine."""
@@ -377,17 +378,21 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo('<-- Sent attach confirm.')
 
     def _mirror_structure_callback(self, msg):
-        if self._structure:
-            Logger.localinfo(f'--> Sending behavior structure to mirror id={msg.data} ...')
-            self._pub.publish(Topics._MIRROR_STRUCTURE_TOPIC, self._structure)
-            self._inner_sync_request = True
-            # enable control of states since a mirror is listening
-            self._enable_ros_control()
+        sm_struct = self._structure
+        if sm_struct:
+            if sm_struct.behavior_id == msg.data:
+                Logger.localinfo(f'--> Sending behavior structure to mirror id={msg.data} ...')
+                self._pub.publish(Topics._MIRROR_STRUCTURE_TOPIC, sm_struct)
+                self._inner_sync_request = True
+                # enable control of states since a mirror is listening
+                self._enable_ros_control()
+            else:
+                Logger.localinfo(f"Structure for '{self.name}' id={sm_struct.behavior_id} mismatch "
+                                 f' with request from mirror id={msg.data} - ignore request!')
         else:
             Logger.logwarn(f"No structure defined for '{self.name}'! - nothing sent to mirror.")
 
     # handle state events
-
     def _notify_start(self):
         super()._notify_start()
 
