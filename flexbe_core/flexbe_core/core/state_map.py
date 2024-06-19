@@ -47,7 +47,7 @@ class StateMap:
     def __str__(self):
         """Return string with state map information."""
         return (f'State map with {len(self._state_map)} entries'
-                '.' if self._num_collision_processed == 0 else f' with {self._num_collision_processed} collisions!')
+                + ('.' if self._num_collision_processed == 0 else f' and {self._num_collision_processed} collisions!'))
 
     def __getitem__(self, index):
         """Get existing state if possible, or return None."""
@@ -90,6 +90,7 @@ class StateMap:
             state._state_id = self._hash_path(hash_path)
             collisions = 0
             while state._state_id in self._state_map:
+                # Collision with existing state detected.  Define a new state_id by extending path.
                 collisions += 1
                 if collisions > 20:
                     raise KeyError(f"Unable to avoid collisions in StateMap with '{path}'")
