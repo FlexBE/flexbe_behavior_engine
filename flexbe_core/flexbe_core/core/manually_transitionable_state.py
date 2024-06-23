@@ -57,18 +57,22 @@ class ManuallyTransitionableState(RosState):
     def _manually_transitionable_execute(self, *args, **kwargs):
         self._manual_transition_requested = None
         if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
-            command_msg = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
-            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                              CommandFeedback(command='transition', args=[command_msg.target, self.name]))
-            if command_msg.target != self.name:
-                Logger.logwarn("Requested outcome for state '%s' but active state is '%s'" %
-                               (command_msg.target, self.name))
-            else:
+            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+            if command_msg.target == self.name:
+                cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
+                assert cmd_msg2 is command_msg, "Unexpected change in CMD_TRANSITION_TOPIC buffer"
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                  CommandFeedback(command='transition', args=[command_msg.target, self.name]))
+
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
                 self._manual_transition_requested = outcome
                 Logger.localinfo("--> Manually triggered outcome '%s' of state '%s'" % (outcome, self.name))
                 return outcome
+            else:
+                Logger.loginfo(f"Requested outcome for state '{command_msg.target}' "
+                               f" but this active state is '{self.name}' - keep looking for potential nested state")
+
         # otherwise, return the normal outcome
         self._force_transition = False
         return self.__execute(*args, **kwargs)
