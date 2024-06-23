@@ -99,12 +99,16 @@ class ConcurrencyContainer(OperatableStateMachine):
 
         self._manual_transition_requested = None
         # Logger.localinfo(f"-concurrency container '{self.name}' is_controlled={self._is_controlled}"
-        #                  f'  has transition request={self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC)}')
+        #                  f" with {len(self._states)} states is entering={self._entering} ")
         if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
             # Special handling in concurrency container - can be either CC or one of several internal states.
-            command_msg = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
+            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
 
             if command_msg.target == self.name:
+                cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
+                assert cmd_msg2 is command_msg, "Unexpected change in CMD_TRANSITION_TOPIC buffer"
+                Logger.localinfo(f"-concurrency container '{self.name}' is handling the transition cmd msg={command_msg}")
+
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
                 self._manual_transition_requested = outcome
@@ -122,40 +126,46 @@ class ConcurrencyContainer(OperatableStateMachine):
                 self._last_outcome = outcome
                 return outcome
             else:
-                Logger.localinfo(f"concurrency container '{self.name}' ")
+                Logger.localinfo(f"concurrency container '{self.name}' - storing {command_msg} transition request")
                 self._manual_transition_requested = command_msg
 
         for state in self._states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
+                # print(f"   in current {self._name} : state '{state.name}' is already done.", flush=True)
                 continue  # already done with executing
 
-            if self._manual_transition_requested is not None and self._manual_transition_requested.target == state.name:
-                # Transition request applies to this state
-                # @TODO - Should we be using path not name here?
-                command_msg = self._manual_transition_requested
-                self._manual_transition_requested = None  # Reset at this level
+            if self._manual_transition_requested is not None:
+                if self._manual_transition_requested.target == state.name:
+                    # Transition request applies to this state
+                    # @TODO - Should we be using path not name here?
+                    command_msg = self._manual_transition_requested
+                    cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
+                    assert cmd_msg2 is command_msg, "Something is up with handling of buffer for CMD_TRANSITION_TOPIC"
+                    Logger.localinfo(f"-concurrency container '{self.name}' state '{state.name}' is handling "
+                                     f"the cmd msg={command_msg}")
+                    self._manual_transition_requested = None  # Reset at this level
 
-                if 0 <= command_msg.outcome < len(state.outcomes):
-                    state._force_transition = True
-                    outcome = state.outcomes[command_msg.outcome]
-                    state._manual_transition_requested = outcome
-                    self._returned_outcomes[state.name] = outcome
-                    with UserData(reference=self._userdata, remap=self._remappings[state.name],
-                                  input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
-                        state.on_exit(userdata)
+                    if 0 <= command_msg.outcome < len(state.outcomes):
+                        state._force_transition = True
+                        outcome = state.outcomes[command_msg.outcome]
+                        state._manual_transition_requested = outcome
+                        self._returned_outcomes[state.name] = outcome
+                        with UserData(reference=self._userdata, remap=self._remappings[state.name],
+                                      input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
+                            state.on_exit(userdata)
 
-                    # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here
-                    state._publish_outcome(outcome)
+                        # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here
+                        state._publish_outcome(outcome)
 
-                    self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                                      CommandFeedback(command='transition',
-                                                      args=[command_msg.target, state.name]))
-                    Logger.localerr(f'--> Manually triggered outcome {outcome} ({command_msg.outcome}) '
-                                    f"of state '{state.name}' from inside concurrency {self.name}")
-                    continue
-                else:
-                    Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for state '{state.name}' "
-                                    f"from inside concurrency '{self.name}'\n{state.outcomes}")
+                        self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                          CommandFeedback(command='transition',
+                                                          args=[command_msg.target, state.name]))
+                        Logger.localerr(f'--> Manually triggered outcome {outcome} ({command_msg.outcome}) '
+                                        f"of state '{state.name}' from inside concurrency {self.name}")
+                        continue
+                    else:
+                        Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for state '{state.name}' "
+                                        f"from inside concurrency '{self.name}'\n{state.outcomes}")
 
             if (PriorityContainer.active_container is not None
                 and not all(a == s for a, s in zip(PriorityContainer.active_container.split('/'),
@@ -173,7 +183,8 @@ class ConcurrencyContainer(OperatableStateMachine):
 
                 continue  # other state has priority
 
-            if state.sleep_duration <= 0:  # ready to execute
+            if state.sleep_duration <= 0 or self._manual_transition_requested is not None:  # ready to execute
+                # Execute if we have a pending manual transition command or state tic rate elapsed
                 out = self._execute_single_state(state)
                 self._returned_outcomes[state.name] = out
 
@@ -234,7 +245,6 @@ class ConcurrencyContainer(OperatableStateMachine):
                 self._force_transition = False
 
         self._last_outcome = outcome
-        # Logger.localinfo(f"ConcurrencyContainer '{self.name}' returning outcome '{outcome}' (request inner sync)")
         return outcome
 
     def _execute_single_state(self, state, force_exit=False):

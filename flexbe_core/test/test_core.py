@@ -476,7 +476,8 @@ class TestCore(unittest.TestCase):
         state._sub._callback(OutcomeRequest(target='invalid', outcome=1), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='transition', args=['invalid', 'subject']))
+        # This state won't handle the transition request, so not message is expected
+        self.assertNoMessage(sub, fb_topic)
         self.node.get_logger().info('test_manually_transitionable_state - OK! ')
 
     def test_cross_combinations(self):
