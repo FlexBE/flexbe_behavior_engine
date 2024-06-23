@@ -36,6 +36,7 @@ from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.preemptable_state import PreemptableState
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
+from flexbe_msgs.msg import CommandFeedback
 
 import rclpy
 
@@ -84,7 +85,20 @@ class PreemptableStateMachine(LockableStateMachine):
         """Spin the execute loop for preemptable portion."""
         outcome = None
         while rclpy.ok():
+            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+
             outcome = self.execute(userdata)
+
+            if command_msg is not None:
+                command_msg2 = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+                if command_msg is command_msg2:
+                    # Execute loop went through process and did not handle the requested transition
+                    Logger.loginfo(f"'{self.name}' did not handle transition "
+                                   f"cmd='{command_msg.target}' ({command_msg.outcome}) - toss it!")
+                    self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                      CommandFeedback(command='transition',
+                                                      args=['invalid', command_msg.target]))
+                    self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
 
             # Store the information for safely passing to heartbeat thread
             deep_states = self.get_deep_states()

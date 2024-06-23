@@ -293,12 +293,31 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if not ProxySubscriberCached._topics[topic]['buffered']:
-            Logger.warning('Attempted to access buffer of non-buffered topic!')
-            return None
-        if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
-            return None
-        return ProxySubscriberCached._topics[topic]['msg_queue'].popleft()
+        if cls.is_available(topic):
+            if not ProxySubscriberCached._topics[topic]['buffered']:
+                Logger.warning('Attempted to access buffer of non-buffered topic!')
+                return None
+            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+                return None
+            return ProxySubscriberCached._topics[topic]['msg_queue'].popleft()
+        return None
+
+    @classmethod
+    def peek_at_buffer(cls, topic):
+        """
+        Peek at the oldest buffered message of the given topic, but leave in queue.
+
+        @type topic: string
+        @param topic: The topic of interest.
+        """
+        if cls.is_available(topic):
+            if not ProxySubscriberCached._topics[topic]['buffered']:
+                Logger.warning('Attempted to access buffer of non-buffered topic!')
+                return None
+            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+                return None
+            return ProxySubscriberCached._topics[topic]['msg_queue'][0]
+        return None
 
     @classmethod
     def has_msg(cls, topic):
@@ -320,7 +339,9 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        return len(ProxySubscriberCached._topics[topic]['msg_queue']) > 0
+        if cls.is_available(topic):
+            return len(ProxySubscriberCached._topics[topic]['msg_queue']) > 0
+        return False
 
     @classmethod
     def remove_last_msg(cls, topic, clear_buffer=False):
