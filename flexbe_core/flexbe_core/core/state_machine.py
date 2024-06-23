@@ -124,8 +124,9 @@ class StateMachine(State):
 
     def execute(self, userdata):
         """Execute the SM."""
-        if self._current_state is None:
+        if self._entering or self._current_state is None:
             self.assert_consistent_transitions()
+            self._entering = False
             self._current_state = self.initial_state
             self._userdata = userdata if userdata is not None else UserData()
             self._userdata(add_from=self._own_userdata)
@@ -203,7 +204,8 @@ class StateMachine(State):
         """Return how long to sleep between execute steps."""
         if self._current_state is not None:
             return self._current_state.sleep_duration
-
+        elif self._entering:
+            return -0.1  # No sleep when entering
         return 0.00005  # return some minimal wait
 
     def get_deep_states(self):

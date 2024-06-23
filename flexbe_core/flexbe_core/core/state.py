@@ -58,6 +58,7 @@ class State:
         self._state_id = None  # Assigned with structure after all states added to behavior
         self._inner_sync_request = False  # Any state can generate request, but should be rare
         self._type = 0  # Basic states are type 0, containers have non-zero type
+        self._entering = True
 
     def __str__(self):
         """Return name of this state."""

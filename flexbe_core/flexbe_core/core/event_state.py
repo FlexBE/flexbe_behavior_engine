@@ -58,7 +58,6 @@ class EventState(OperatableState):
         self.__execute = self.execute
         self.execute = self._event_execute
 
-        self._entering = True
         self._skipped = False
         self._paused = False
         self._last_active_container = None
