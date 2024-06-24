@@ -41,9 +41,10 @@ class CalculationState(EventState):
 
     -- calculation  function    The function that performs the desired calculation.
                                 It could be a private function (self.foo) manually defined in a behavior's source code
-                                or a lambda function (e.g., lambda x: x^2, where x will be the input_value).
+                                or a Python lambda function (e.g., lambda x: x**2),
+                                where x is the argument passed to the function.
 
-    ># input_value  object      Input to the calculation function.
+    ># input_value  object      Userdata used as input to the calculation function.
 
     #> output_value object      The result of the calculation.
 

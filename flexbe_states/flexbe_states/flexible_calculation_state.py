@@ -41,8 +41,10 @@ class FlexibleCalculationState(EventState):
 
     -- calculation  function    The function that performs the desired calculation.
                                 It could be a private function (self.foo) manually defined in a behavior's source code
-                                or a lambda function (e.g., lambda x: x[0]^2 + x[1]^2).
-    -- input_keys   string[]    List of available input keys.
+                                or a Python lambda function (e.g., lambda x: x[0]**2 + x[1]**2),
+                                where x is the list argument passed to the function.
+
+    -- input_keys   string[]    List of userdata keys used to create a list of input data for calculation.
 
     ># input_keys   object[]    Input(s) to the calculation function as a list of userdata.
                                 The individual inputs can be accessed as list elements (see lambda expression example).
