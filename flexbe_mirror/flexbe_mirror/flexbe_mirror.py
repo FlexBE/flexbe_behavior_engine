@@ -372,7 +372,7 @@ class FlexbeMirror(Node):
             if len(self._struct_buffer) > 0:
                 while self._sm is None and len(self._struct_buffer) > 0:
                     # Search buffer looking for desired structure
-                    struct = self._struct_buffer.popLeft()
+                    struct = self._struct_buffer.popleft()
                     if struct.behavior_id == msg.behavior_id:
                         self._mirror_state_machine(struct)
                         Logger.localinfo(f"Mirror built for checksum '{msg.behavior_id}'")

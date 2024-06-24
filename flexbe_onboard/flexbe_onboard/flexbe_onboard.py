@@ -113,6 +113,7 @@ class FlexbeOnboard(Node):
         self._trigger_ready = True
         self._running = False
         self._run_lock = threading.Lock()
+        self._starting = False
         self._switching = False
         self._switch_lock = threading.Lock()
         self._behavior_id = -1
@@ -152,6 +153,12 @@ class FlexbeOnboard(Node):
         return result
 
     def _behavior_callback(self, beh_sel_msg):
+        if self._starting:
+            # Prevent multiple request messages from triggering too soon
+            Logger.logwarn(f"Received behavior start request for {beh_sel_msg.behavior_key} "
+                           f"({beh_sel_msg.behavior_id}) while prior request was starting.\n    Ignore second request!")
+            return
+        self._starting = True  # Prevent two start requests from ocurring back to back
         self._trigger_ready = False  # We have received the behavior selection request
         self._ready_counter = 0
         thread = threading.Thread(target=self._behavior_execution, args=[beh_sel_msg])
@@ -222,6 +229,7 @@ class FlexbeOnboard(Node):
                 # self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
                 Logger.localinfo('\033[92m--- Behavior Engine ready to try again! ---\033[0m')
                 self._ready_counter = 8  # Trigger heartbeat to republish READY within 2 seconds
+            self._starting = False  # Now allow a new start requests
             return
 
         # perform the behavior switch if required
@@ -244,6 +252,7 @@ class FlexbeOnboard(Node):
                                   ' because switching is not possible.')
                     self._proxy_pub.publish(Topics._CMD_FEEDBACK_TOPIC,
                                             CommandFeedback(command='switch', args=['not_switchable']))
+                    self._starting = False  # Now allow a new start requests
                     return
 
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
@@ -261,11 +270,11 @@ class FlexbeOnboard(Node):
 
                 # extract the active state if any
                 if active_states is not None:
-                    Logger.localinfo(f"Behavior Engine - '{self.be.name}': {self.be.beh_id} "
+                    Logger.localinfo(f"Behavior Engine - '{be.name}': {be.beh_id} "
                                      f'switching behaviors from active state {[acst.name for acst in active_states]} ...')
                     try:
                         if len(active_states) > 1:
-                            Logger.localinfo(f"\n\nBehavior Engine - '{self.be.name}': {self.be.beh_id} "
+                            Logger.localinfo(f"\n\nBehavior Engine - '{be.name}': {be.beh_id} "
                                              f'- switching only top level state!\n')
                             Logger.logwarn('Switch multiple active states?')
 
@@ -280,6 +289,7 @@ class FlexbeOnboard(Node):
                         self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
                                                           behavior_id=self.be.beh_id,
                                                           code=BEStatus.RUNNING))
+                        self._starting = False  # Now allow a new start requests
                         return
                     # stop the rest
                     Logger.localinfo(f"Behavior Engine - '{self.be.name}': {self.be.beh_id} - "
@@ -296,6 +306,7 @@ class FlexbeOnboard(Node):
                              f'key={beh_sel_msg.behavior_key}={be.beh_id} ({beh_sel_msg.behavior_id}) ...')
             assert self.be is None, 'Run lock with old behavior active?'
             self._running = True
+            self._starting = False  # Now allow a new start requests
             self.be = be
 
             result = None
@@ -346,7 +357,7 @@ class FlexbeOnboard(Node):
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
                 Logger.localinfo('\033[92m--- Behavior Engine finished - ready for more! ---\033[0m')
 
-            # Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
+            Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
             self._running = False
             self._switching = False
             self.be = None
