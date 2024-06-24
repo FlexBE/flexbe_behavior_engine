@@ -39,9 +39,11 @@ class CheckConditionState(EventState):
     This state can be used if the further control flow of the behavior depends on a simple condition.
 
     -- predicate    function    The condition whose truth value will be evaluated.
-                                Has to expect one parameter which will be set to input_value and return a boolean.
+                                Has to expect one parameter which will be set to input_value and return a boolean,
+                                e.g. a Python lambda function (lambda x: x == 3),
+                                where x is the argument passed to the function.
 
-    ># input_value  object      Input to the predicate function.
+    ># input_value  object      Userdata used as input to the predicate function.
 
     <= true                     Returned if the condition evaluates to True
     <= false                    Returned if the condition evaluates to False
