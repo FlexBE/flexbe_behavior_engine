@@ -106,7 +106,7 @@ class ConcurrencyContainer(OperatableStateMachine):
 
             if command_msg.target == self.name:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
-                assert cmd_msg2 is command_msg, "Unexpected change in CMD_TRANSITION_TOPIC buffer"
+                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
                 Logger.localinfo(f"-concurrency container '{self.name}' is handling the transition cmd msg={command_msg}")
 
                 self._force_transition = True
@@ -140,9 +140,9 @@ class ConcurrencyContainer(OperatableStateMachine):
                     # @TODO - Should we be using path not name here?
                     command_msg = self._manual_transition_requested
                     cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
-                    assert cmd_msg2 is command_msg, "Something is up with handling of buffer for CMD_TRANSITION_TOPIC"
+                    assert cmd_msg2 is command_msg, 'Something is up with handling of buffer for CMD_TRANSITION_TOPIC'
                     Logger.localinfo(f"-concurrency container '{self.name}' state '{state.name}' is handling "
-                                     f"the cmd msg={command_msg}")
+                                     f"the cmd msg='{command_msg}'")
                     self._manual_transition_requested = None  # Reset at this level
 
                     if 0 <= command_msg.outcome < len(state.outcomes):
