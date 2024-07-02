@@ -47,20 +47,20 @@ Use the following launch file for running the onboard engine:
 
     ros2 launch flexbe_onboard behavior_onboard.launch.py
 
-Use the following launch file for running the operator control station (requires the FlexBE App):
+Use the following launch file for running the operator control station (requires the FlexBE App or WebUI):
 
-    ros2 launch flexbe_app flexbe_ocs.launch.py
+    ros2 launch flexbe_webui flexbe_ocs.launch.py
 
 Use the following launch file to run both of the above, e.g., for testing on a single computer:
 
-    ros2 launch flexbe_app flexbe_full.launch.py
+    ros2 launch flexbe_webui flexbe_full.launch.py
 
 For running tests use:
 `colcon test --ctest-args --packages-select <flexbe_package>`
 
 ## Next Steps
 
-- Do some of the [tutorials](http://philserver.bplaced.net/fbe/documentation.php).
+- Do some of the [tutorials](http://flexbe.github.io).
 - Visit the [FlexBE GitHub Organization](https://github.com/FlexBE) for additional available states.
 
 - If you are converted an existing system from ROS 1 to ROS 2, we provide a
