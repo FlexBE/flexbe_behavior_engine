@@ -112,7 +112,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         """Calculate all state ids and prepare the ContainerStructure message."""
         self._state_map = StateMap()
         self._structure = self._build_structure_msg()
-        print(f"\x1b[94mBuilt {self._state_map}\x1b[0m", flush=True)
+        print(f'\x1b[94mBuilt {self._state_map}\x1b[0m', flush=True)
 
     def _build_structure_msg(self):
         """Create a message to describe the structure of this state machine."""
