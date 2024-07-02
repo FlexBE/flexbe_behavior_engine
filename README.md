@@ -62,7 +62,7 @@ For running tests use:
 
 ## Next Steps
 
-- Do some of the [tutorials](http://philserver.bplaced.net/fbe/documentation.php).
+- Do some of the [tutorials](http://flexbe.github.io).
 - Visit the [FlexBE GitHub Organization](https://github.com/FlexBE) for additional available states.
 
 - If you are converted an existing system from ROS 1 to ROS 2, we provide a

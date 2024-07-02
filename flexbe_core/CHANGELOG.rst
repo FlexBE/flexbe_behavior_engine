@@ -1,6 +1,16 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+3.0.4 (2024-07-02)
+------------------
+* minor clean up from flake8/pycodestyle
+* add option to globally set desired update rate by calling set_default_rate from behavior
+* add peek_at_buffer to proxy subscriber; modify processing of transition command for nested behaviors
+* modify _entering flag and no sleep if entering
+* grab reference to avoid race condition processing message in different thread while behavior finishing
+* tweak state_map string text
+
 3.0.3 (2024-06-06)
 ------------------
 
