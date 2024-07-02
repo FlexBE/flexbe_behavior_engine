@@ -1,6 +1,10 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+3.0.5 (2024-07-02)
+------------------
+
 3.0.4 (2024-07-02)
 ------------------
 * tweak help description of calculation/condition states
