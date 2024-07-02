@@ -42,8 +42,9 @@ from rclpy.exceptions import ParameterNotDeclaredException
 class RosState(State):
     """A state to interface with ROS."""
 
-    _node = None
     _breakpoints = None
+    _default_rate_hz = 10.0  # Default best effort update rate
+    _node = None
 
     @staticmethod
     def initialize_ros(node):
@@ -65,12 +66,12 @@ class RosState(State):
         """Initialize RosState instance."""
         super().__init__(*args, **kwargs)
 
-        self._desired_period_ns = (1 / 10) * 1e9
-
         if 'desired_rate' in kwargs:
             Logger.localinfo('RosState: Set desired state update '
                              f"rate to {kwargs['desired_rate']} Hz.")
-            self._desired_period_ns = (1 / kwargs['desired_rate']) * 1e9
+            self.set_rate(kwargs['desired_rate'])
+        else:
+            self.set_rate(RosState._default_rate_hz)
 
         self._is_controlled = False
 
@@ -102,6 +103,31 @@ class RosState(State):
         @param desired_rate: The desired rate in Hz.
         """
         self._desired_period_ns = (1 / desired_rate) * 1e9
+
+    @classmethod
+    def set_default_rate(cls, desired_rate):
+        """
+        Set the desired best effort execution rate of all states.
+
+        i.e., the rate with which the execute method is being called.
+
+        Note: The rate is best-effort, real-time support is not yet available.
+
+        This must be called at behavior level PRIOR to any states being created.
+        Typically, add import to behavior MANUAL_IMPORT section
+                    from flexbe_core.core import RosState
+        The, in the MANUAL_INIT section
+            RosState.set_default_rate(5.0)
+
+        Note: This will change the default update rate for any states created afterwards,
+        so beware when importing sub-behaviors with different rates defined!
+
+        @type desired_rate: float
+        @param desired_rate: The desired rate in Hz.
+        """
+        cls._default_rate_hz = desired_rate
+        Logger.localinfo('RosState: Set the default state update '
+                         f'rate for behavior to {desired_rate} Hz.')
 
     def _enable_ros_control(self):
         self._is_controlled = True
