@@ -29,6 +29,9 @@
 
 """Class to handle the FlexBE mirror of onboard statemachine."""
 
+import threading
+import time
+import traceback
 from collections import deque
 
 try:
@@ -38,10 +41,6 @@ except Exception:
         """Set thread name dummy function if prctl not defined."""
         # print('Python thread names are not visible in ps/top unless you install prctl')
         pass
-
-import threading
-import time
-import traceback
 
 from flexbe_core import Logger, MIN_UI_VERSION
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine
@@ -62,16 +61,16 @@ from .mirror_state import MirrorState
 from .mirror_state_machine import MirrorStateMachine
 
 bestatus_map = {
-    BEStatus.STARTED: "STARTED",
-    BEStatus.FINISHED: "FINISHED",
-    BEStatus.FAILED: "FAILED",
-    BEStatus.LOCKED: "LOCKED",
-    BEStatus.WAITING: "WAITING",
-    BEStatus.SWITCHING: "SWITCHING",
-    BEStatus.WARNING: "WARNING",
-    BEStatus.ERROR: "ERROR",
-    BEStatus.READY: "READY",
-    BEStatus.RUNNING: "RUNNING",
+    BEStatus.STARTED: 'STARTED',
+    BEStatus.FINISHED: 'FINISHED',
+    BEStatus.FAILED: 'FAILED',
+    BEStatus.LOCKED: 'LOCKED',
+    BEStatus.WAITING: 'WAITING',
+    BEStatus.SWITCHING: 'SWITCHING',
+    BEStatus.WARNING: 'WARNING',
+    BEStatus.ERROR: 'ERROR',
+    BEStatus.READY: 'READY',
+    BEStatus.RUNNING: 'RUNNING',
 }
 
 
@@ -801,7 +800,7 @@ class FlexbeMirror(Node):
                                 assert path_seg in state.path, (f'Mismatched state id={state.state_id} for {state.path} vs. '
                                                                 f'({con_msg.state_id}) {con_msg.path}')
                         else:
-                            raise KeyError(f"State id {con_msg.state_id} not found in {self._state_map}!")
+                            raise KeyError(f'State id {con_msg.state_id} not found in {self._state_map}!')
                 end = time.time()
                 Logger.localinfo(f"Validated constructed mirror for behavior id ='{self._sm.id}' in {end - start} seconds !")
                 return  # success here

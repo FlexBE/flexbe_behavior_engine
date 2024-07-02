@@ -155,8 +155,8 @@ class FlexbeOnboard(Node):
     def _behavior_callback(self, beh_sel_msg):
         if self._starting:
             # Prevent multiple request messages from triggering too soon
-            Logger.logwarn(f"Received behavior start request for {beh_sel_msg.behavior_key} "
-                           f"({beh_sel_msg.behavior_id}) while prior request was starting.\n    Ignore second request!")
+            Logger.logwarn(f'Received behavior start request for {beh_sel_msg.behavior_key} '
+                           f'({beh_sel_msg.behavior_id}) while prior request was starting.\n    Ignore second request!')
             return
         self._starting = True  # Prevent two start requests from ocurring back to back
         self._trigger_ready = False  # We have received the behavior selection request
@@ -357,7 +357,7 @@ class FlexbeOnboard(Node):
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.READY))
                 Logger.localinfo('\033[92m--- Behavior Engine finished - ready for more! ---\033[0m')
 
-            Logger.localinfo(f"Behavior execution finished for id={self.be.beh_id}, exit thread!")
+            Logger.localinfo(f'Behavior execution finished for id={self.be.beh_id}, exit thread!')
             self._running = False
             self._switching = False
             self.be = None
