@@ -2,6 +2,9 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.5 (2024-07-02)
+------------------
+
 3.0.4 (2024-07-02)
 ------------------
 * minor clean up from flake8/pycodestyle

@@ -9,7 +9,7 @@ package_name = 'flexbe_onboard'
 
 setup(
     name=package_name,
-    version='3.0.4',
+    version='3.0.5',
     packages=find_packages(),
     data_files=[
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
