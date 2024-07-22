@@ -83,13 +83,14 @@ class ConcurrencyContainer(OperatableStateMachine):
     def get_required_autonomy(self, outcome, state):
         """Return required autonomy level for this outcome."""
         try:
-            assert state in self._current_state, "get required autonomy in ConcurrencyContainer - state doesn't match!"
+            assert state in self._states, "get required autonomy in ConcurrencyContainer - state doesn't match!"
             return self._autonomy[state.name][outcome]
         except Exception as exc:
             Logger.error(f"Failure to retrieve autonomy for '{self.name}' in CC - "
                          f"  current state label='{self.name}' state='{state.name}' outcome='{outcome}'.")
-            Logger.localerr(f'{type(exc)} - {exc}\n\n {self._current_state}')
-            Logger.localerr(f'{self._autonomy}')
+            Logger.localerr(f'error={type(exc)} - {exc}')
+            Logger.localerr(f'current_state={self._current_state}')
+            Logger.localerr(f'autonomy={self._autonomy}')
 
     def _execute_current_state(self):
         """Execute the current states within this concurrency container."""
@@ -132,6 +133,7 @@ class ConcurrencyContainer(OperatableStateMachine):
         for state in self._states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 # print(f"   in current {self._name} : state '{state.name}' is already done.", flush=True)
+                self._current_state.append(state)
                 continue  # already done with executing
 
             if self._manual_transition_requested is not None:
