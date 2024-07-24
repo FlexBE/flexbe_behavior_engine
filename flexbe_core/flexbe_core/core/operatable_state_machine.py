@@ -416,13 +416,15 @@ class OperatableStateMachine(PreemptableStateMachine):
         super()._notify_stop()
         self._structure = None  # Flag for destruction
 
-    def on_exit(self, userdata):
+    def on_exit(self, userdata=None):
         """Call on exiting the statemachine."""
+        self._entering = True
         if self._current_state is not None:
-            udata = UserData(reference=self.userdata,
-                             input_keys=self._current_state.input_keys,
-                             output_keys=self._current_state.output_keys,
-                             remap=self._remappings[self._current_state.name])
+            with UserData(reference=self._userdata,
+                          input_keys=self._current_state.input_keys,
+                          output_keys=self._current_state.output_keys,
+                          remap=self._remappings[self._current_state.name]) as udata:
+                # Pass userdata to internal states matching as defined in state_machine
+                self._current_state.on_exit(udata)
             self._current_state._entering = True
-            self._current_state.on_exit(udata)
             self._current_state = None

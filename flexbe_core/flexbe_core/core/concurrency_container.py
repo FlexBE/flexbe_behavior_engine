@@ -117,11 +117,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                                   CommandFeedback(command='transition',
                                                   args=[command_msg.target, self.name]))
                 Logger.localwarn(f"--> Manually triggered outcome {outcome} of concurrency container '{self.name}'")
-                self.on_exit(self.userdata,
-                             states=[s for s in self._states if (s.name not in self._returned_outcomes
-                                                                 or self._returned_outcomes[s.name] is None)
-                                     ]
-                             )
+
                 self._returned_outcomes = {}
                 self._current_state = None
                 self._last_outcome = outcome
@@ -154,6 +150,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                         self._returned_outcomes[state.name] = outcome
                         with UserData(reference=self._userdata, remap=self._remappings[state.name],
                                       input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
+                            Logger.localinfo(f"     CC '{self}' manual transition and on exit for '{state}'")
                             state.on_exit(userdata)
 
                         # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here
@@ -211,19 +208,11 @@ class ConcurrencyContainer(OperatableStateMachine):
         if outcome is None:
             return None
 
-        # trigger on_exit for those states that are not done yet
-        self.on_exit(self.userdata,
-                     states=[s for s in self._states if (s.name not in self._returned_outcomes
-                                                         or self._returned_outcomes[s.name] is None)])
-        self._returned_outcomes = {}
-        # right now, going out of a concurrency container may break sync
-        # thus, as a quick fix, explicitly request sync again on any output
-        # self._inner_sync_request = True
         self._current_state = None
 
         if self._is_controlled:
             # reset previously requested outcome if applicable
-            if self._last_requested_outcome is not None and outcome is None:
+            if self._last_requested_outcome != outcome:
                 self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
                 self._last_requested_outcome = None
 
@@ -273,6 +262,7 @@ class ConcurrencyContainer(OperatableStateMachine):
     def on_enter(self, userdata):  # pylint: disable=W0613
         """Call on entering the concurrency container."""
         super().on_enter(userdata)
+        self._returned_outcomes = {}
         for state in self._states:
             # Force on_enter at state level (userdata passed by _execute_single_state)
             state._entering = True  # force state to handle enter on first execute
@@ -281,10 +271,13 @@ class ConcurrencyContainer(OperatableStateMachine):
     def on_exit(self, userdata, states=None):
         """Call when concurrency container exits."""
         for state in self._states if states is None else states:
-            if state in self._returned_outcomes:
+            if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 continue  # skip states that already exited themselves
+            Logger.localinfo(f"     CC '{self}' exiting contained state '{state}'")
             self._execute_single_state(state, force_exit=True)
         self._current_state = None
+        self._returned_outcomes = {}
+        self._entering = True
 
     def get_deep_states(self):
         """

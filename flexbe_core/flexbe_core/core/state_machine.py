@@ -133,6 +133,11 @@ class StateMachine(State):
             # Logger.localinfo(f"Entering StateMachine '{self.name}' "
             #                  f"({self._state_id}) initial state='{self._current_state.name}'")
         outcome = self._execute_current_state()
+
+        if outcome:
+            # Exit this statemachine
+            self.on_exit(self._userdata)
+
         return outcome
 
     def _execute_current_state(self):
@@ -155,11 +160,7 @@ class StateMachine(State):
 
             self._current_state = self._labels.get(target)
             if self._current_state is None:
-                Logger.localinfo(f" SM '{self.name}' ({self.id}) returning '{target}' ")
                 return target
-            # else:
-            #     Logger.localinfo(f" SM '{self.name}' ({self.id}) updated current state to "
-            #                      f"'{self._current_state.name}' ({self._current_state._state_id}) given outcome='{target}' ")
 
         return None
 
