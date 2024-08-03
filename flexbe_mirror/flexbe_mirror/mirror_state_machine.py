@@ -268,6 +268,8 @@ class MirrorStateMachine(PreemptableStateMachine):
         self._last_outcome = None
         self.assert_consistent_transitions()
         self._current_state = self.initial_state
+        self._last_outcome = None
+        self._current_state._entering = True  # force state to handle enter on first execute
         self._userdata = None  # not used in mirror
         MirrorState.publish_update(self._target_path)
 
