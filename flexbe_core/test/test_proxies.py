@@ -280,45 +280,45 @@ class TestProxies(unittest.TestCase):
         ProxyActionClient.initialize(self.node)
         client = ProxyActionClient({topic1: BehaviorExecution}, wait_duration=1.0)
         self.assertFalse(client.has_result(topic1))
-        status = client.get_state(topic1)
-        self.node.get_logger().info(f'validate action client - check state before sending = {status} ')
+        status = client.get_status(topic1)
+        self.node.get_logger().info(f'validate action client - check status before sending = {status} ')
 
         client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
-        status = client.get_state(topic1)
-        self.node.get_logger().info(f'validate action client - check state after goal sent = {status} ')
+        status = client.get_status(topic1)
+        self.node.get_logger().info(f'validate action client - check status after goal sent = {status} ')
 
         end_time = time.time() + 10
         while time.time() < end_time and not client.has_result(topic1):
-            status = client.get_state(topic1)
-            # self.node.get_logger().info(f'   get state = {status} ')
+            status = client.get_status(topic1)
+            # self.node.get_logger().info(f'   get status = {status} ')
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
 
         self.assertTrue(client.has_result(topic1))
 
-        status = client.get_state(topic1)
-        self.node.get_logger().info(f'   check state = {status} ')
+        status = client.get_status(topic1)
+        self.node.get_logger().info(f'   check status = {status} ')
 
         self.node.get_logger().info('validate action client result 1 ... ')
         result = client.get_result(topic1)
         self.assertEqual(result.outcome, 'ok')
 
-        status = client.get_state(topic1)
+        status = client.get_status(topic1)
         self.assertEqual(status, GoalStatus.STATUS_SUCCEEDED)
         self.node.get_logger().info('validate action client succeeded - OK! ')
 
-        status = client.get_state(topic1)
-        self.node.get_logger().info(f'   check state before send 2 = {status} ')
+        status = client.get_status(topic1)
+        self.node.get_logger().info(f'   check status before send 2 = {status} ')
         client.send_goal(topic1, BehaviorExecution.Goal(), wait_duration=1.0)
-        status = client.get_state(topic1)
-        self.node.get_logger().info(f'   check state after sending goal 2 = {status} ')
+        status = client.get_status(topic1)
+        self.node.get_logger().info(f'   check status after sending goal 2 = {status} ')
 
         # end_time = time.time() + 2
         while not client.has_result(topic1):
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
-            status = client.get_state(topic1)
-            # self.node.get_logger().info(f'   check state = {status} ')
+            status = client.get_status(topic1)
+            # self.node.get_logger().info(f'   check status = {status} ')
 
         self.assertFalse(client.is_active(topic1))
 
@@ -326,7 +326,7 @@ class TestProxies(unittest.TestCase):
         result = client.get_result(topic1)
         self.assertEqual(result.outcome, 'ok')
 
-        status = client.get_state(topic1)
+        status = client.get_status(topic1)
         self.assertEqual(status, GoalStatus.STATUS_SUCCEEDED)
         self.node.get_logger().info('validate action client succeeded 2 - OK! ')
 
