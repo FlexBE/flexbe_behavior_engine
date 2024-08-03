@@ -28,9 +28,9 @@
 
 import ast
 import pickle
-import sys
 import time
 
+from PySide6.QtCore import Signal, Slot, QCoreApplication, Qt, QThread
 from PySide6.QtWidgets import QApplication
 
 from flexbe_core import Logger
@@ -41,7 +41,33 @@ from flexbe_msgs.action import BehaviorInput
 
 import rclpy
 from rclpy.action import ActionServer
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import ExternalShutdownException
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+
+
+class InputActionWorker(QThread):
+    _show_dialog_signal = Signal(str)
+    _hide_dialog_signal = Signal()
+
+    def __init__(self, node):
+        super().__init__()
+        self._node = node
+
+    def run(self):
+        try:
+            # Use a MultiThreadedExecutor to enable processing goals concurrently
+            executor = MultiThreadedExecutor()
+            print('Begin spining ROS loop for InputActionServer ...', flush=True)
+            rclpy.spin(self._node, executor=executor)
+        except (KeyboardInterrupt, ExternalShutdownException):
+            print('Caught KeyboardInterrupt in InputActionWorker thread - shutdown ...')
+        except Exception as exc:
+            print(f'Unknown exception in InputActionWorker:\n    {exc}')
+
+        print('\nShutting down the input action server ...', flush=True)
+        QCoreApplication.quit()  # Trigger shutdown of GUI application
 
 
 class InputActionServer(Node):
@@ -55,15 +81,22 @@ class InputActionServer(Node):
     def __init__(self):
         """Initialize the InputActionServer instance."""
         super().__init__('input_action_server')
+        self._action_topic = 'flexbe/behavior_input'
         self._server = ActionServer(
             self,
             BehaviorInput,
-            'flexbe/behavior_input',
-            self.execute_callback
+            self._action_topic,
+            callback_group=ReentrantCallbackGroup(),
+            execute_callback=self.execute_callback,
+            cancel_callback=self.cancel_callback
         )
-        self._app = QApplication(sys.argv)
+
+        self._input_dialog = InputGUI("default")
 
         self._input = None
+        self._canceled = False
+        self._worker = None
+
         Logger.initialize(self)
 
     def get_input_type(self, request_type):
@@ -89,8 +122,12 @@ class InputActionServer(Node):
 
     def execute_callback(self, goal_handle):
         """On receipt of goal, open GUI and request input from user."""
+        # Reset cancellation flag
+        self._canceled = False
+
         result = BehaviorInput.Result()
         Logger.localinfo('Requesting: %s', goal_handle.request.msg)
+        # Logger.localinfo(f'   goal id: {goal_handle.goal_id.uuid}')
         try:
             type_text, type_class, expected_elements = self.get_input_type(goal_handle.request.request_type)
             prompt_text = f'{goal_handle.request.msg}\n{type_text}'
@@ -102,21 +139,30 @@ class InputActionServer(Node):
             return result
 
         # Get data from user
-        mainWin = InputGUI(prompt_text)
-        mainWin.show()
-        while mainWin.is_none() and mainWin.isVisible():
-            self._app.processEvents()
-            time.sleep(.01)
-        self._input = mainWin.get_input()
-        mainWin.close()
+        try:
+            # Request input from GUI running in a separate thread
+            self._worker._show_dialog_signal.emit(prompt_text)
 
-        if self._input is None:
-            Logger.logwarn('No data entered while input window was visible!')
-            result.result_code = BehaviorInput.Result.RESULT_ABORTED
-            result.data = 'No data entered while input window was visible!'
-            goal_handle.abort()
-        else:
-            try:
+            while self._input_dialog.is_none() and not self._canceled:
+                time.sleep(0.02)  # Add a short sleep to avoid busy-waiting
+
+            # Emit signal to hide the dialog and get input
+            self._worker._hide_dialog_signal.emit()
+
+            if self._canceled:
+                Logger.localwarn('Request was canceled!')
+                goal_handle.canceled()
+                result.data = 'Input request was canceled!'
+                result.result_code = BehaviorInput.Result.RESULT_ABORTED
+                return result
+
+            if self._input is None or self._input == '':
+                Logger.logwarn(f"No data entered while input window was visible! '{self._input}'")
+                result.result_code = BehaviorInput.Result.RESULT_ABORTED
+                result.data = 'No data entered while input window was visible!'
+                goal_handle.abort()
+                return result
+            else:
                 input_data = ast.literal_eval(self._input)  # convert string to Python data
                 if not isinstance(input_data, type_class):
                     result.data = f"Invalid input type '{type(input_data)}' not '{type_class}' - expected '{type_text}'"
@@ -132,31 +178,59 @@ class InputActionServer(Node):
                     result.result_code = BehaviorInput.Result.RESULT_FAILED
                     Logger.localwarn(result.data)
                     goal_handle.abort()
-                    return result
+                else:
+                    result.data = str(pickle.dumps(input_data))
+                    result.result_code = BehaviorInput.Result.RESULT_OK
+                    goal_handle.succeed()
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.logwarn(f'Error processing input request to set data:\n {exc}')
+            result.result_code = BehaviorInput.Result.RESULT_FAILED
+            result.data = str(exc)
+            goal_handle.abort()
 
-                result.data = str(pickle.dumps(input_data))
-                Logger.localinfo('    Data returned %s', self._input)
-                result.result_code = BehaviorInput.Result.RESULT_OK
-                goal_handle.succeed()
-            except Exception as exc:  # pylint: disable=W0703
-                Logger.logwarn('Failure to set data: %s', str(exc))
-                result.result_code = BehaviorInput.Result.RESULT_FAILED
-                result.data = str(exc)
-                goal_handle.abort()
-
+        self._canceled = False  # Reset cancellation flag
         return result
 
+    def cancel_callback(self, goal_handle):
+        Logger.localwarn(f"Canceling goal for '{self._action_topic}' ...")
+        self._canceled = True
+        return rclpy.action.CancelResponse.ACCEPT
 
-def main(args=None):
+    @Slot()
+    def on_get_input(self, val=0):
+        self._input = self._input_dialog.get_input()
+
+
+def main(args=[]):
     """Run action server and GUI on request."""
-    rclpy.init(args=args)
+    app = QApplication(args)
+
+    rclpy.init()
     action_server = InputActionServer()
+
+    # Connect signals and slots
+    worker = InputActionWorker(action_server)
+    action_server._worker = worker  # Allow server to access signals
+    worker._show_dialog_signal.connect(action_server._input_dialog.show, type=Qt.BlockingQueuedConnection)
+    worker._hide_dialog_signal.connect(action_server._input_dialog.hide, type=Qt.BlockingQueuedConnection)
+    worker._hide_dialog_signal.connect(action_server.on_get_input, type=Qt.BlockingQueuedConnection)
+    worker.start()
+
     try:
-        Logger.localinfo('Waiting for requests from FlexBE input state ...')
-        rclpy.spin(action_server)
-    except KeyboardInterrupt:
-        pass
-    print('\nShutting down the input action server!', flush=True)
+        print('Begin GUI execution for InputActionServer ...', flush=True)
+        app.exec_()
+    except Exception as e:
+        print(f'Exception in app.exec_: {e}', flush=True)
+
+    print('requesting rclpy shutdown ...', flush=True)
+    rclpy.shutdown()
+
+    print('Ensure shutdown of ROS worker thread ...', flush=True)
+    worker.quit()
+
+    print("wait on ROS thread to close ...", flush=True)
+    worker.wait()
+    print("done!", flush=True)
 
 
 if __name__ == '__main__':

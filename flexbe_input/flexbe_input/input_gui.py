@@ -27,8 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """FlexBE InputGUI."""
-from PySide6.QtCore import QSize
-from PySide6.QtWidgets import QLabel, QLineEdit, QMainWindow, QPushButton
+from PySide6.QtCore import QSize, Slot
+from PySide6.QtWidgets import QLabel, QLineEdit, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
 
 class InputGUI(QMainWindow):
@@ -44,34 +44,99 @@ class InputGUI(QMainWindow):
 
         self.input = None
 
-        self.setMinimumSize(QSize(320, 140))
+        self.setMinimumSize(QSize(320, 180))
         self.setWindowTitle('FlexBE Input State')
+        self.setStyleSheet("""
+            QMainWindow {
+                border: 2px solid #8f8f91;
+                border-radius: 10px;
+            }
+            """)
+
+        central_widget = QWidget(self)
+        self.setCentralWidget(central_widget)
+        central_widget.setStyleSheet("QWidget { border: 1px solid blue; background-color: palette(window); }")
+
+        layout = QVBoxLayout(central_widget)
 
         self.prompt = QLabel(self)
-        self.prompt.move(60, 20)
         self.prompt.setText(prompt)
-        self.prompt.adjustSize()
+        self.prompt.setStyleSheet("QLabel { border: none; background-color: palette(window); }")
+        layout.addWidget(self.prompt)
+
+        edit_style = """
+        QLineEdit {
+            border: 2px solid #8f8f91;
+            background-color: #f0f0f0;
+            padding: 2px;
+            color: black;
+        }
+
+        QLineEdit:focus {
+            border: 2px solid #0078d7;  /* Change this color to your desired highlight color */
+        }
+        """
 
         self.line = QLineEdit(self)
-        self.line.move(60, 60)
-        self.line.resize(200, 32)
+        self.line.setStyleSheet(edit_style)
         self.line.returnPressed.connect(self.set_input)  # Treat return as submit
+        layout.addWidget(self.line)
+        button_style = """
+        QPushButton {
+            border: 2px solid #8f8f91;
+            border-radius: 6px;
+            background-color: #f0f0f0;
+            padding: 2px;
+            color: black;
+        }
 
-        self.button = QPushButton('Submit', self)
-        self.button.clicked.connect(self.set_input)
-        self.button.resize(200, 32)
-        self.button.move(60, 100)
+        QPushButton:pressed {
+            background-color: #dcdcdc;
+            border-style: inset;
+        }
+        QPushButton:focus {
+            border: 2px solid #0078d7;  /* Change this color to your desired highlight color */
+        }
+        """
+        self.submit = QPushButton('Submit', self)
+        self.submit.setStyleSheet(button_style)
+        self.submit.clicked.connect(self.set_input)
+        layout.addWidget(self.submit)
+
+        self.cancel = QPushButton('Cancel', self)
+        self.cancel.setStyleSheet(button_style)
+        self.cancel.clicked.connect(self.set_cancel)
+        layout.addWidget(self.cancel)
+
         self.adjustSize()
 
     def set_input(self):
         """Set input text from GUI."""
         self.input = self.line.text()
 
+    def set_cancel(self):
+        """Set input text from GUI."""
+        self.input = ''
+
+    @Slot(str)
+    def show(self, prompt):
+        print(f"showing dialog with '{prompt}' ", flush=True)
+        self.prompt.setText(prompt)
+        self.prompt.adjustSize()
+        self.line.setText("")
+        self.input = None  # clear for next entry
+        self.adjustSize()
+        self.resize(self.sizeHint())  # Resize to fit the new content
+        super().show()
+
+    @Slot()
+    def hide(self):
+        print("hiding dialog", flush=True)
+        super().hide()
+
     def is_none(self):
         """Return true while input is none."""
-        if self.input is None:
-            return True
-        return False
+        return self.input is None
 
     def get_input(self):
         """Get the stored input."""
