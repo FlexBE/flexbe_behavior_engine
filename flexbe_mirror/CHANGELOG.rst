@@ -2,6 +2,16 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.6 (2024-08-05)
+------------------
+* clean up sync messaging and set entering flag for state
+* minor clean up from flake8/pycodestyle
+* fix typo in flexbe_mirror
+* ignore second behavior start request while first is processing (in case of zombie launcher)
+* fix state map id verification with collisions
+* rework re-request structure logic if behavior sm fails during mirroring to avoid spamming console
+* clean up some messages
+
 3.0.5 (2024-07-02)
 ------------------
 

@@ -2,6 +2,11 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.6 (2024-08-05)
+------------------
+* allow canceling input request
+* set style for the Input GUI
+
 3.0.5 (2024-07-02)
 ------------------
 

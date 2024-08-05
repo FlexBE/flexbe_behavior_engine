@@ -2,6 +2,12 @@
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.6 (2024-08-05)
+------------------
+* minor clean up from flake8/pycodestyle
+* fix typo in flexbe_mirror
+* ignore second behavior start request while first is processing (in case of zombie launcher)
+
 3.0.5 (2024-07-02)
 ------------------
 
