@@ -96,6 +96,7 @@ class MirrorState(EventState):
         """Enter the mirror state."""
         self._entering = False
         self._last_outcome = None
+        self._last_execution = None
         MirrorState.publish_update(self._target_path)
 
     def on_exit_mirror(self, userdata, desired_outcome):

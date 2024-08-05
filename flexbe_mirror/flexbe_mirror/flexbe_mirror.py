@@ -511,23 +511,23 @@ class FlexbeMirror(Node):
                                          f'    Check UI and consider manual re-sync!\n'
                                          '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
                                          f' {self._sync_heartbeat_mismatch_counter}')
-                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id} : \n'
-                                             f'   Onboard IDs: {msg.current_state_checksums}\n    '
-                                             f'Mirror IDs {mirror_status.current_state_checksums}')
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id} {self._sync_heartbeat_mismatch_counter}: \n'
+                                             f'   Onboard IDs: {msg.current_state_checksums}\n'
+                                             f'    Mirror IDs: {mirror_status.current_state_checksums}')
 
                             for state_hash in msg.current_state_checksums:
                                 try:
                                     ob_state_id, ob_out = StateMap.unhash(state_hash)
                                     ob_state = self._state_map[ob_state_id]
-                                    Logger.localinfo(f"  onboard {ob_state_id} : '{ob_state.name}' "
-                                                     f'out={ob_out} - {ob_state.path}')
+                                    Logger.localinfo(f"  onboard {ob_state_id} : '{ob_state.name.replace('_mirror', '')}'"
+                                                     f" out={ob_out} - {ob_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
                             for state_hash in mirror_status.current_state_checksums:
                                 try:
                                     mr_state_id, mr_out = StateMap.unhash(state_hash)
                                     mr_state = self._state_map[mr_state_id]
-                                    Logger.localinfo(f"  mirror {mr_state_id} : '{mr_state.name.replace('_mirror', '')}' "
+                                    Logger.localinfo(f"   mirror {mr_state_id} : '{mr_state.name.replace('_mirror', '')}'"
                                                      f" out={mr_out} - {mr_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for mirror state hash {state_hash} - {type(exc)} - {exc}')
