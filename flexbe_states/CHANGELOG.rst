@@ -2,6 +2,12 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.6 (2024-08-05)
+------------------
+* update cancel for action client; define get_status to replace get_state for proxy action client
+* remove result from input_state or cancel on exit
+* tweak help description of calculation/condition states
+
 3.0.5 (2024-07-02)
 ------------------
 
