@@ -30,7 +30,7 @@ import ast
 import pickle
 import time
 
-from PySide6.QtCore import Signal, Slot, QCoreApplication, Qt, QThread
+from PySide6.QtCore import QCoreApplication, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import QApplication
 
 from flexbe_core import Logger
@@ -48,6 +48,8 @@ from rclpy.node import Node
 
 
 class InputActionWorker(QThread):
+    """Worker thread for InputAction server."""
+
     _show_dialog_signal = Signal(str)
     _hide_dialog_signal = Signal()
 
@@ -56,6 +58,7 @@ class InputActionWorker(QThread):
         self._node = node
 
     def run(self):
+        """Run loop for worker thread."""
         try:
             # Use a MultiThreadedExecutor to enable processing goals concurrently
             executor = MultiThreadedExecutor()
@@ -91,7 +94,7 @@ class InputActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
-        self._input_dialog = InputGUI("default")
+        self._input_dialog = InputGUI('default')
 
         self._input = None
         self._canceled = False
@@ -192,12 +195,14 @@ class InputActionServer(Node):
         return result
 
     def cancel_callback(self, goal_handle):
+        """Cancel the active goal."""
         Logger.localwarn(f"Canceling goal for '{self._action_topic}' ...")
         self._canceled = True
         return rclpy.action.CancelResponse.ACCEPT
 
     @Slot()
-    def on_get_input(self, val=0):
+    def on_get_input(self):
+        """Get the input from edit box."""
         self._input = self._input_dialog.get_input()
 
 
@@ -228,9 +233,9 @@ def main(args=[]):
     print('Ensure shutdown of ROS worker thread ...', flush=True)
     worker.quit()
 
-    print("wait on ROS thread to close ...", flush=True)
+    print('wait on ROS thread to close ...', flush=True)
     worker.wait()
-    print("done!", flush=True)
+    print('done!', flush=True)
 
 
 if __name__ == '__main__':

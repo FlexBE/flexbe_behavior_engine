@@ -33,9 +33,9 @@
 import time
 import unittest
 
-from flexbe_core import EventState, OperatableStateMachine
+from flexbe_core import EventState, OperatableStateMachine, initialize_flexbe_core
 from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
-from flexbe_core.proxy import initialize_proxies, shutdown_proxies
+from flexbe_core.proxy import shutdown_proxies
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -60,7 +60,7 @@ class TestExceptions(unittest.TestCase):
         self.node = rclpy.create_node('exception_test_' + str(self.test), context=self.context)
         self.node.get_logger().info(' set up exceptions test %d (%d) ... ' % (self.test, self.context.ok()))
         self.executor.add_node(self.node)
-        initialize_proxies(self.node)
+        initialize_flexbe_core(self.node)
 
     def tearDown(self):
         """Tear down the TestExceptions test."""
@@ -87,14 +87,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_invalid_outcome ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class ReturnInvalidOutcomeState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                self.initialize_ros(node)
                 super().__init__(outcomes=['done'])
 
             def execute(self, userdata):
@@ -114,14 +111,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_invalid_transition ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class ReturnDoneState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                ReturnDoneState.initialize_ros(node)
                 super().__init__(outcomes=['done'])
 
             def execute(self, userdata):
@@ -144,14 +138,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_invalid_userdata ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class AccessInvalidInputState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                AccessInvalidInputState.initialize_ros(node)
                 super().__init__(outcomes=['done'], input_keys=['input'])
 
             def execute(self, userdata):
@@ -172,14 +163,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_invalid_userdata_output ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class SetInvalidOutputState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                SetInvalidOutputState.initialize_ros(node)
                 super().__init__(outcomes=['done'], output_keys=['output'])
 
             def execute(self, userdata):
@@ -200,14 +188,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_missing_userdata ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class AccessValidInputState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                AccessValidInputState.initialize_ros(node)
                 super().__init__(outcomes=['done'], input_keys=['missing'])
 
             def execute(self, userdata):
@@ -228,14 +213,11 @@ class TestExceptions(unittest.TestCase):
         self.node.get_logger().info('test_modify_input_key ...! ')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
 
         class ModifyInputKeyState(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                ModifyInputKeyState.initialize_ros(node)
                 super().__init__(outcomes=['done'], input_keys=['only_input'])
 
             def execute(self, userdata):

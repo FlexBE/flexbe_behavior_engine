@@ -151,7 +151,8 @@ class ConcurrencyContainer(OperatableStateMachine):
                         self._returned_outcomes[state.name] = outcome
                         with UserData(reference=self._userdata, remap=self._remappings[state.name],
                                       input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
-                            Logger.localinfo(f"ConcurrencyContainer '{self}' manual transition '{outcome}' and on exit for '{state}'")
+                            Logger.localinfo(f"ConcurrencyContainer '{self}' manual transition"
+                                             f" '{outcome}' and on exit for '{state}'")
                             state.on_exit(userdata)
 
                         # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here

@@ -33,11 +33,11 @@
 import time
 import unittest
 
-from flexbe_core import ConcurrencyContainer, EventState, OperatableStateMachine
+from flexbe_core import ConcurrencyContainer, EventState, OperatableStateMachine, initialize_flexbe_core
 from flexbe_core.core import PreemptableState
 from flexbe_core.core.exceptions import StateMachineError
 from flexbe_core.core.topics import Topics
-from flexbe_core.proxy import ProxySubscriberCached, initialize_proxies, shutdown_proxies
+from flexbe_core.proxy import ProxySubscriberCached, shutdown_proxies
 
 from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
 
@@ -132,7 +132,7 @@ class TestCore(unittest.TestCase):
         # self.node.get_logger().info(' set up core test %d (%d)... ' % (self.test, self.context.ok()))
         self.executor.add_node(self.node)
 
-        initialize_proxies(self.node)
+        initialize_flexbe_core(self.node)
 
         time.sleep(0.1)
 
@@ -160,8 +160,7 @@ class TestCore(unittest.TestCase):
 
     def _create(self):
         """Create the test."""
-        CoreTestState.initialize_ros(self.node)
-        OperatableStateMachine.initialize_ros(self.node)
+        initialize_flexbe_core(self.node)
         state = CoreTestState()
         state._enable_ros_control()
         sm = OperatableStateMachine(outcomes=['done', 'error'])
@@ -230,7 +229,6 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_event_state ...  ')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ProxySubscriberCached.initialize(self.node)
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
 
         state, sm = self._create()
@@ -287,7 +285,6 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_operatable_state ... ')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ProxySubscriberCached.initialize(self.node)
         state, sm = self._create()
         self.node.get_logger().info('test_operatable_state - ProxySubscribe request ...')
         out_topic = Topics._OUTCOME_TOPIC
@@ -343,7 +340,6 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_preemptable_state ... ')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ProxySubscriberCached.initialize(self.node)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
 
@@ -386,7 +382,6 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_lockable_state ... ')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ProxySubscriberCached.initialize(self.node)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
@@ -460,7 +455,6 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_manually_transitionable_state ...')
 
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ProxySubscriberCached.initialize(self.node)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
@@ -476,7 +470,7 @@ class TestCore(unittest.TestCase):
         state._sub._callback(OutcomeRequest(target='invalid', outcome=1), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        # This state won't handle the transition request, so not message is expected
+        # This state won't handle the transition request, so no message is expected
         self.assertNoMessage(sub, fb_topic)
         self.node.get_logger().info('test_manually_transitionable_state - OK! ')
 
@@ -541,8 +535,6 @@ class TestCore(unittest.TestCase):
         """Test CC."""
         self.node.get_logger().info('test_concurrency_container ... ')
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        ConcurrencyTestState.initialize_ros(self.node)
-        ConcurrencyContainer.initialize_ros(self.node)
         cc = ConcurrencyContainer(outcomes=['done', 'error'],
                                   conditions=[
                                   ('error', [('main', 'error')]),
@@ -692,8 +684,6 @@ class TestCore(unittest.TestCase):
                 userdata.data_out = self._out_content
                 return 'done'
 
-        TestUserdataState.initialize_ros(self.node)
-        OperatableStateMachine.initialize_ros(self.node)
         inner_sm = OperatableStateMachine(outcomes=['done'], input_keys=['sm_in'], output_keys=['sm_out'])
         inner_sm._state_id = 4096
         inner_sm.userdata.own = 'own_data'

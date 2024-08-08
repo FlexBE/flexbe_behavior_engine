@@ -42,7 +42,7 @@ except Exception:
         # print('Python thread names are not visible in ps/top unless you install prctl')
         pass
 
-from flexbe_core import Logger, MIN_UI_VERSION
+from flexbe_core import Logger, MIN_UI_VERSION, initialize_flexbe_core
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine
 from flexbe_core.core import PreemptableState, PreemptableStateMachine, StateMap
 from flexbe_core.core.topics import Topics
@@ -82,14 +82,7 @@ class FlexbeMirror(Node):
         super().__init__('flexbe_mirror')
 
         self._sm = None
-        ProxyPublisher.initialize(self)
-        ProxySubscriberCached.initialize(self)
-        Logger.initialize(self)
-
-        MirrorState.initialize_ros(self)
-        PreemptableState.initialize_ros(self)
-        PreemptableStateMachine.initialize_ros(self)
-        LockableStateMachine.initialize_ros(self)
+        initialize_flexbe_core(self)
 
         self._timing_event = threading.Event()  # Used for wait timer
 
@@ -462,7 +455,7 @@ class FlexbeMirror(Node):
             thread.start()
 
             # Force a new update after sync
-            Logger.localinfo(f'\x1b[93mReceived sync for current behavior - request behavior update message\x1b[0m')
+            Logger.localinfo('\x1b[93mReceived sync for current behavior - request behavior update message\x1b[0m')
             MirrorStateMachine._execute_flag = True  # Execute once more after any change,
             self._sm._last_deep_states_list = None
 
@@ -517,7 +510,8 @@ class FlexbeMirror(Node):
                                          f'    Check UI and consider manual re-sync!\n'
                                          '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
                                          f' {self._sync_heartbeat_mismatch_counter}')
-                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id} {self._sync_heartbeat_mismatch_counter}: \n'
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f' {self._sync_heartbeat_mismatch_counter}: \n'
                                              f'   Onboard IDs: {msg.current_state_checksums}\n'
                                              f'    Mirror IDs: {mirror_status.current_state_checksums}')
 

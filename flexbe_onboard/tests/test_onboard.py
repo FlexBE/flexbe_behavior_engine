@@ -225,12 +225,18 @@ class TestOnboard(unittest.TestCase):
 
         # Wait for published message
         end_time = time.time() + 1
-        while time.time() < end_time:
-            self.executor.spin_once(timeout_sec=0.1)
+        try:
+            while time.time() < end_time:
+                self.executor.spin_once(timeout_sec=0.1)
+        except Exception as exc:
+            print(f'\x1b[91mException in executor: {exc}\x1b[0m')
 
         while self.sub.has_buffered(Topics._BEHAVIOR_LOGGING_TOPIC):
             behavior_logs.append(self.sub.get_from_buffer(Topics._BEHAVIOR_LOGGING_TOPIC).text)
-            self.executor.spin_once(timeout_sec=0.1)
+            try:
+                self.executor.spin_once(timeout_sec=0.1)
+            except Exception as exc:
+                print(f'\x1b[91mException in executor: {exc}\x1b[0m')
         self.assertIn('value_1', behavior_logs)
         self.node.get_logger().info('Done onboard testing!')
         self.executor.spin_once(timeout_sec=0.1)

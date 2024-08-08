@@ -55,13 +55,13 @@ class InputGUI(QMainWindow):
 
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
-        central_widget.setStyleSheet("QWidget { border: 1px solid blue; background-color: palette(window); }")
+        central_widget.setStyleSheet('QWidget { border: 1px solid blue; background-color: palette(window); }')
 
         layout = QVBoxLayout(central_widget)
 
         self.prompt = QLabel(self)
         self.prompt.setText(prompt)
-        self.prompt.setStyleSheet("QLabel { border: none; background-color: palette(window); }")
+        self.prompt.setStyleSheet('QLabel { border: none; background-color: palette(window); }')
         layout.addWidget(self.prompt)
 
         edit_style = """
@@ -120,10 +120,11 @@ class InputGUI(QMainWindow):
 
     @Slot(str)
     def show(self, prompt):
-        print(f"showing dialog with '{prompt}' ", flush=True)
+        """Show dialog if hidden."""
+        print(f"showing input UI dialog with '{prompt}' ", flush=True)
         self.prompt.setText(prompt)
         self.prompt.adjustSize()
-        self.line.setText("")
+        self.line.setText('')
         self.input = None  # clear for next entry
         self.adjustSize()
         self.resize(self.sizeHint())  # Resize to fit the new content
@@ -131,7 +132,8 @@ class InputGUI(QMainWindow):
 
     @Slot()
     def hide(self):
-        print("hiding dialog", flush=True)
+        """Hide dialog when not in use."""
+        print('hiding input UI dialog', flush=True)
         super().hide()
 
     def is_none(self):

@@ -32,6 +32,7 @@ from functools import partial
 from threading import Lock, Timer
 
 from action_msgs.msg import GoalStatus
+
 from flexbe_core.logger import Logger
 
 from rclpy.action import ActionClient

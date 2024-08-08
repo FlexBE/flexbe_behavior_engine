@@ -147,6 +147,7 @@ class InputState(EventState):
             self._return = 'no_connection'
 
     def on_exit(self, userdata):
+        """Call when state exits."""
         # Make sure that the action is not running when leaving this state.
         # A situation where the action would still be active is for example when the operator manually triggers an outcome.
         Logger.localinfo(f"on exit for '{self._action_topic}'.")
