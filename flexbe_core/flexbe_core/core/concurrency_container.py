@@ -86,7 +86,7 @@ class ConcurrencyContainer(OperatableStateMachine):
             assert state in self._states, "get required autonomy in ConcurrencyContainer - state doesn't match!"
             return self._autonomy[state.name][outcome]
         except Exception as exc:
-            Logger.error(f"Failure to retrieve autonomy for '{self.name}' in CC - "
+            Logger.error(f"Failure to retrieve autonomy for '{self.name}' in ConcurrencyContainer - "
                          f"  current state label='{self.name}' state='{state.name}' outcome='{outcome}'.")
             Logger.localerr(f'error={type(exc)} - {exc}')
             Logger.localerr(f'current_state={self._current_state}')
@@ -95,20 +95,21 @@ class ConcurrencyContainer(OperatableStateMachine):
     def _execute_current_state(self):
         """Execute the current states within this concurrency container."""
         # execute all states that are done with sleeping and determine next sleep duration
+        if self._entering:
+            self.on_enter(self._userdata)
+
         self._inner_sync_request = False  # clear prior request for lower level state
         self._current_state = []  # Concurrency container has multiple active states so use list
 
         self._manual_transition_requested = None
-        # Logger.localinfo(f"-concurrency container '{self.name}' is_controlled={self._is_controlled}"
-        #                  f" with {len(self._states)} states is entering={self._entering} ")
         if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
-            # Special handling in concurrency container - can be either CC or one of several internal states.
+            # Special handling in concurrency container - can be either ConcurrencyContainer or one of several internal states.
             command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
 
             if command_msg.target == self.name:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
                 assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
-                Logger.localinfo(f"-concurrency container '{self.name}' is handling the transition cmd msg={command_msg}")
+                Logger.localinfo(f"ConcurrencyContainer '{self.name}' is handling the transition cmd msg={command_msg}")
 
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
@@ -117,19 +118,19 @@ class ConcurrencyContainer(OperatableStateMachine):
                                   CommandFeedback(command='transition',
                                                   args=[command_msg.target, self.name]))
                 Logger.localwarn(f"--> Manually triggered outcome {outcome} of concurrency container '{self.name}'")
+                self._publish_outcome(outcome)
 
                 self._returned_outcomes = {}
                 self._current_state = None
                 self._last_outcome = outcome
                 return outcome
             else:
-                Logger.localinfo(f"concurrency container '{self.name}' - storing {command_msg} transition request")
+                Logger.localinfo(f"\x1b[94mConcurrencyContainer '{self.name}' - storing {command_msg} transition request\x1b[0m")
                 self._manual_transition_requested = command_msg
 
         for state in self._states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 # print(f"   in current {self._name} : state '{state.name}' is already done.", flush=True)
-                self._current_state.append(state)
                 continue  # already done with executing
 
             if self._manual_transition_requested is not None:
@@ -139,7 +140,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                     command_msg = self._manual_transition_requested
                     cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
                     assert cmd_msg2 is command_msg, 'Something is up with handling of buffer for CMD_TRANSITION_TOPIC'
-                    Logger.localinfo(f"-concurrency container '{self.name}' state '{state.name}' is handling "
+                    Logger.localinfo(f"ConcurrencyContainer '{self.name}' state '{state.name}' is handling "
                                      f"the cmd msg='{command_msg}'")
                     self._manual_transition_requested = None  # Reset at this level
 
@@ -150,7 +151,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                         self._returned_outcomes[state.name] = outcome
                         with UserData(reference=self._userdata, remap=self._remappings[state.name],
                                       input_keys=state.input_keys, output_keys=state.output_keys) as userdata:
-                            Logger.localinfo(f"     CC '{self}' manual transition and on exit for '{state}'")
+                            Logger.localinfo(f"ConcurrencyContainer '{self}' manual transition '{outcome}' and on exit for '{state}'")
                             state.on_exit(userdata)
 
                         # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here
@@ -160,7 +161,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                                           CommandFeedback(command='transition',
                                                           args=[command_msg.target, state.name]))
                         Logger.localerr(f'--> Manually triggered outcome {outcome} ({command_msg.outcome}) '
-                                        f"of state '{state.name}' from inside concurrency {self.name}")
+                                        f"of state '{state.name}' from inside ConcurrencyContainer '{self.name}'")
                         continue
                     else:
                         Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for state '{state.name}' "
@@ -270,10 +271,10 @@ class ConcurrencyContainer(OperatableStateMachine):
 
     def on_exit(self, userdata, states=None):
         """Call when concurrency container exits."""
+        Logger.localinfo(f"ConcurrencyContainer on_exit for '{self}'.")
         for state in self._states if states is None else states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 continue  # skip states that already exited themselves
-            Logger.localinfo(f"     CC '{self}' exiting contained state '{state}'")
             self._execute_single_state(state, force_exit=True)
         self._current_state = None
         self._returned_outcomes = {}

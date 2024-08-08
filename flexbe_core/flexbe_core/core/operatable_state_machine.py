@@ -180,6 +180,29 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     # execution
     def _execute_current_state(self):
+
+        self._manual_transition_requested = None
+        if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
+            # Special handling in statemachine container
+            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+
+            if command_msg.target == self.name:
+                cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
+                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
+                Logger.localinfo(f"Statemachine '{self.name}' is handling the transition cmd msg={command_msg}")
+
+                self._force_transition = True
+                outcome = self.outcomes[command_msg.outcome]
+                self._manual_transition_requested = outcome
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                  CommandFeedback(command='transition',
+                                                  args=[command_msg.target, self.name]))
+                Logger.localwarn(f"--> Manually triggered outcome {outcome} of statemachine '{self.name}'")
+                self._last_outcome = outcome
+                self._publish_outcome(outcome)
+
+                return outcome
+
         # catch any exception and keep state active to let operator intervene
         try:
             # --- @TODO remove self._inner_sync_request = False  # clear any prior sync request

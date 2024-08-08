@@ -73,6 +73,7 @@ class MirrorStateMachine(PreemptableStateMachine):
         MirrorState._last_state_outcome = None
 
         MirrorStateMachine._execute_flag = True  # Force a first pass regardless of messages
+        self._last_deep_states_list = None  # Force change to send behavior update
         loop_count = 0
         self._total_loop_count = 0  # Attribute only added to top-level SM
         outcome = PreemptableState._preempted_name
@@ -184,6 +185,21 @@ class MirrorStateMachine(PreemptableStateMachine):
             # Current state might be None while waiting on final outcome message to exit SM
             return None
 
+        if MirrorState._last_state_id == self.state_id:
+            # Handle this state machine outcome
+            if self._last_outcome is not None:
+                Logger.localwarn(f"Already processed outcome='{self._last_outcome}' for "
+                                 f" state '{self.name}' ({self.state_id}) given new "
+                                 f'outcome index={MirrorState._last_state_outcome}')
+
+            MirrorState._last_state_id = None  # Flag that the message was handled
+            if MirrorState._last_state_outcome is not None:
+                Logger.localwarn(f" StateMachine '{self.name}' ({self.state_id}) processing "
+                                 f'outcome index={MirrorState._last_state_outcome}')
+                outcome = self.on_exit_mirror(userdata, MirrorState._last_state_outcome)
+                MirrorState._last_state_outcome = None  # Flag that the message was handled
+                return outcome
+
         # Process the current state
         outcome = self._current_state.execute_mirror(userdata)
         if outcome is not None:
@@ -278,8 +294,9 @@ class MirrorStateMachine(PreemptableStateMachine):
         try:
             if self._current_state is not None:
                 self._current_state._entering = True
-                self._current_state.on_exit(userdata, -1)  # Preempted
-            self._last_outcome = self.outcomes[desired_outcome]
+                self._current_state.on_exit_mirror(userdata, -1)  # Preempted
+            if desired_outcome != -1:
+                self._last_outcome = self.outcomes[desired_outcome]
             self._current_state = None
             self._entering = True
             return self._last_outcome

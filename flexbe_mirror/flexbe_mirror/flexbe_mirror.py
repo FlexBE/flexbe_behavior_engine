@@ -460,6 +460,12 @@ class FlexbeMirror(Node):
             thread = threading.Thread(target=self._restart_mirror, args=[msg, start_time])
             thread.daemon = True
             thread.start()
+
+            # Force a new update after sync
+            Logger.localinfo(f'\x1b[93mReceived sync for current behavior - request behavior update message\x1b[0m')
+            MirrorStateMachine._execute_flag = True  # Execute once more after any change,
+            self._sm._last_deep_states_list = None
+
         else:
             Logger.localerr('Mirror synchronize request id='
                             f'{msg.behavior_id} mismatch active= {self._active_id}')

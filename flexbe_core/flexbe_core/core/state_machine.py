@@ -128,6 +128,7 @@ class StateMachine(State):
             self.assert_consistent_transitions()
             self._entering = False
             self._current_state = self.initial_state
+            self._current_state._entering = True  # Force entering action
             self._userdata = userdata if userdata is not None else UserData()
             self._userdata(add_from=self._own_userdata)
             # Logger.localinfo(f"Entering StateMachine '{self.name}' "

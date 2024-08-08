@@ -69,7 +69,8 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
 
         self._current_state = None
         self._returned_outcomes = {}
-        self._last_outcome = self.outcomes[desired_outcome]
+        if desired_outcome != -1:
+            self._last_outcome = self.outcomes[desired_outcome]
         return self._last_outcome
 
     def execute_mirror(self, userdata):
