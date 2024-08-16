@@ -143,9 +143,9 @@ class ProxySubscriberCached:
                         # Since we don't throw TypeErrors based on isinstance, and count on Python's duck typing
                         # for callbacks, we will ignore on FlexBE side for subscribers
                         if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
-                            Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'"
-                                             ' - keep existing subscriber! ('
-                                             f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                            # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'"
+                            #                  ' - keep existing subscriber! ('
+                            #                  f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                             ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
                         else:
                             Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
