@@ -50,7 +50,7 @@ from rclpy.node import Node
 class InputActionWorker(QThread):
     """Worker thread for InputAction server."""
 
-    _show_dialog_signal = Signal(str)
+    _show_dialog_signal = Signal(str, object)
     _hide_dialog_signal = Signal()
 
     def __init__(self, node):
@@ -116,6 +116,8 @@ class InputActionServer(Node):
                  BehaviorInput.Goal.REQUEST_2D: ('list of 2 numbers', (list, tuple), 2),  # allow either list or tuple
                  BehaviorInput.Goal.REQUEST_3D: ('list of 3 numbers', (list, tuple), 3),  # e.g., '[1, 2]', '(1, 2)', or '1, 2'
                  BehaviorInput.Goal.REQUEST_4D: ('list of 4 numbers', (list, tuple), 4),
+                 BehaviorInput.Goal.REQUEST_STRING: ('string', str, 1),
+                 BehaviorInput.Goal.REQUEST_SELECTION: ('selected item', str, 1)
                  }
 
         if request_type in types:
@@ -144,7 +146,10 @@ class InputActionServer(Node):
         # Get data from user
         try:
             # Request input from GUI running in a separate thread
-            self._worker._show_dialog_signal.emit(prompt_text)
+            if goal_handle.request.request_type == BehaviorInput.Goal.REQUEST_SELECTION:
+                self._worker._show_dialog_signal.emit(prompt_text, goal_handle.request.items)
+            else:
+                self._worker._show_dialog_signal.emit(prompt_text, None)
 
             while self._input_dialog.is_none() and not self._canceled:
                 time.sleep(0.02)  # Add a short sleep to avoid busy-waiting
@@ -166,15 +171,21 @@ class InputActionServer(Node):
                 goal_handle.abort()
                 return result
             else:
-                input_data = ast.literal_eval(self._input)  # convert string to Python data
-                if not isinstance(input_data, type_class):
-                    result.data = f"Invalid input type '{type(input_data)}' not '{type_class}' - expected '{type_text}'"
+                if type_class is str:
+                    result.data = self._input
+                    data_len = 1
+                else:
+                    input_data = ast.literal_eval(self._input)  # convert string to Python data
+                    result.data = str(pickle.dumps(input_data))
+                    data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
+
+                if not isinstance(result.data, type_class):
+                    result.data = f"Invalid input type '{type(result.data)}' not '{type_class}' - expected '{type_text}'"
                     result.result_code = BehaviorInput.Result.RESULT_FAILED
                     Logger.localwarn(result.data)
                     goal_handle.abort()
                     return result
 
-                data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
                 if data_len != expected_elements:
                     result.data = (f'Invalid number of elements {data_len} not {expected_elements} '
                                    f"of {type_class} - expected '{type_text}'")
@@ -182,7 +193,6 @@ class InputActionServer(Node):
                     Logger.localwarn(result.data)
                     goal_handle.abort()
                 else:
-                    result.data = str(pickle.dumps(input_data))
                     result.result_code = BehaviorInput.Result.RESULT_OK
                     goal_handle.succeed()
         except Exception as exc:  # pylint: disable=W0703

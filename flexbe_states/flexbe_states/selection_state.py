@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
+# Copyright 2024 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -12,7 +12,7 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -28,10 +28,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""InputState."""
-import ast
-import pickle
-
+"""SelectionState."""
 from action_msgs.msg import GoalStatus
 
 from flexbe_core import EventState, Logger
@@ -40,17 +37,17 @@ from flexbe_core.proxy import ProxyActionClient
 from flexbe_msgs.action import BehaviorInput
 
 
-class InputState(EventState):
+class SelectionState(EventState):
     """
-    Implements a state where the state machine needs an input from the operator.
+    Implements a state where the state machine needs an input from the operator as choice from list of strings.
 
     Requests of different types, such as requesting a waypoint, a template, or a pose, can be specified.
 
-    -- request  uint8       One of the custom-defined values to specify the type of request.
     -- message  string      Message displayed to the operators to let them know what to do.
     -- timeout  float       Timeout in seconds to wait for server to be available.
 
-    #> data     object      The data provided by the operator. The exact type depends on the request.
+    ># items    object      List or tuple of items to select from
+    #> data     object      The data selected by the operator. The exact type depends on the request.
 
     <= received             Returned as soon as valid data is available.
     <= aborted              The operator declined to provide the requested data.
@@ -65,14 +62,14 @@ class InputState(EventState):
 
     """
 
-    def __init__(self, request, message, timeout=1.0, action_topic='flexbe/behavior_input'):
+    def __init__(self, message, timeout=1.0, action_topic='flexbe/behavior_input'):
         """Construct instance."""
-        super(InputState, self).__init__(outcomes=['received', 'aborted', 'no_connection', 'data_error'],
-                                         output_keys=['data'])
-        ProxyActionClient.initialize(InputState._node)
+        super(SelectionState, self).__init__(outcomes=['received', 'aborted', 'no_connection', 'data_error'],
+                                             input_keys=['items'],
+                                             output_keys=['data'])
+        ProxyActionClient.initialize(SelectionState._node)
         self._action_topic = action_topic
         self._client = None
-        self._request = request
         self._message = message
         self._timeout = timeout
         self._return = None
@@ -100,20 +97,10 @@ class InputState(EventState):
             else:
                 # Attempt to load data and convert it to the proper format.
                 try:
-                    # Convert string to byte array and load using pickle
-                    if self._request in (BehaviorInput.Goal.REQUEST_STRING, BehaviorInput.Goal.REQUEST_SELECTION):
-                        Logger.localinfo(f" InputState returned string '{result.data}'")
-                        response_data = result.data
-                    else:
-                        Logger.localinfo(f" InputState returned '{result.data}'")
-                        input_data = ast.literal_eval(result.data)
+                    # Selection state returns string
+                    response_data = result.data
 
-                        # Note: This state uses the Pickle module, and is subject to this warning from the Pickle manual:
-                        #     Warning: The pickle module is not secure against erroneous or maliciously constructed data.
-                        #     Never unpickle data received from an untrusted or unauthenticated source.
-                        response_data = pickle.loads(input_data)
-                        Logger.localinfo(f'   converted to {type(response_data)} : {response_data}')
-
+                    Logger.loginfo(f" SelectionState returned '{response_data}'")
                     userdata.data = response_data
                     self._return = 'received'
                 except Exception as exc:  # pylint: disable=W0703
@@ -136,12 +123,16 @@ class InputState(EventState):
         self._client.remove_result(self._action_topic)
         self._return = None
 
+        if 'items' not in userdata:
+            self._return = 'aborted'
+            msg = f"SelectionState '{self}' requires userdata.items key!"
+            Logger.localwarn(msg)
+            return
+
         # Retrive the goal for the BehaviorInput Action.
-        action_goal = BehaviorInput.Goal()
-        # Retrive the request type and message from goal.
-        action_goal.request_type = self._request
-        action_goal.msg = self._message
-        Logger.loghint(f"Onboard requests '{self._message}'")
+        action_goal = BehaviorInput.Goal(request_type=BehaviorInput.Goal.REQUEST_SELECTION,
+                                         items=userdata.items, msg=self._message)
+        Logger.loghint(f"Onboard requests '{self._message}' : {userdata.items}")
 
         # Attempt to send the goal.
         try:
@@ -159,10 +150,4 @@ class InputState(EventState):
 
         if self._client.is_active(self._action_topic):
             self._client.cancel(self._action_topic)
-            Logger.loginfo(f"Cancelled active action goal for '{self._action_topic}'.")
-
-        if self._client.has_result(self._action_topic):
-            # remove the old result so we are ready for the next time
-            # and don't prematurely return
-            # Note: We don't delete in execute to allow the cancel check above
-            self._client.remove_result(self._action_topic)
+            Logger.loginfo(f"Requested to cancel active action goal for '{self._action_topic}'.")

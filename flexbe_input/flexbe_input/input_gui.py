@@ -28,7 +28,7 @@
 
 """FlexBE InputGUI."""
 from PySide6.QtCore import QSize, Slot
-from PySide6.QtWidgets import QLabel, QLineEdit, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QLabel, QLineEdit, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
 
 class InputGUI(QMainWindow):
@@ -53,34 +53,96 @@ class InputGUI(QMainWindow):
             }
             """)
 
-        central_widget = QWidget(self)
-        self.setCentralWidget(central_widget)
-        central_widget.setStyleSheet('QWidget { border: 1px solid blue; background-color: palette(window); }')
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.central_widget.setStyleSheet('QWidget { border: 1px solid blue; background-color: palette(window); }')
+        self.combo_box = None
+        self.input_line = None
 
-        layout = QVBoxLayout(central_widget)
+    def clear_layout(self):
+        # Clear prior layout
+        while self.main_layout.count():
+            item = self.main_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)  # Detach the widget from the layout
+                widget.deleteLater()
+
+    def set_layout(self, prompt, items=None):
+        # Update the layout
+        self.clear_layout()
 
         self.prompt = QLabel(self)
-        self.prompt.setText(prompt)
         self.prompt.setStyleSheet('QLabel { border: none; background-color: palette(window); }')
-        layout.addWidget(self.prompt)
+        self.prompt.setText(prompt)
+        self.prompt.adjustSize()
+        self.main_layout.addWidget(self.prompt)
 
-        edit_style = """
-        QLineEdit {
-            border: 2px solid #8f8f91;
-            background-color: #f0f0f0;
-            padding: 2px;
-            color: black;
-        }
+        if items is None:
+            # One line entry field
+            edit_style = """
+            QLineEdit {
+                border: 2px solid #8f8f91;
+                background-color: #f0f0f0;
+                padding: 2px;
+                color: black;
+            }
 
-        QLineEdit:focus {
-            border: 2px solid #0078d7;  /* Change this color to your desired highlight color */
-        }
-        """
+            QLineEdit:focus {
+                border: 2px solid #0078d7;  /* Change this color to your desired highlight color */
+            }
+            """
 
-        self.line = QLineEdit(self)
-        self.line.setStyleSheet(edit_style)
-        self.line.returnPressed.connect(self.set_input)  # Treat return as submit
-        layout.addWidget(self.line)
+            self.input_line = QLineEdit(self)
+            self.input_line.setStyleSheet(edit_style)
+            self.input_line.returnPressed.connect(self.set_input)  # Treat return as submit
+            self.input_line.setText('')
+            self.combo_box = None
+            self.main_layout.addWidget(self.input_line)
+        else:
+            combo_style = """
+                QComboBox {
+                    border: 2px solid #8f8f91;
+                    background-color: #f0f0f0;
+                    padding: 2px;
+                    color: black;
+                }
+
+                QComboBox:focus {
+                    border: 2px solid #0078d7;  /* Highlight color */
+                }
+
+                QComboBox::drop-down {
+                    border-left: 1px solid #8f8f91;
+                }
+
+                QComboBox::down-arrow {
+                    image: url(down_arrow.png);  /* Optionally customize the down arrow */
+                    width: 10px;
+                    height: 10px;
+                }
+
+                QComboBox QAbstractItemView {
+                    background-color: #f0f0f0;
+                    selection-background-color: #0078d7;
+                    border: 1px solid #8f8f91;
+                }
+                """
+
+            self.combo_box = QComboBox(self)
+            self.combo_box.setStyleSheet(combo_style)
+            string_items = []
+            for item in items:
+                if not isinstance(item, str):
+                    string_items.append(f'{item}')  # Convert to string if not already
+                else:
+                    string_items.append(item)
+            self.combo_box.addItems(string_items)
+            self.combo_box.currentIndexChanged.connect(self.change_selection)
+            self.line = None
+            self.main_layout.addWidget(self.combo_box)
+
         button_style = """
         QPushButton {
             border: 2px solid #8f8f91;
@@ -100,33 +162,54 @@ class InputGUI(QMainWindow):
         """
         self.submit = QPushButton('Submit', self)
         self.submit.setStyleSheet(button_style)
-        self.submit.clicked.connect(self.set_input)
-        layout.addWidget(self.submit)
+        if items is None:
+            self.submit.clicked.connect(self.set_input)
+        else:
+            self.submit.clicked.connect(self.set_selection)
+
+        self.main_layout.addWidget(self.submit)
 
         self.cancel = QPushButton('Cancel', self)
         self.cancel.setStyleSheet(button_style)
         self.cancel.clicked.connect(self.set_cancel)
-        layout.addWidget(self.cancel)
+        self.main_layout.addWidget(self.cancel)
 
         self.adjustSize()
 
+    def change_selection(self):
+        """Print selection."""
+        if self.combo_box is None:
+            print("Unknown combo box - why is this called!", flush=True)
+        else:
+            print(f" Currently selected '{self.combo_box.currentText()}' ")
+
+    def set_selection(self):
+        """Set input text from selection box."""
+        if self.combo_box is None:
+            print("Unknown combo box - why is this called!", flush=True)
+            self.input = "unknown"
+        else:
+            print(f" Selected '{self.combo_box.currentText()}' ")
+            self.input = self.combo_box.currentText()
+
     def set_input(self):
         """Set input text from GUI."""
-        self.input = self.line.text()
+        if self.input_line is None:
+            print("Unknown combo box - why is this called!", flush=True)
+            self.input = "unknown"
+        else:
+            self.input = self.input_line.text()
 
     def set_cancel(self):
         """Set input text from GUI."""
         self.input = ''
 
     @Slot(str)
-    def show(self, prompt):
+    def show(self, prompt, items=None):
         """Show dialog if hidden."""
         print(f"showing input UI dialog with '{prompt}' ", flush=True)
-        self.prompt.setText(prompt)
-        self.prompt.adjustSize()
-        self.line.setText('')
         self.input = None  # clear for next entry
-        self.adjustSize()
+        self.set_layout(prompt, items)
         self.resize(self.sizeHint())  # Resize to fit the new content
         super().show()
 
@@ -134,6 +217,7 @@ class InputGUI(QMainWindow):
     def hide(self):
         """Hide dialog when not in use."""
         print('hiding input UI dialog', flush=True)
+        self.clear_layout()
         super().hide()
 
     def is_none(self):
