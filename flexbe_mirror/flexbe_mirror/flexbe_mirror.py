@@ -755,7 +755,7 @@ class FlexbeMirror(Node):
 
         result = PreemptableStateMachine._preempted_name
         try:
-            result = self._sm.spin(start_time)
+            result = self._sm.spin(start_time, self._state_map)
             Logger.localinfo(f"Mirror finished spin with result '{result}' after {self.get_elapsed_str(start_time)} s")
             self._sm.destroy()
         except Exception as exc:
