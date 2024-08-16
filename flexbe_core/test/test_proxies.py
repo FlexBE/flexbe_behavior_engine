@@ -333,7 +333,9 @@ class TestProxies(unittest.TestCase):
         self.assertTrue(client.has_result(topic1))
         client.remove_result(topic1)
         self.assertIsNone(client._result.get(topic1))
-        self.assertIsNone(client._result_status.get(topic1))
+        self.assertEqual(status, GoalStatus.STATUS_SUCCEEDED)
+        #  -- we are now preserving status until cleared on next goal
+        # self.assertIsNone(client._result_status.get(topic1))
         self.assertFalse(client.has_result(topic1))
         self.node.get_logger().info('validated remove_result! ')
 

@@ -96,6 +96,7 @@ class ConcurrencyContainer(OperatableStateMachine):
         """Execute the current states within this concurrency container."""
         # execute all states that are done with sleeping and determine next sleep duration
         if self._entering:
+            Logger.localerr(f"CC: Why is entering flag set here '{self.name}' of '{self.path}'?")
             self.on_enter(self._userdata)
 
         self._inner_sync_request = False  # clear prior request for lower level state
@@ -127,6 +128,12 @@ class ConcurrencyContainer(OperatableStateMachine):
             else:
                 Logger.localinfo(f"\x1b[94mConcurrencyContainer '{self.name}' - storing {command_msg} transition request\x1b[0m")
                 self._manual_transition_requested = command_msg
+
+        if self._is_controlled and self._last_requested_outcome is not None:
+            # We have already processed the current state and received an outcome
+            # We are waiting on outcome confirmation from the OCS
+            Logger.localinfo(f"CC '{self.path}' is waiting on user to confirm outcome")
+            return None
 
         for state in self._states:
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
@@ -213,11 +220,6 @@ class ConcurrencyContainer(OperatableStateMachine):
         self._current_state = None
 
         if self._is_controlled:
-            # reset previously requested outcome if applicable
-            if self._last_requested_outcome != outcome:
-                self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
-                self._last_requested_outcome = None
-
             # request outcome because autonomy level is too low
             if (not self._force_transition and self.parent is not None
                 and (not self.parent.is_transition_allowed(self.name, outcome)
@@ -226,7 +228,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                     self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
                                       OutcomeRequest(outcome=self.outcomes.index(outcome),
                                                      target=self.path))
-                    Logger.localinfo('<-- Want result: %s > %s' % (self.name, outcome))
+                    Logger.localinfo('<-- Want result: %s > %s' % (self.path, outcome))
                     StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                     autonomy=self.parent.autonomy_level,
                                     required=self.parent.get_required_autonomy(outcome, self))
@@ -234,6 +236,7 @@ class ConcurrencyContainer(OperatableStateMachine):
                 outcome = None
             elif outcome is not None and outcome in self.outcomes:
                 # autonomy level is high enough, report the executed transition
+                Logger.localinfo(f"controlled CC '{self.name}' from '{self.path}'permitting outcome '{outcome}' ")
                 self._publish_outcome(outcome)
                 self._force_transition = False
 
@@ -263,6 +266,7 @@ class ConcurrencyContainer(OperatableStateMachine):
 
     def on_enter(self, userdata):  # pylint: disable=W0613
         """Call on entering the concurrency container."""
+        Logger.localinfo(f" CC on_enter for '{self.path}' ... ")
         super().on_enter(userdata)
         self._returned_outcomes = {}
         for state in self._states:
@@ -280,6 +284,11 @@ class ConcurrencyContainer(OperatableStateMachine):
         self._current_state = None
         self._returned_outcomes = {}
         self._entering = True
+
+        if self._last_requested_outcome is not None:
+            Logger.localinfo(f"CC '{self.name}' of '{self.path}' clear prior LRO='{self._last_requested_outcome}'.")
+            self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
+            self._last_requested_outcome = None
 
     def get_deep_states(self):
         """

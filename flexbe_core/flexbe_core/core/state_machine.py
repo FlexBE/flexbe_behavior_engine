@@ -113,7 +113,14 @@ class StateMachine(State):
         """Spin the SM execute loop."""
         outcome = None
         while True:
-            outcome = self.execute(userdata)
+            try:
+                outcome = self.execute(userdata)
+            except Exception as exc:
+                Logger.logerr(f"Exception in '{self}' - stopping behavior!")
+                Logger.localinfo(f'{exc}')
+                self.on_exit(userdata)
+                Logger.logerr(f"Exception in '{self}' - {exc}")
+                return None
 
             if outcome is not None:
                 break
@@ -124,15 +131,9 @@ class StateMachine(State):
 
     def execute(self, userdata):
         """Execute the SM."""
-        if self._entering or self._current_state is None:
-            self.assert_consistent_transitions()
-            self._entering = False
-            self._current_state = self.initial_state
-            self._current_state._entering = True  # Force entering action
-            self._userdata = userdata if userdata is not None else UserData()
-            self._userdata(add_from=self._own_userdata)
-            # Logger.localinfo(f"Entering StateMachine '{self.name}' "
-            #                  f"({self._state_id}) initial state='{self._current_state.name}'")
+        if self._entering:
+            self.on_enter(userdata)
+
         outcome = self._execute_current_state()
 
         if outcome:
@@ -140,6 +141,16 @@ class StateMachine(State):
             self.on_exit(self._userdata)
 
         return outcome
+
+    def on_enter(self, userdata):
+        self.assert_consistent_transitions()
+        self._entering = False
+        self._current_state = self.initial_state
+        self._current_state._entering = True  # Force entering action
+        self._userdata = userdata if userdata is not None else UserData()
+        self._userdata(add_from=self._own_userdata)
+        Logger.localinfo(f"Entering StateMachine '{self.name}' of '{self.path}' "
+                         f"({self._state_id}) initial state='{self._current_state.name}'")
 
     def _execute_current_state(self):
         """Execute the currently active state in this SM."""

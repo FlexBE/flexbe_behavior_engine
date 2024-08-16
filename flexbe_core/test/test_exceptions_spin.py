@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Test FlexBE Exception handling."""
+"""Test FlexBE Exception handling with sm.spin()."""
 import time
 import unittest
 
@@ -41,20 +41,22 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
 
-class TestExceptions(unittest.TestCase):
+class TestExceptionsSpin(unittest.TestCase):
     """Test FlexBE Exception handling."""
 
     test = 0
 
     def __init__(self, *args, **kwargs):
-        """Initialize TestExceptions instance."""
+        """Initialize TestExceptionsSpin instance."""
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        """Set up the TestExceptions test."""
-        TestExceptions.test += 1
+        """Set up the TestExceptionsSpin test."""
+        TestExceptionsSpin.test += 1
         self.context = rclpy.context.Context()
         rclpy.init(context=self.context)
+        if not rclpy.ok(context=self.context):
+            raise RuntimeError('rclpy failed to initialize properly with context')
 
         self.executor = MultiThreadedExecutor(context=self.context)
         self.node = rclpy.create_node('exception_test_' + str(self.test), context=self.context)
@@ -63,7 +65,7 @@ class TestExceptions(unittest.TestCase):
         initialize_flexbe_core(self.node)
 
     def tearDown(self):
-        """Tear down the TestExceptions test."""
+        """Tear down the TestExceptionsSpin test."""
         self.node.get_logger().info(' shutting down exceptions test %d (%d) ... ' % (self.test, self.context.ok()))
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
 
@@ -95,16 +97,17 @@ class TestExceptions(unittest.TestCase):
                 super().__init__(outcomes=['done'])
 
             def execute(self, userdata):
+                self._node.get_logger().info('test_invalid_outcome  - execute with invalid outcome ...')
                 return 'invalid'
 
-        outcome = None
-        try:
-            sm = OperatableStateMachine(outcomes=['done'])
-            with sm:
-                OperatableStateMachine.add('state', ReturnInvalidOutcomeState(), transitions={'done': 'done'})
-            outcome = sm.execute(None)
-        except StateError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+            def on_enter(self, userdata):
+                self._node.get_logger().info('test_invalid_outcome  - on_enter ...')
+                super().on_enter(userdata)
+
+        sm = OperatableStateMachine(name='test_invalid_outcome', outcomes=['done'])
+        with sm:
+            OperatableStateMachine.add('state', ReturnInvalidOutcomeState(), transitions={'done': 'done'})
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, StateError)
@@ -128,15 +131,11 @@ class TestExceptions(unittest.TestCase):
         inner_sm = OperatableStateMachine(outcomes=['done'])
         with inner_sm:
             OperatableStateMachine.add('state', ReturnDoneState(), transitions={'done': 'invalid'})
-        sm = OperatableStateMachine(outcomes=['done'])
+        sm = OperatableStateMachine(name='test_invalid_transition', outcomes=['done'])
         with sm:
             OperatableStateMachine.add('inner', inner_sm, transitions={'done': 'done'})
 
-        outcome = None
-        try:
-            outcome = sm.execute(None)
-        except StateMachineError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, StateMachineError)
@@ -158,15 +157,11 @@ class TestExceptions(unittest.TestCase):
                 print(userdata.invalid)
                 return 'done'
 
-        sm = OperatableStateMachine(outcomes=['done'])
+        sm = OperatableStateMachine(name='test_invalid_userdata_input', outcomes=['done'])
         with sm:
             OperatableStateMachine.add('state', AccessInvalidInputState(), transitions={'done': 'done'})
 
-        outcome = None
-        try:
-            outcome = sm.execute(None)
-        except UserDataError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, UserDataError)
@@ -188,15 +183,11 @@ class TestExceptions(unittest.TestCase):
                 userdata.invalid = False
                 return 'done'
 
-        sm = OperatableStateMachine(outcomes=['done'])
+        sm = OperatableStateMachine(name='test_invalid_userdata_output', outcomes=['done'])
         with sm:
             OperatableStateMachine.add('state', SetInvalidOutputState(), transitions={'done': 'done'})
 
-        outcome = None
-        try:
-            outcome = sm.execute(None)
-        except UserDataError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, UserDataError)
@@ -218,15 +209,11 @@ class TestExceptions(unittest.TestCase):
                 print(userdata.missing)
                 return 'done'
 
-        sm = OperatableStateMachine(outcomes=['done'])
+        sm = OperatableStateMachine(name='test_missing_userdata', outcomes=['done'])
         with sm:
             OperatableStateMachine.add('state', AccessValidInputState(), transitions={'done': 'done'})
 
-        outcome = None
-        try:
-            outcome = sm.execute(None)
-        except UserDataError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, UserDataError)
@@ -248,16 +235,12 @@ class TestExceptions(unittest.TestCase):
                 userdata.only_input['new'] = 'not_allowed'
                 return 'done'
 
-        sm = OperatableStateMachine(outcomes=['done'])
+        sm = OperatableStateMachine(name='test_modify_input_key', outcomes=['done'])
         sm.userdata.only_input = {'existing': 'is_allowed'}
         with sm:
             OperatableStateMachine.add('state', ModifyInputKeyState(), transitions={'done': 'done'})
 
-        outcome = None
-        try:
-            outcome = sm.execute(None)
-        except UserDataError as exc:
-            self.node.get_logger().info(f" sm had expected exception '{exc}'")
+        outcome = sm.spin(None, rclpy_context=self.context)
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, UserDataError)

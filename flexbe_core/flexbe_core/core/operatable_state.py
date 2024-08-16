@@ -64,7 +64,7 @@ class OperatableState(PreemptableState):
         outcome = self.__execute(*args, **kwargs)
 
         if self._is_controlled:
-            # reset previously requested outcome if applicable
+            # reset previously requested outcome if applicable (not reset in on_enter/exit like OSM)
             if self._last_requested_outcome is not None and outcome is None:
                 self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
                 self._last_requested_outcome = None
@@ -75,7 +75,7 @@ class OperatableState(PreemptableState):
                 if outcome != self._last_requested_outcome:
                     self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
                                       OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.path))
-                    Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.name, outcome))
+                    Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.path, outcome))
                     StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                     autonomy=self.parent.autonomy_level,
                                     required=self.parent.get_required_autonomy(outcome, self))
@@ -84,8 +84,10 @@ class OperatableState(PreemptableState):
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
+                Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'permitting outcome '{outcome}' ")
                 self._publish_outcome(outcome)
                 self._force_transition = False
+
         return outcome
 
     def _publish_outcome(self, outcome):

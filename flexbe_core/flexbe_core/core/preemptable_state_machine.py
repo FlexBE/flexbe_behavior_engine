@@ -82,13 +82,20 @@ class PreemptableStateMachine(LockableStateMachine):
     def _valid_targets(self):
         return super()._valid_targets + [PreemptableStateMachine._preempted_name]
 
-    def spin(self, userdata=None):
+    def spin(self, userdata=None, rclpy_context=None):
         """Spin the execute loop for preemptable portion."""
         outcome = None
-        while rclpy.ok():
+        while rclpy.ok(context=rclpy_context):
             command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
 
-            outcome = self.execute(userdata)
+            try:
+                outcome = self.execute(userdata)
+            except Exception as exc:
+                Logger.logerr(f"Exception in '{self.name}' - stopping behavior!")
+                Logger.localinfo(f'{exc}')
+                self.on_exit(userdata)  # Call to preempt any active states
+                Logger.logerr(f"Exception in '{self.name}' - {exc}")
+                return None
 
             if command_msg is not None:
                 command_msg2 = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
@@ -122,7 +129,6 @@ class PreemptableStateMachine(LockableStateMachine):
                 break
 
             self.wait(seconds=self.sleep_duration)
-
         return outcome
 
     def get_latest_status(self):
