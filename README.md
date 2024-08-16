@@ -34,15 +34,33 @@ Next, navigate to the "ros2_ws" top-level directory and build FlexBE:
 
     colcon build
 
-Furthermore, create your own repository for behavior development (contains examples):
 
-    ros2 run flexbe_widget create_repo [your_project_name]
+## Creating new FlexBE Behavior packages
+
+To begin, create your own repository for behavior development in the `${WORKSPACE_ROOT}/src` folder:
+
+    `ros2 run flexbe_widget create_repo [your_project_name] <meta_package_name> <--non-interactive>`
+
+This will clone a project template (requires internet access) that contains examples and proper package definitions,
+and create the ROS 2 package structure and three subfolders.
+
+For example, running
+  `ros2 run flexbe_widget create_repo my_project my_flexbe_project`
+
+from the `${WORKSPACE_ROOT}/src` folder will create:
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project`
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_flexbe_project` - the ROS meta package
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_behaviors`
+    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_states`
+
+
+These are intended to contain your custom FlexBE state implementations and HFSM-based behaviors.
 
 This version of the flexbe_behavior_engine requires version 4.0+ of the FlexBE user interface.
 
 It is recommended to install the FlexBE user interface by following one of these steps:
+ * https://github.com/FlexBE/flexbe_webui.git - new Python-based webserver version (preferred)
  * https://github.com/FlexBE/flexbe_app.git - classic FlexBE App (iron or ros2-devel branches)
- * https://github.com/FlexBE/flexbe_webui.git - new Python-based webserver version
 
 
 ## Usage
@@ -98,4 +116,4 @@ Let us know if you know a paper which should be added to the list.
 ## Maintainers
 
 - Philipp Schillinger ([@pschillinger](https://github.com/pschillinger), [Contact](http://philserver.bplaced.net/fbe/contact.php))
-- David Conner ([@dcconner](https://github.com/dcconner))
+- David Conner ([@dcconner](https://github.com/dcconner)) [Contact](https://flexbe.readthedocs.io/en/latest/contactinfo.html)
