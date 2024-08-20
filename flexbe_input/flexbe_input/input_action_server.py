@@ -172,19 +172,23 @@ class InputActionServer(Node):
                 return result
             else:
                 if type_class is str:
+                    print(f"Process data as string '{self._input}' with request {type_class}", flush=True)
                     result.data = self._input
                     data_len = 1
                 else:
+                    print(f"Process data '{self._input}' as {type_class}", flush=True)
                     input_data = ast.literal_eval(self._input)  # convert string to Python data
-                    result.data = str(pickle.dumps(input_data))
+                    print(f"  input data[{type(input_data)}] = {input_data}", flush=True)
                     data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
 
-                if not isinstance(result.data, type_class):
-                    result.data = f"Invalid input type '{type(result.data)}' not '{type_class}' - expected '{type_text}'"
-                    result.result_code = BehaviorInput.Result.RESULT_FAILED
-                    Logger.localwarn(result.data)
-                    goal_handle.abort()
-                    return result
+                    if not isinstance(input_data, type_class):
+                        result.data = f"Invalid input type '{type(result.data)}' not '{type_class}' - expected '{type_text}'"
+                        result.result_code = BehaviorInput.Result.RESULT_FAILED
+                        Logger.localwarn(result.data)
+                        goal_handle.abort()
+                        return result
+                    # Convert binary to string for transport
+                    result.data = str(pickle.dumps(input_data))
 
                 if data_len != expected_elements:
                     result.data = (f'Invalid number of elements {data_len} not {expected_elements} '
