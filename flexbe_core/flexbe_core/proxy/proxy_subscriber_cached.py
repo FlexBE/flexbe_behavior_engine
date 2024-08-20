@@ -132,7 +132,7 @@ class ProxySubscriberCached:
                                                         'callbacks': defaultdict(None),
                                                         'subscribers': [inst_id]}
 
-            Logger.localinfo(f"Created subscription for '{topic}' with message type '{msg_type.__name__}'!")
+            # Logger.localinfo(f"Created subscription for '{topic}' with message type '{msg_type.__name__}'!")
 
         else:
             with ProxySubscriberCached._subscription_lock:
@@ -147,10 +147,10 @@ class ProxySubscriberCached:
                             #                  ' - keep existing subscriber! ('
                             #                  f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                             ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
-                        else:
-                            Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
-                                             ' - keep existing subscriber! '
-                                             f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                        # else:
+                        #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
+                        #                     ' - keep existing subscriber! '
+                        #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                     else:
                         Logger.info(f'Mis-matched msg_types ({msg_type.__name__} vs. '
                                     f"{ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__})"
@@ -158,13 +158,13 @@ class ProxySubscriberCached:
                         raise TypeError(f"Trying to replace existing subscription with different msg type for '{topic}'")
                 else:
                     if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
-                        Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'!  "
-                                         f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                        # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'!  "
+                        #                  f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                         ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
-                    else:
-                        Logger.localinfo(f"Existing subscription for '{topic}' with same message type "
-                                         '- keep existing subscriber! '
-                                         f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
+                    # else:
+                    #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type "
+                    #                     '- keep existing subscriber! '
+                    #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
 
         # Register the local callback for topic message
         if callback is not None:

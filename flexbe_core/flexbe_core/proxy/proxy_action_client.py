@@ -88,9 +88,9 @@ class ProxyActionClient:
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy action clients!\n{ str(exc)}')
 
-    def __init__(self, topics=None, wait_duration=10):
+    def __init__(self, topics=None, wait_duration=1.0):
         """
-        Initialize the proxy with optionally a given set of clients.
+        Initialize the proxy with an optionally given set of clients.
 
         @type topics: dictionary string - message class
         @param topics: A dictionay containing a collection of topic - message type pairs.
@@ -104,10 +104,10 @@ class ProxyActionClient:
                 ProxyActionClient.setup_client(topic, action_type, wait_duration)
 
     @classmethod
-    def setupClient(cls, topic, action_type, wait_duration=10):
+    def setupClient(cls, topic, action_type, wait_duration=1.0):
         """Set up proxy action client (Deprecated)."""
         Logger.localerr('Deprecated: Use ProxyActionClient.setup_client instead!')
-        cls.setup_client(topic, action_type, wait_duration=10)
+        cls.setup_client(topic, action_type, wait_duration)
 
     @classmethod
     def setup_client(cls, topic, action_type, wait_duration=None):
