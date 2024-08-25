@@ -2,6 +2,14 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+* use state id consistently to avoid long path strings
+* modify preempt and published outcome to improve sync
+* add flexbe_outcome_listener node for simple monitoring
+
 3.0.7 (2024-08-24)
 ------------------
 * reduce default wait durations on proxy start ups; reduce start up spam

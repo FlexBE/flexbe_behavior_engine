@@ -6,7 +6,7 @@ PACKAGE_NAME = 'flexbe_input'
 
 setup(
     name=PACKAGE_NAME,
-    version='3.0.7',
+    version='4.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
