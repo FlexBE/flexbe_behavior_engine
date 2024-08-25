@@ -2,6 +2,12 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* modify mirror handling for controllable OSM/CC and improve sync
+* add initialize_flexbe_core for common initialization
+* updates to ConcurrencyContainer and StateMachine to handle sync and forced outcomes
+
 3.0.6 (2024-08-05)
 ------------------
 * clean up sync messaging and set entering flag for state

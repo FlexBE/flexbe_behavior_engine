@@ -195,7 +195,7 @@ class OperatableStateMachine(PreemptableStateMachine):
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
                 assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
                 Logger.localinfo(f"Statemachine '{self.name}' from '{self.path}' is "
-                                 f"handling the transition cmd msg={command_msg}")
+                                 f"handling the transition cmd msg='{command_msg}'")
 
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]

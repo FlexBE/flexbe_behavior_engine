@@ -2,6 +2,15 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* reduce default wait durations on proxy start ups; reduce start up spam
+* clarify state map message
+* allow controllable OSM and concurrency outputs; improve sync handling; unhandled state exception stops behavior
+* modify clear action handling; retain action result status; reduce startup spam
+* add initialize_flexbe_core for common initialization
+* updates to ConcurrencyContainer and StateMachine to handle sync and forced outcomes
+
 3.0.6 (2024-08-05)
 ------------------
 * update cancel for action client

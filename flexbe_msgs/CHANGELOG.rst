@@ -2,6 +2,10 @@
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* add new states; modify BehaviorInput to allow strings and selection combo box
+
 3.0.6 (2024-08-05)
 ------------------
 

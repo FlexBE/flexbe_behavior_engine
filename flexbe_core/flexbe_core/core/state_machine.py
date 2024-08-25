@@ -143,6 +143,7 @@ class StateMachine(State):
         return outcome
 
     def on_enter(self, userdata):
+        """Call on entering the state machine."""
         self.assert_consistent_transitions()
         self._entering = False
         self._current_state = self.initial_state

@@ -47,7 +47,8 @@ class StateMap:
     def __str__(self):
         """Return string with state map information."""
         return (f'State map with {len(self._state_map)} entries'
-                + ('.' if self._num_collision_processed == 0 else f' (resolved {self._num_collision_processed} state map id collisions)!'))
+                + ('.' if self._num_collision_processed == 0 else
+                   f' (resolved {self._num_collision_processed} state map id collisions)!'))
 
     def __getitem__(self, index):
         """Get existing state if possible, or return None."""

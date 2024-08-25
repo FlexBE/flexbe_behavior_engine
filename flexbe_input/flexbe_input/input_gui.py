@@ -61,7 +61,7 @@ class InputGUI(QMainWindow):
         self.input_line = None
 
     def clear_layout(self):
-        # Clear prior layout
+        """Clear prior layout of widget."""
         while self.main_layout.count():
             item = self.main_layout.takeAt(0)
             widget = item.widget()
@@ -70,7 +70,7 @@ class InputGUI(QMainWindow):
                 widget.deleteLater()
 
     def set_layout(self, prompt, items=None):
-        # Update the layout
+        """Update the widget layout."""
         self.clear_layout()
 
         self.prompt = QLabel(self)
@@ -179,15 +179,15 @@ class InputGUI(QMainWindow):
     def change_selection(self):
         """Print selection."""
         if self.combo_box is None:
-            print("Unknown combo box - why is this called!", flush=True)
+            print('Unknown combo box - why is this called!', flush=True)
         else:
             print(f" Currently selected '{self.combo_box.currentText()}' ")
 
     def set_selection(self):
         """Set input text from selection box."""
         if self.combo_box is None:
-            print("Unknown combo box - why is this called!", flush=True)
-            self.input = "unknown"
+            print('Unknown combo box - why is this called!', flush=True)
+            self.input = 'unknown'
         else:
             print(f" Selected '{self.combo_box.currentText()}' ")
             self.input = self.combo_box.currentText()
@@ -195,8 +195,8 @@ class InputGUI(QMainWindow):
     def set_input(self):
         """Set input text from GUI."""
         if self.input_line is None:
-            print("Unknown combo box - why is this called!", flush=True)
-            self.input = "unknown"
+            print('Unknown combo box - why is this called!', flush=True)
+            self.input = 'unknown'
         else:
             self.input = self.input_line.text()
 

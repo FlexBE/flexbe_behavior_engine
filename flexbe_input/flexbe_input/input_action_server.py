@@ -178,7 +178,7 @@ class InputActionServer(Node):
                 else:
                     print(f"Process data '{self._input}' as {type_class}", flush=True)
                     input_data = ast.literal_eval(self._input)  # convert string to Python data
-                    print(f"  input data[{type(input_data)}] = {input_data}", flush=True)
+                    print(f"  input data[{type(input_data)}] = '{input_data}'", flush=True)
                     data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
 
                     if not isinstance(input_data, type_class):

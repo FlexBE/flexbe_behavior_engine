@@ -2,6 +2,11 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* add new states; modify BehaviorInput to allow strings and selection combo box
+* add initialize_flexbe_core for common initialization
+
 3.0.6 (2024-08-05)
 ------------------
 * update cancel for action client; define get_status to replace get_state for proxy action client

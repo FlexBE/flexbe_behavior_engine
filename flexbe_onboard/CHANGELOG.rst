@@ -2,6 +2,10 @@
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* add initialize_flexbe_core for common initialization
+
 3.0.6 (2024-08-05)
 ------------------
 * minor clean up from flake8/pycodestyle

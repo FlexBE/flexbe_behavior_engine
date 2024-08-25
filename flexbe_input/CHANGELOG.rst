@@ -2,6 +2,12 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.7 (2024-08-24)
+------------------
+* fix issue with input action server
+* add new states; modify BehaviorInput to allow strings and selection combo box
+* add initialize_flexbe_core for common initialization
+
 3.0.6 (2024-08-05)
 ------------------
 * allow canceling input request

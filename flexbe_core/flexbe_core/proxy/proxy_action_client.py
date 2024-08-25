@@ -53,13 +53,13 @@ class ProxyActionClient:
     _client_sync_lock = Lock()
 
     _goal_status_dict = {
-        0: "UNKNOWN",
-        1: "ACCEPTED",
-        2: "EXECUTING",
-        3: "CANCELING",
-        4: "SUCCEEDED",
-        5: "CANCELED",
-        6: "ABORTED"
+        0: 'UNKNOWN',
+        1: 'ACCEPTED',
+        2: 'EXECUTING',
+        3: 'CANCELING',
+        4: 'SUCCEEDED',
+        5: 'CANCELED',
+        6: 'ABORTED'
     }
 
     @staticmethod
