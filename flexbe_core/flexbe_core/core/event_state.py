@@ -87,6 +87,7 @@ class EventState(OperatableState):
 
         if self._entering:
             self._entering = False
+            self._exited = False
             self._last_outcome = None
             self.on_enter(*args, **kwargs)
 
@@ -104,9 +105,18 @@ class EventState(OperatableState):
             self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='repeat'))
             repeat = True
 
-        if repeat or outcome is not None and not PreemptableState.preempt:
-            self._entering = True
+        if repeat or outcome is not None:
+            # As this is currently coded, a repeat command will immedately halt
+            # call on_exit, then reenter the state
+            # (vs. an alternative to wait until outcome and then repeat)
             self.on_exit(*args, **kwargs)
+            self._exited = True
+            self._entering = True  # for next call
+            if repeat:
+                outcome = None  # clear outcome so we stay on this state
+            else:
+                # Publish outcome for this state
+                self._publish_outcome(outcome)
 
         self._last_outcome = outcome
         return outcome

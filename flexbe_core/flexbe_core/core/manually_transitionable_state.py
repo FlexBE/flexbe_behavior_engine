@@ -58,11 +58,11 @@ class ManuallyTransitionableState(RosState):
         self._manual_transition_requested = None
         if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
             command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
-            if command_msg.target == self.name:
+            if command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
                 assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
                 self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                                  CommandFeedback(command='transition', args=[command_msg.target, self.name]))
+                                  CommandFeedback(command='transition', args=[f'{command_msg.target}', f'{self.state_id}']))
 
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
@@ -71,7 +71,7 @@ class ManuallyTransitionableState(RosState):
                 return outcome
             else:
                 Logger.loginfo(f"Requested outcome for state '{command_msg.target}' "
-                               f" but this active state is '{self.name}' - keep looking for potential nested state")
+                               f" but this active state is '{self.path}' - keep looking for potential nested state")
 
         # otherwise, return the normal outcome
         self._force_transition = False

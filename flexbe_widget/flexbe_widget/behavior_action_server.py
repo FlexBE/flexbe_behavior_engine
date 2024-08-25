@@ -45,7 +45,7 @@ from rclpy.action import ActionServer
 
 from rosidl_runtime_py import get_interface_path
 
-from std_msgs.msg import Empty, String
+from std_msgs.msg import Empty, Int32
 
 import yaml
 
@@ -65,7 +65,7 @@ class BehaviorActionServer:
         self._pub = self._node.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
         self._preempt_pub = self._node.create_publisher(Empty, Topics._CMD_PREEMPT_TOPIC, 100)
         self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb, 100)
-        self._state_pub = self._node.create_subscription(String, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb, 100)
+        self._state_pub = self._node.create_subscription(Int32, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb, 100)
 
         self._as = ActionServer(self._node, BehaviorExecution,
                                 Topics._EXECUTE_BEHAVIOR_ACTION,
@@ -200,4 +200,4 @@ class BehaviorActionServer:
         self._current_state = msg.data
         if self._current_goal and self._current_goal.is_active:
             self._current_goal.publish_feedback(BehaviorExecution.Feedback(current_state=self._current_state))
-            self._node.get_logger().loginfo("Current state: '%s'" % self._current_state)
+            self._node.get_logger().loginfo('Current state id = %d' % self._current_state)

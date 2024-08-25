@@ -54,6 +54,8 @@ class TestProxies(unittest.TestCase):
     """Test the FlexBE proxies."""
 
     test = 0
+    __EXECUTE_TIMEOUT_SEC=0.025
+    __TIME_SLEEP = 0.05  # Sleep time for loops
 
     def __init__(self, *args, **kwargs):
         """Initialize TestProxies instance."""
@@ -76,28 +78,28 @@ class TestProxies(unittest.TestCase):
     def tearDown(self):
         """Tear down the test."""
         self.node.get_logger().info(' shutting down proxies test %d (%d) ... ' % (self.test, self.context.ok()))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in core test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(0.1)
+        time.sleep(TestProxies.__TIME_SLEEP)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
-        time.sleep(0.1)
+        time.sleep(TestProxies.__TIME_SLEEP)
 
         self.executor.shutdown()
-        time.sleep(0.1)
+        time.sleep(TestProxies.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(0.5)
+        time.sleep(TestProxies.__TIME_SLEEP*5)
 
     def test_publish_subscribe(self):
         """Test publish and subscribe."""
         self.node.get_logger().info('test_publish_subscribe ...')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
         ProxyPublisher.initialize(self.node)
         ProxySubscriberCached.initialize(self.node)
 
@@ -106,23 +108,23 @@ class TestProxies(unittest.TestCase):
 
         self.node.get_logger().info('test_publish_subscribe - define publishers ...')
         pub = ProxyPublisher({topic1: String})
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
         pub = ProxyPublisher({topic2: String})
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('  subscribe topic1 only ...')
 
         sub = ProxySubscriberCached({topic1: String}, inst_id=id(self))
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
         self.assertTrue(pub.is_available(topic1))
 
         # cannot call wait given spin_once structure
         # self.assertTrue(pub.wait_for_any(topic1))
         # self.assertFalse(pub.wait_for_any(topic2))
         for _ in range(50):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.01)
-            time.sleep(0.04)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+            time.sleep(TestProxies.__TIME_SLEEP)
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
         self.assertFalse(pub.number_of_subscribers(topic2) > 0)
@@ -134,8 +136,8 @@ class TestProxies(unittest.TestCase):
         self.node.get_logger().info('  subscribe topic2 ...')
         sub = ProxySubscriberCached({topic2: String}, inst_id=id(self))
         for _ in range(50):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.01)
-            time.sleep(0.05)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+            time.sleep(TestProxies.__TIME_SLEEP)
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
         self.assertTrue(pub.number_of_subscribers(topic2) > 0)
@@ -157,7 +159,7 @@ class TestProxies(unittest.TestCase):
         self.node.get_logger().info('  listen for two messages ...')
         end_time = time.time() + 5
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.assertTrue(sub.has_msg(topic1))
         self.assertEqual(sub.get_last_msg(topic1).data, '1')
@@ -186,8 +188,8 @@ class TestProxies(unittest.TestCase):
         sub.enable_buffer(topic1)
         # No wait in this setup -  self.assertTrue(pub.wait_for_any(topic1))
         for _ in range(10):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.01)
-            time.sleep(0.05)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+            time.sleep(TestProxies.__TIME_SLEEP)
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
 
@@ -202,7 +204,7 @@ class TestProxies(unittest.TestCase):
         # make sure messages can be received
         end_time = time.time() + 3
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.assertTrue(sub.has_msg(topic1))
         self.assertTrue(sub.has_buffered(topic1))
@@ -215,7 +217,7 @@ class TestProxies(unittest.TestCase):
         # make sure message can be received
         end_time = time.time() + 3
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.assertEqual(sub.get_from_buffer(topic1).data, '2')
         self.assertEqual(sub.get_from_buffer(topic1).data, '3')
@@ -244,7 +246,7 @@ class TestProxies(unittest.TestCase):
         srv.call_async(topic1, Trigger.Request())
         end_time = time.time() + 10
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.assertTrue(srv.done(topic1))
 
@@ -265,7 +267,7 @@ class TestProxies(unittest.TestCase):
         topic1 = '/action_1'
 
         def execute_cb(goal_handle):
-            time.sleep(0.1)
+            time.sleep(TestProxies.__TIME_SLEEP)
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return BehaviorExecution.Result()
@@ -291,7 +293,7 @@ class TestProxies(unittest.TestCase):
         while time.time() < end_time and not client.has_result(topic1):
             status = client.get_status(topic1)
             # self.node.get_logger().info(f'   get status = {status} ')
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
 
         self.assertTrue(client.has_result(topic1))
@@ -315,7 +317,7 @@ class TestProxies(unittest.TestCase):
 
         # end_time = time.time() + 2
         while not client.has_result(topic1):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
             self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
             status = client.get_status(topic1)
             # self.node.get_logger().info(f'   check status = {status} ')

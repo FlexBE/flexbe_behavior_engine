@@ -32,9 +32,11 @@
 """OperatableStateMachine."""
 from enum import Enum
 
+from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
 from flexbe_core.core.operatable_state import OperatableState
 from flexbe_core.core.preemptable_state_machine import PreemptableStateMachine
 from flexbe_core.core.ros_state import RosState
+from flexbe_core.core.state import State
 from flexbe_core.core.state_map import StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.core.user_data import UserData
@@ -70,7 +72,6 @@ class OperatableStateMachine(PreemptableStateMachine):
         self._autonomy = {}
         self._inner_sync_request = False
         self._last_exception = None
-        self._state_map = None
         self._structure = None
         self._type = OperatableStateMachine.ContainerType.OperatableStateMachine.value
 
@@ -108,16 +109,15 @@ class OperatableStateMachine(PreemptableStateMachine):
         PreemptableStateMachine.add(label, state, transitions, remapping)
         self._autonomy[label] = autonomy
 
-    def define_structure(self):
+    def define_structure(self, state_map):
         """Calculate all state ids and prepare the ContainerStructure message."""
-        self._state_map = StateMap()
-        self._structure = self._build_structure_msg()
-        print(f'\x1b[94mBuilt {self._state_map}\x1b[0m', flush=True)
+        self._structure = self._build_structure_msg(state_map)
+        print(f'\x1b[94mBuilt {state_map}\x1b[0m', flush=True)
 
-    def _build_structure_msg(self):
+    def _build_structure_msg(self, state_map):
         """Create a message to describe the structure of this state machine."""
         structure_msg = ContainerStructure()
-        container_msg = self._add_to_structure_msg(structure_msg, self._state_map)
+        container_msg = self._add_to_structure_msg(structure_msg, state_map)
         container_msg.outcomes = self.outcomes
         structure_msg.behavior_id = self.id
         return structure_msg
@@ -180,18 +180,12 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     # execution
     def _execute_current_state(self):
-
-        if self._entering:
-            # On entering this state machine
-            Logger.localerr(f"OSM: Why is entering flag set here '{self.name}' of '{self.path}'?")
-            raise Exception("entering flag still set L187 of OSM - '{self.path}'")
-
         self._manual_transition_requested = None
         if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
             # Special handling in statemachine container
             command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
 
-            if command_msg.target == self.name:
+            if command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
                 assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
                 Logger.localinfo(f"Statemachine '{self.name}' from '{self.path}' is "
@@ -202,29 +196,31 @@ class OperatableStateMachine(PreemptableStateMachine):
                 self._manual_transition_requested = outcome
                 self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
                                   CommandFeedback(command='transition',
-                                                  args=[command_msg.target, self.name]))
+                                                  args=[f'{command_msg.target}', f'{self.state_id}']))
                 Logger.localwarn(f"--> Manually triggered outcome {outcome} of statemachine '{self.name}'")
                 self._last_outcome = outcome
-                self._publish_outcome(outcome)
                 return outcome
 
         if self._is_controlled and self._last_requested_outcome is not None:
             # We have already processed the current state and received an outcome
             # We are waiting on outcome confirmation from the OCS
-            Logger.localinfo(f"OSM '{self.path}' is waiting on user to confirm outcome")
+            Logger.loginfo_throttle(2.0, f"OSM '{self.path}' is waiting on user to confirm outcome")
             return None
 
         try:
             outcome = super()._execute_current_state()
             self._last_exception = None
         except Exception as exc:  # pylint: disable=W0703
-            # catch any exception and log here, but re-raise to stop behavior
-            outcome = None
-            self._last_exception = exc
-            Logger.logerr("Failed to execute state '%s':\n%s" % (self.current_state_label, str(exc)))
+            # catch any exception and log here, but re-raise to preempt behavior
+            Logger.logerr("Failed to execute state '%s':\n%s - %s" % (self.current_state_label, str(type(exc)), str(exc)))
             import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))  # Guard against exeception including format!
-            raise exc
+            outcome = None
+            if isinstance(exc, (StateError, StateMachineError, UserDataError)):
+                self._last_exception = exc
+            else:
+                self._last_exception = StateError(str(exc))
+            raise self._last_exception
 
         if self._is_controlled:
             # request outcome because autonomy level is too low
@@ -235,7 +231,7 @@ class OperatableStateMachine(PreemptableStateMachine):
                     if outcome != self._last_requested_outcome:
                         self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
                                           OutcomeRequest(outcome=self.outcomes.index(outcome),
-                                                         target=self.path))
+                                                         target=self.state_id))
                         Logger.localinfo("<-- Want result: '%s' -> '%s'" % (self.path, outcome))
                         StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                         autonomy=self.parent.autonomy_level,
@@ -243,9 +239,7 @@ class OperatableStateMachine(PreemptableStateMachine):
                         self._last_requested_outcome = outcome
                     outcome = None
 
-            if outcome is not None and outcome in self.outcomes:
-                Logger.localinfo(f"controlled SM '{self.name}' from '{self.path}'returning outcome '{outcome}' ")
-                self._publish_outcome(outcome)
+            if outcome is not None:
                 self._force_transition = False
 
         self._last_outcome = outcome
@@ -254,16 +248,17 @@ class OperatableStateMachine(PreemptableStateMachine):
     def _publish_outcome(self, outcome):
         """Update the UI and logs about this outcome."""
         # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
-        try:
-            outcome_index = self.outcomes.index(outcome)
-        except Exception as exc:  # pylint: disable=W0703
-            outcome_index = 0
-            Logger.localerr('State Machine outcome error : %s > %s (%d) (%d) (%s)'
-                            % (self.name, outcome, outcome_index, self._state_id, self.__class__.__name__))
-            raise exc
+        if outcome == State._preempted_name:
+            # special case of preempted outcome specify max outcome hash
+            Logger.localinfo('Publish Preempted: State Machine result: %s > %s (%d) (%d) (%s)'
+                             % (self.name, outcome, StateMap._MAX_OUTCOME, self.state_id, self.__class__.__name__))
+            self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, StateMap._MAX_OUTCOME)))
+            self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
+            return
 
-        Logger.localinfo('State Machine result: %s > %s (%d) (%d) (%s)'
-                         % (self.name, outcome, outcome_index, self._state_id, self.__class__.__name__))
+        outcome_index = self.outcomes.index(outcome)
+        # Logger.localinfo('Publish outcome: State Machine result: %s > %s (%d) (%d) (%s)'
+        #                  % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
         self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
         self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
         if self._force_transition:
@@ -296,7 +291,7 @@ class OperatableStateMachine(PreemptableStateMachine):
             assert self.current_state_label == state.name, "get required autonomys in OSM state doesn't match!"
             return self._autonomy[self.current_state_label][outcome]
         except Exception:  # pylint: disable=W0703
-            Logger.error(f"Failure to retrieve autonomy for '{self.name}' - "
+            Logger.error(f"Failure to retrieve autonomy for '{self.name}' - {self.current_state_label}"
                          f"  current state label='{self.name}' outcome='{outcome}'.")
             Logger.localerr(f'{self._autonomy}')
 
@@ -325,7 +320,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         Logger.localinfo('     state logger shutdown ...')
         StateLogger.shutdown()
 
-    def confirm(self, name, beh_id):
+    def confirm(self, name, beh_id, state_map):
         """
         Confirm the state machine and triggers the creation of the structural message.
 
@@ -337,11 +332,14 @@ class OperatableStateMachine(PreemptableStateMachine):
 
         @type beh_id: int
         @param beh_id: The behavior id of this state machine to identify it.
+
+        @type state_map: StateMap
+        @param state_map: mapping of state ids to state instance
         """
         self.set_name(name)
         self.id = beh_id
 
-        self.define_structure()
+        self.define_structure(state_map)
         Logger.localinfo(f"State machine '{self.name}' ({self.id}) (inst_id={id(self)}) confirmed and structure defined.")
 
         Logger.localinfo(f'--> Set up pub/sub for behavior {self.name}: {self.id} ...')
@@ -446,26 +444,48 @@ class OperatableStateMachine(PreemptableStateMachine):
 
     def on_enter(self, userdata=None):  # pylint: disable=W0613
         """Call on entering the operatable state machine."""
-        Logger.localinfo(f"OSM on enter for '{self.name}' from '{self.path}' ...")
+        self._last_outcome = None
         self._last_exception = None
         self._last_requested_outcome = None
         super().on_enter(userdata)
 
     def on_exit(self, userdata=None):
         """Call on exiting the statemachine."""
-        Logger.localinfo(f"SM on exit for '{self.name}' from '{self.path}' ...")
-        self._entering = True
-        if self._current_state is not None:
+        if self._current_state is None:
+            if self._exited:
+                # This should never be true
+                Logger.localinfo(f"OSM on exit for '{self.name}' from '{self.path}' - "
+                                 f'and have already called on_exit? {self._current_state}, '
+                                 f"{self._exited} '{self._last_outcome}' ...")
+        else:
+            # Current state is still active, so preempt and call on_exit
+            if self._current_state._exited or self._current_state._last_outcome is not None:
+                # This should not be true as should have cleared current state if this was true
+                Logger.localinfo(f"OSM on exit for '{self.name}' from '{self.path}' (exited={self._exited}) "
+                                 f"- with current='{self._current_state}' "
+                                 f"(exited={self._current_state._exited}), '{self._current_state._last_outcome}' ...")
+
             with UserData(reference=self._userdata,
                           input_keys=self._current_state.input_keys,
                           output_keys=self._current_state.output_keys,
                           remap=self._remappings[self._current_state.name]) as udata:
                 # Pass userdata to internal states matching as defined in state_machine
                 self._current_state.on_exit(udata)
+                self._current_state._exited = True
+            Logger.localinfo(f"preempting '{self._current_state.name}' ({self._current_state.path})")
+            self._current_state._publish_outcome(State._preempted_name)  # Normally published by EventState.execute
             self._current_state._entering = True
             self._current_state = None
 
+        if self._last_outcome is None:
+            # no outcome, so notify that we preempted this state
+            # otherwise, outcome published by SM execute for regular outcome
+            self._publish_outcome(State._preempted_name)
+
         if self._last_requested_outcome is not None:
-            Logger.localinfo(f"SM '{self.name}' of '{self.path}' clear prior LRO='{self._last_requested_outcome}'.")
-            self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
+            # Logger.localinfo(f"SM '{self.name}' of '{self.path}' clear prior LRO='{self._last_requested_outcome}'.")
+            self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.state_id))
             self._last_requested_outcome = None
+
+        self._exited = True
+        self._entering = True  # for next entry

@@ -55,10 +55,11 @@ class State:
         # properties of instances of a state machine
         self._name = None
         self._parent = None
-        self._state_id = None  # Assigned with structure after all states added to behavior
+        self._state_id = -1  # Assigned with structure after all states added to behavior
         self._inner_sync_request = False  # Any state can generate request, but should be rare
         self._type = 0  # Basic states are type 0, containers have non-zero type
         self._entering = True
+        self._exited = False  # State has exited since last on_enter
 
     def __str__(self):
         """Return name of this state."""

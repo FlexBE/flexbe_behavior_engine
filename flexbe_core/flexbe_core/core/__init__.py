@@ -31,6 +31,9 @@
 
 from .concurrency_container import ConcurrencyContainer  # noqa: F401
 from .event_state import EventState  # noqa: F401
+from .exceptions import StateError  # noqa: F401
+from .exceptions import StateMachineError  # noqa: F401
+from .exceptions import UserDataError  # noqa: F401
 from .lockable_state import LockableState  # noqa: F401
 from .lockable_state_machine import LockableStateMachine  # noqa: F401
 from .manually_transitionable_state import ManuallyTransitionableState  # noqa: F401
@@ -44,23 +47,28 @@ from .ros_state_machine import RosStateMachine  # noqa: F401
 from .state import State  # noqa: F401
 from .state_machine import StateMachine  # noqa: F401
 from .state_map import StateMap  # noqa: F401
+from .topics import Topics
 from .user_data import UserData  # noqa: F401
 
 __all__ = [
-    'PreemptableStateMachine',
-    'OperatableStateMachine',
-    'LockableStateMachine',
-    'RosStateMachine',
-    'StateMachine',
     'ConcurrencyContainer',
-    'PriorityContainer',
-    'State',
-    'RosState',
-    'ManuallyTransitionableState',
-    'LockableState',
-    'PreemptableState',
-    'OperatableState',
     'EventState',
+    'LockableState',
+    'LockableStateMachine',
+    'ManuallyTransitionableState',
+    'OperatableState',
+    'OperatableStateMachine',
+    'PreemptableState',
+    'PreemptableStateMachine',
+    'PriorityContainer',
+    'RosState',
+    'RosStateMachine',
+    'State',
+    'StateError',
+    'StateMachine',
+    'StateMachineError',
     'StateMap',
-    'UserData'
+    'Topics',
+    'UserData',
+    'UserDataError'
 ]

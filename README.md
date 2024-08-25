@@ -3,8 +3,8 @@
 FlexBE is a high-level behavior engine coordinating the capabilities of a robot in order to solve complex tasks.
 Behaviors are modeled as hierarchical state machines (HFSM) where states correspond to active actions
 and transitions describe the reaction to outcomes.
-Main advantage over similar approaches is the good operator integration and an
-intuitive user interface.
+
+The main advantage of FlexBE over similar approaches is the good operator integration and an intuitive user interface.
 Besides executing behaviors in full autonomy, the operator can restrict execution of certain transitions or trigger them manually.
 Furthermore, FlexBE supports modifying the whole structure of a behavior during its execution without restarting it.
 The user interface features a runtime control interface as well as a graphical editor for state machines.
@@ -23,64 +23,73 @@ Rolling ![ROS Build Farm](https://build.ros2.org/job/Rdev__flexbe_behavior_engin
 
 ## Installation
 
-For released versions, FlexBE is available as ` apt install` package `ros-<DISTRO>-flexbe-*`
+For released versions, FlexBE is available as `apt install` package `ros-<DISTRO>-flexbe-*`
 
 To build from source, execute the following commands to install FlexBE for ROS 2 systems:
 
-    cd "ros2_ws"/src
-    git clone https://github.com/FlexBE/flexbe_behavior_engine.git
+  `cd "ros2_ws"/src`
+
+  `git clone https://github.com/FlexBE/flexbe_behavior_engine.git`
 
 Next, navigate to the "ros2_ws" top-level directory and build FlexBE:
 
-    colcon build
-
+  `colcon build`
 
 ## Creating new FlexBE Behavior packages
 
 To begin, create your own repository for behavior development in the `${WORKSPACE_ROOT}/src` folder:
 
-    `ros2 run flexbe_widget create_repo [your_project_name] <meta_package_name> <--non-interactive>`
+  `ros2 run flexbe_widget create_repo [your_project_name] <meta_package_name> <--non-interactive>`
 
 This will clone a project template (requires internet access) that contains examples and proper package definitions,
 and create the ROS 2 package structure and three subfolders.
 
 For example, running
+
   `ros2 run flexbe_widget create_repo my_project my_flexbe_project`
 
 from the `${WORKSPACE_ROOT}/src` folder will create:
-    * `${WORKSPACE_ROOT}/src/my_flexbe_project`
-    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_flexbe_project` - the ROS meta package
-    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_behaviors`
-    * `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_states`
-
+  - `${WORKSPACE_ROOT}/src/my_flexbe_project`
+  - `${WORKSPACE_ROOT}/src/my_flexbe_project/my_flexbe_project` - the ROS meta package
+  - `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_behaviors`
+  - `${WORKSPACE_ROOT}/src/my_flexbe_project/my_project_flexbe_states`
 
 These are intended to contain your custom FlexBE state implementations and HFSM-based behaviors.
 
-This version of the flexbe_behavior_engine requires version 4.0+ of the FlexBE user interface.
+This release of the FlexBE Behavior Engine requires version 4.1+ of the FlexBE UI.
+This breaks compatability with the older FlexBE App and now requires use of the FlexBE WebUI tool.
 
-It is recommended to install the FlexBE user interface by following one of these steps:
- * https://github.com/FlexBE/flexbe_webui.git - new Python-based webserver version (preferred)
- * https://github.com/FlexBE/flexbe_app.git - classic FlexBE App (iron or ros2-devel branches)
+It is recommended to install the FlexBE WebUI user interface:
+
+  [FlexBE WebUI](https://github.com/FlexBE/flexbe_webui.git) - Python-based webserver version
 
 
 ## Usage
 
 Use the following launch file for running the onboard engine:
 
-    ros2 launch flexbe_onboard behavior_onboard.launch.py
+  `ros2 launch flexbe_onboard behavior_onboard.launch.py`
 
 Use the following launch file for running the operator control station (requires the FlexBE App or WebUI):
 
-    ros2 launch flexbe_webui flexbe_ocs.launch.py
+  `ros2 launch flexbe_webui flexbe_ocs.launch.py`
 
- > Note: replace `flexbe_webui` with `flexbe_app` to run the "classic" UI (after `ros2 run flexbe_app nwjs_install`).
+During testing is is recommended to start the base nodes and the UI client separately:
 
-Use the following launch file to run both of the above, e.g., for testing on a single computer:
+  `ros2 launch flexbe_webui flexbe_ocs.launch.py headless:=True`
 
-    ros2 launch flexbe_webui flexbe_full.launch.py
+  `ros2 run flexbe_webui webui_client`
+
+  See the `flexbe_webui`  README for more details.
+
+
+Use the following launch file to run the entire FlexBE system, both onboard and OCS, e.g., for testing on a single computer:
+
+  `ros2 launch flexbe_webui flexbe_full.launch.py`
 
 For running tests use:
-`colcon test --ctest-args --packages-select <flexbe_package>`
+
+  `colcon test --ctest-args --packages-select <flexbe_package>`
 
 ## Next Steps
 

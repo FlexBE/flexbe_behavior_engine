@@ -37,7 +37,7 @@ from flexbe_core.logger import Logger
 
 from flexbe_msgs.msg import CommandFeedback
 
-from std_msgs.msg import String
+from std_msgs.msg import Int32
 
 
 class LockableState(ManuallyTransitionableState):
@@ -99,41 +99,42 @@ class LockableState(ManuallyTransitionableState):
 
     def _execute_lock(self, target):
         """Execute lock."""
-        if target in (self.path, ''):
-            target = self.path
+
+        if target in (self.state_id, 0):
+            target = self.state_id
             found_target = True
             self._locked = True
         else:
             found_target = self._parent.lock(target)
         # provide feedback about lock
         self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                          CommandFeedback(command='lock', args=[target, target if found_target else '']))
+                          CommandFeedback(command='lock', args=[f'{target}', f'{target}' if found_target else '-1']))
         if not found_target:
-            Logger.logwarn(f"Wanted to lock '{target}', but could not find it in current path '{self.path}'.")
+            Logger.logwarn(f"Wanted to lock state id '{target}', but could not find it in current path '{self.path}'.")
         else:
-            Logger.localinfo(f"--> Locking in state '{target}'")
+            Logger.localinfo(f"--> Locking in state '{target}' at '{self.path}'")
 
     def _execute_unlock(self, target):
-        if target == self.path or (self._locked and target == ''):
-            target = self.path
+        if target == self.state_id or (self._locked and target == 0):
+            target = self.state_id
             found_target = True
             self._locked = False
         else:
             found_target = self._parent.unlock(target)
         # provide feedback about unlock
         self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                          CommandFeedback(command='unlock', args=[target, target if found_target else '']))
+                          CommandFeedback(command='unlock', args=[f'{target}', f'{target}' if found_target else '-1']))
         if not found_target:
             Logger.logwarn(f"Wanted to unlock '{target}', but could not find it in current path '{self.path}'.")
         else:
-            Logger.localinfo(f"--> Unlocking in state '{target}'")
+            Logger.localinfo(f"--> Unlocking in state '{target}' at '{self.path}'")
 
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
             self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
-            self._sub.subscribe(Topics._CMD_LOCK_TOPIC, String, inst_id=id(self))
-            self._sub.subscribe(Topics._CMD_UNLOCK_TOPIC, String, inst_id=id(self))
+            self._sub.subscribe(Topics._CMD_LOCK_TOPIC, Int32, inst_id=id(self))
+            self._sub.subscribe(Topics._CMD_UNLOCK_TOPIC, Int32, inst_id=id(self))
 
     def _disable_ros_control(self):
         if self._is_controlled:

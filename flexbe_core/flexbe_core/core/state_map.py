@@ -38,7 +38,9 @@ class StateMap:
 
     __HASH_BITS = 31  # Keep in signed 32-bit range
     # 2**31 - 1 - 256
-    __HASH_MASK = 0x7FFFFF00  # 23-bits keeps in signed range, and allows for 256 output encoding
+    __HASH_MASK = 0x7FFFFF00  # 23-bits keeps in signed range, and allows for 254 outputs to be encode
+
+    _MAX_OUTCOME = 254  # Hash function adds one, so this is the number of outcomes including preempted
 
     def __init__(self):
         self._state_map = {}
@@ -56,6 +58,11 @@ class StateMap:
             return self._state_map[index]
         else:
             return None
+
+    @property
+    def items(self):
+        """List key-value pairs (index, path)."""
+        return [(key, state.path) for key, state in self._state_map.items()]
 
     @classmethod
     def _hash_path(cls, path):
@@ -87,23 +94,23 @@ class StateMap:
     def add_state(self, path, state):
         """Define state id hash and store in map to state instance."""
         hash_path = path
-        if state._state_id is None or state._state_id == -1:
+        if state.state_id is None or state.state_id == -1:
             state._state_id = self._hash_path(hash_path)
             collisions = 0
-            while state._state_id in self._state_map:
+            while state.state_id in self._state_map:
                 # Collision with existing state detected.  Define a new state_id by extending path.
                 collisions += 1
                 if collisions > 20:
                     raise KeyError(f"Unable to avoid collisions in StateMap with '{path}'")
                 hash_path += path
                 state._state_id = self._hash_path(hash_path)
-            self._state_map[state._state_id] = state
+            self._state_map[state.state_id] = state
             self._num_collision_processed += collisions
         else:
-            if state._state_id in self._state_map:
-                Logger.error(f"State '{path}' : id={state._state_id} is already in map!")
+            if state.state_id in self._state_map:
+                Logger.error(f"State '{path}' : id={state.state_id} is already in map!")
                 raise KeyError(f"Existing state in StateMap with '{path}'")
-            self._state_map[state._state_id] = state
+            self._state_map[state.state_id] = state
 
     def get_state(self, state_id):
         """Return reference to state given id."""
@@ -135,4 +142,4 @@ class StateMap:
     @classmethod
     def hash(cls, state, outcome_index):
         """Convert state id and outcome to hashed identifier for outcome reports."""
-        return state._state_id + 1 + outcome_index
+        return state.state_id + 1 + outcome_index

@@ -45,6 +45,8 @@ class TestLogger(unittest.TestCase):
     """Test FlexBE Logger handling."""
 
     test = 0
+    __EXECUTE_TIMEOUT_SEC=0.025
+    __TIME_SLEEP = 0.05  # Sleep time for loops
 
     def __init__(self, *args, **kwargs):
         """Initialize TestLogger instance."""
@@ -64,22 +66,22 @@ class TestLogger(unittest.TestCase):
     def tearDown(self):
         """Tear down the test."""
         self.node.get_logger().info(' shutting down logger test %d (%d) ... ' % (self.test, self.context.ok()))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in logger test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
 
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
         self.executor.shutdown()
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(0.2)
+        time.sleep(TestLogger.__TIME_SLEEP*2)
 
     def test_throttle_logger_one(self):
         """Test throttle logger one."""
@@ -88,7 +90,7 @@ class TestLogger(unittest.TestCase):
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.25)
         initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleSingleLog(EventState):
             """Local Test state definition."""
@@ -128,7 +130,7 @@ class TestLogger(unittest.TestCase):
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.35)
         initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
@@ -169,7 +171,7 @@ class TestLogger(unittest.TestCase):
 
         initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
@@ -200,7 +202,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.001)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC*0.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 
@@ -214,7 +216,7 @@ class TestLogger(unittest.TestCase):
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.22)
         initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
@@ -245,7 +247,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.001)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC*.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 

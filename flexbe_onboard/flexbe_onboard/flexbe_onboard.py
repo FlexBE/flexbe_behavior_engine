@@ -55,7 +55,7 @@ from flexbe_core.core.state_machine import StateMachine
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 
-from flexbe_msgs.msg import BEStatus, BehaviorSelection, BehaviorSync, CommandFeedback, UserdataInfo
+from flexbe_msgs.msg import BEStatus, BehaviorSelection, BehaviorSync, CommandFeedback, StateMapMsg, UserdataInfo
 from flexbe_msgs.srv import GetUserdata
 
 import rclpy
@@ -93,6 +93,7 @@ class FlexbeOnboard(Node):
         # only at onboard level
         self._heartbeat_pub = self.create_publisher(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC, 10)
         self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 10)
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_TOPIC, 2)
 
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC,
@@ -315,7 +316,15 @@ class FlexbeOnboard(Node):
                 self.be.confirm()
                 Logger.localinfo(f'    behavior {self.be.name}: {self.be.beh_id} confirmation.')
 
-                args = [self.be.requested_state_path] if self.be.requested_state_path is not None else []
+                # Publish behavior state map as a debugging aid (match to OCS side published by launcher and mirror)
+                state_ids, state_paths = be.state_map_items
+                state_map_msg = StateMapMsg(behavior_id=be.beh_id,
+                                            state_ids=state_ids,
+                                            state_paths=state_paths)
+                self._state_map_pub.publish(state_map_msg)
+
+                # Publish start status
+                args = [self.be.requested_state_id] if self.be.requested_state_id is not None else []
                 Logger.localinfo(f'Behavior Engine - behavior {self.be.name}: {self.be.beh_id} BEStatus STARTED.')
                 self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
                                                   behavior_id=self.be.beh_id,

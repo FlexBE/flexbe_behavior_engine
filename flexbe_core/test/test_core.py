@@ -34,9 +34,9 @@ import time
 import unittest
 
 from flexbe_core import ConcurrencyContainer, EventState, OperatableStateMachine, initialize_flexbe_core
-from flexbe_core.core import PreemptableState
-from flexbe_core.core.exceptions import StateMachineError
-from flexbe_core.core.topics import Topics
+from flexbe_core.core import PreemptableState, State
+from flexbe_core.core import StateMachineError
+from flexbe_core.core import Topics
 from flexbe_core.proxy import ProxySubscriberCached, shutdown_proxies
 
 from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
@@ -44,7 +44,7 @@ from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-from std_msgs.msg import Bool, Empty, String, UInt32
+from std_msgs.msg import Bool, Empty, Int32, String, UInt32
 
 
 class CoreTestState(EventState):
@@ -96,6 +96,7 @@ class ConcurrencyTestState(CoreTestState):
 
     def __init__(self):
         super().__init__()
+
     # def execute(self, userdata):
     #     outcome = super().execute(userdata)
     #     self._node.get_logger().info('      %s - ConcurrencyTestState execute'
@@ -116,6 +117,10 @@ class TestCore(unittest.TestCase):
 
     test = 0
 
+    __TIME_SLEEP = 0.025  # Sleep time for loops
+    __EXECUTE_TIMEOUT_SEC = 0.025  # Timeout in executor loops for spin once
+    __LOOP_COUNT = 50  # Number of times to execute loops for checking (total time ~ LOOP_COUNT*(TIME_SLEEP + TIMEOUT))
+
     def __init__(self, *args, **kwargs):
         """Initialize TestCore instance."""
         super().__init__(*args, **kwargs)
@@ -134,29 +139,29 @@ class TestCore(unittest.TestCase):
 
         initialize_flexbe_core(self.node)
 
-        time.sleep(0.1)
+        time.sleep(TestCore.__TIME_SLEEP)
 
     def tearDown(self):
         """Tear down the TestCore test."""
         self.node.get_logger().info(' shutting down core test %d ... ' % (self.test))
-        for _ in range(50):
+        for _ in range(int(0.25*TestCore.__LOOP_COUNT)):
             # Allow any lingering pub/sub to clear up
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.01)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in core test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(0.1)
+        time.sleep(TestCore.__TIME_SLEEP)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
-        time.sleep(0.1)
+        time.sleep(TestCore.__TIME_SLEEP)
 
         self.executor.shutdown()
-        time.sleep(0.1)
+        time.sleep(TestCore.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(0.2)
+        time.sleep(TestCore.__TIME_SLEEP*2)
 
     def _create(self):
         """Create the test."""
@@ -165,6 +170,7 @@ class TestCore(unittest.TestCase):
         state._enable_ros_control()
         sm = OperatableStateMachine(outcomes=['done', 'error'])
         sm._state_id = 1024
+        sm.set_name('top-level')
         with sm:
             OperatableStateMachine.add('subject', state,
                                        transitions={'done': 'done', 'error': 'error'},
@@ -172,26 +178,56 @@ class TestCore(unittest.TestCase):
         return state, sm
 
     def _execute(self, state):
-        """Execute the test."""
+        """Execute the state via container."""
         # self.node.get_logger().info(' execute %s ... ' % (str(state.name)))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         state.last_events = []
         outcome = state.parent.execute(None)
         # self.node.get_logger().info('       outcome = %s ... ' % (str(outcome)))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         return outcome
 
+    def _reset_sm(self, sm, state):
+        """Reset the state machine for another pass."""
+        if sm is not None:
+            sm._entering = True
+            sm.on_enter()
+        if state is not None:
+            state._entering = True
+            state.on_enter(None)
+
+    def _execute_state(self, state):
+        """
+        Execute the state.
+
+        For this, you may need to call on_enter and on_exit.
+        """
+        try:
+            # self.node.get_logger().info(' execute %s ... ' % (str(state.name)))
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.05)
+
+            state.last_events = []
+            outcome = state.execute(None)
+            # self.node.get_logger().info('       outcome = %s ... ' % (str(outcome)))
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+            return outcome
+        except Exception as exc:
+            self.node.get_logger().error(f"    exception in state execute for '{state.name}' ... ")
+            self.node.get_logger().info(f"{exc}")
+            import traceback
+            self.node.get_logger().info(f"{traceback.format_exc()}")
+
     def assertMessage(self, sub, topic, msg, timeout=1):
         """Check message."""
-        for _ in range(int(timeout * 100)):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        for _ in range(int(timeout * TestCore.__LOOP_COUNT)):
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
             if sub.has_msg(topic):
                 received = sub.get_last_msg(topic)
                 sub.remove_last_msg(topic)
                 break
-            time.sleep(0.1)
+            time.sleep(TestCore.__TIME_SLEEP)
         else:
             raise AssertionError('Did not receive message on topic %s, expected:\n%s'
                                  % (topic, str(msg)))
@@ -214,26 +250,29 @@ class TestCore(unittest.TestCase):
 
     def assertNoMessage(self, sub, topic, timeout=1):
         """Assert no message received."""
-        for _ in range(int(timeout * 100)):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        if not sub.has_msg(topic):
+            self.node.get_logger().info(f"Wait to verify no message arrives for '{topic}' ...")
+        for _ in range(int(timeout * TestCore.__LOOP_COUNT)):
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
             if sub.has_msg(topic):
                 received = sub.get_last_msg(topic)
                 sub.remove_last_msg(topic)
                 raise AssertionError('Should not receive message on topic %s, but got:\n%s'
                                      % (topic, str(received)))
-            time.sleep(0.1)
+            time.sleep(TestCore.__TIME_SLEEP)
+        self.node.get_logger().info(f"   No message arrived for '{topic}' - good!")
 
     # Test Cases
     def test_event_state(self):
         """Test event state."""
         self.node.get_logger().info('test_event_state ...  ')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
         time.sleep(0.2)
 
@@ -284,7 +323,7 @@ class TestCore(unittest.TestCase):
         """Test operatable state."""
         self.node.get_logger().info('test_operatable_state ... ')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state, sm = self._create()
         self.node.get_logger().info('test_operatable_state - ProxySubscribe request ...')
         out_topic = Topics._OUTCOME_TOPIC
@@ -293,53 +332,57 @@ class TestCore(unittest.TestCase):
         #  wait for pub/sub
         end_time = time.time() + 1
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
-            time.sleep(0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+            time.sleep(TestCore.__TIME_SLEEP)
+
+        state.on_enter(None)
 
         # return outcome in full autonomy, no request
-        self.node.get_logger().info('test_operatable_state - request outcome on full autonomy, no request ...')
+        self.node.get_logger().info(f'test_operatable_state - autonomy level={OperatableStateMachine.autonomy_level} '
+                                    f'request outcome on full autonomy, no request ...')
         state.result = 'error'
-        self._execute(state)
+        self._execute_state(state)  # executing single state to we only get the state outputs
 
         self.assertNoMessage(sub, req_topic)
-        self.assertMessage(sub, out_topic, UInt32(data=(2 + state._state_id)))  # Test presumes outcome = 1 + offset
+        self.assertMessage(sub, out_topic, UInt32(data=(2 + state.state_id)))  # Test presumes outcome = 1 + offset
 
         # request outcome on same autonomy and clear request on loopback
         self.node.get_logger().info('test_operatable_state - request outcome on autonomy level=2 ...')
+        self._reset_sm(sm, state)
         OperatableStateMachine.autonomy_level = 2
-        self._execute(state)
+        self._execute_state(state)  # executing single state to we only get the state outputs
         self.assertNoMessage(sub, out_topic)
-        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=1, target='/subject'))
+        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=1, target=CoreTestState._set_state_id))
 
         state.result = None
-        self._execute(state)
-        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=255, target='/subject'))
+        self._execute_state(state)  # executing single state to we only get the state outputs
+        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=255, target=CoreTestState._set_state_id))
 
         # still return other outcomes
         self.node.get_logger().info('test_operatable_state - still return other outcomes')
         state.result = 'done'
-        self._execute(state)
+        self._execute_state(state)  # executing single state to we only get the state outputs
         self.assertNoMessage(sub, req_topic)
-        self.assertMessage(sub, out_topic, UInt32(data=(1 + state._state_id)))  # Test presumes outcome = 0 + offset
+        self.assertMessage(sub, out_topic, UInt32(data=(1 + state.state_id)))  # Test presumes outcome = 0 + offset
 
         # request outcome on lower autonomy, return outcome after level increase
         self.node.get_logger().info('test_operatable_state - lower autonomy level=0')
         OperatableStateMachine.autonomy_level = 0
-        self._execute(state)
+        self._execute_state(state)  # executing single state to we only get the state outputs
         self.assertNoMessage(sub, out_topic)
-        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=0, target='/subject'))
+        self.assertMessage(sub, req_topic, OutcomeRequest(outcome=0, target=CoreTestState._set_state_id))
 
         OperatableStateMachine.autonomy_level = 3
         self.node.get_logger().info('test_operatable_state -autonomy level=3')
-        self._execute(state)
-        self.assertMessage(sub, out_topic, UInt32(data=(1 + state._state_id)))  # Test presumes outcome = 0 + offset
+        self._execute_state(state)
+        self.assertMessage(sub, out_topic, UInt32(data=(1 + state.state_id)))  # Test presumes outcome = 0 + offset
         self.node.get_logger().info('test_operatable_state - OK! ')
 
     def test_preemptable_state(self):
         """Test preemptable state."""
         self.node.get_logger().info('test_preemptable_state ... ')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
 
@@ -349,15 +392,15 @@ class TestCore(unittest.TestCase):
         #  wait for pub/sub
         end_time = time.time() + 1
         while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
-            time.sleep(0.1)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+            time.sleep(TestCore.__TIME_SLEEP)
         # time.sleep(0.2)
 
         # preempt when trigger variable is set
         PreemptableState.preempt = True
         self.node.get_logger().info('test_preemptable_state - preempt = True ...')
         outcome = self._execute(state)
-        self.assertEqual(outcome, PreemptableState._preempted_name)
+        self.assertEqual(outcome, State._preempted_name)
         self.assertRaises(StateMachineError, lambda: state.parent.current_state)
 
         self.node.get_logger().info('test_preemptable_state - preempt = False ...')
@@ -370,7 +413,7 @@ class TestCore(unittest.TestCase):
         state._sub._callback(Empty(), Topics._CMD_PREEMPT_TOPIC)
         outcome = self._execute(state)
 
-        self.assertEqual(outcome, PreemptableState._preempted_name)
+        self.assertEqual(outcome, State._preempted_name)
         self.assertRaises(StateMachineError, lambda: state.parent.current_state)
         self.assertMessage(sub, fb_topic, CommandFeedback(command='preempt'))
 
@@ -381,7 +424,7 @@ class TestCore(unittest.TestCase):
         """Test lockable state."""
         self.node.get_logger().info('test_lockable_state ... ')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
@@ -389,55 +432,55 @@ class TestCore(unittest.TestCase):
 
         # lock and unlock as commanded, return outcome after unlock
         self.node.get_logger().info('  test lock on command ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        state._sub._callback(String(data='/subject'), Topics._CMD_LOCK_TOPIC)
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_LOCK_TOPIC)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state.result = 'done'
 
         self.node.get_logger().info('    execute state after lock ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         outcome = self._execute(state)
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    check results of test lock after execute ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         self.assertIsNone(outcome)
         self.assertTrue(state._locked)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=['/subject', '/subject']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']))
         state.result = None
 
         self.node.get_logger().info('  test unlock on command ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        state._sub._callback(String(data='/subject'), Topics._CMD_UNLOCK_TOPIC)
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_UNLOCK_TOPIC)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=['/subject', '/subject']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']))
 
         # lock and unlock without target
         self.node.get_logger().info('  test lock and unlock without target ... ')
-        state._sub._callback(String(data=''), Topics._CMD_LOCK_TOPIC)
+        state._sub._callback(Int32(data=0), Topics._CMD_LOCK_TOPIC)
         state.result = 'done'
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=['/subject', '/subject']))
-        state._sub._callback(String(data=''), Topics._CMD_UNLOCK_TOPIC)
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']))
+        state._sub._callback(Int32(data=0), Topics._CMD_UNLOCK_TOPIC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=['/subject', '/subject']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']))
 
         # reject invalid lock command
         self.node.get_logger().info('  test reject invalid lock command ... ')
-        state._sub._callback(String(data='/invalid'), Topics._CMD_LOCK_TOPIC)
+        state._sub._callback(Int32(data=12345678), Topics._CMD_LOCK_TOPIC)  # give invalid state id
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=['/invalid', '']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=['12345678', '-1']))
 
         # reject generic unlock command when not locked
         self.node.get_logger().info('  test reject invalid unlock when not locked command ... ')
-        state._sub._callback(String(data=''), Topics._CMD_UNLOCK_TOPIC)
+        state._sub._callback(Int32(data=0), Topics._CMD_UNLOCK_TOPIC)
         self._execute(state)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=['', '']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=['0', '-1']))
 
         # do not transition out of locked container
         self.node.get_logger().info('  test do not transition out of locked container ... ')
@@ -454,20 +497,22 @@ class TestCore(unittest.TestCase):
         """Test manually transitionable state."""
         self.node.get_logger().info('test_manually_transitionable_state ...')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
         time.sleep(0.2)
 
         # return requested outcome
-        state._sub._callback(OutcomeRequest(target='subject', outcome=1), Topics._CMD_TRANSITION_TOPIC)
+        state._sub._callback(OutcomeRequest(target=CoreTestState._set_state_id, outcome=1), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'error')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='transition', args=['subject', 'subject']))
+        self.assertMessage(sub, fb_topic, CommandFeedback(command='transition',
+                                                          args=[f'{CoreTestState._set_state_id}',
+                                                                f'{CoreTestState._set_state_id}']))
 
         # reject outcome request for different target
-        state._sub._callback(OutcomeRequest(target='invalid', outcome=1), Topics._CMD_TRANSITION_TOPIC)
+        state._sub._callback(OutcomeRequest(target=42, outcome=1), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
         # This state won't handle the transition request, so no message is expected
@@ -478,7 +523,7 @@ class TestCore(unittest.TestCase):
         """Test cross combinations."""
         self.node.get_logger().info('test_cross_combinations ...')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         state, sm = self._create()
 
         # manual transition works on low autonomy
@@ -486,7 +531,7 @@ class TestCore(unittest.TestCase):
         state.result = 'error'
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        state._sub._callback(OutcomeRequest(target='subject', outcome=0), Topics._CMD_TRANSITION_TOPIC)
+        state._sub._callback(OutcomeRequest(target=CoreTestState._set_state_id, outcome=0), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
         OperatableStateMachine.autonomy_level = 3
@@ -494,13 +539,13 @@ class TestCore(unittest.TestCase):
 
         # manual transition blocked by lock
         self.node.get_logger().info('test_cross_combinations - check manual transition blocked by lock ... ')
-        state._sub._callback(String(data='/subject'), Topics._CMD_LOCK_TOPIC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_LOCK_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        state._sub._callback(OutcomeRequest(target='subject', outcome=1), Topics._CMD_TRANSITION_TOPIC)
+        state._sub._callback(OutcomeRequest(target=CoreTestState._set_state_id, outcome=1), Topics._CMD_TRANSITION_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        state._sub._callback(String(data='/subject'), Topics._CMD_UNLOCK_TOPIC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_UNLOCK_TOPIC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'error')
 
@@ -512,21 +557,21 @@ class TestCore(unittest.TestCase):
         self.assertIsNone(outcome)
         state._sub._callback(Empty(), Topics._CMD_PREEMPT_TOPIC)
         outcome = self._execute(state)
-        self.assertEqual(outcome, PreemptableState._preempted_name)
+        self.assertEqual(outcome, State._preempted_name)
         PreemptableState.preempt = False
         OperatableStateMachine.autonomy_level = 3
         state.result = None
 
         # preempt also works when locked
         self.node.get_logger().info('test_cross_combinations - verify preempt works when locked ... ')
-        state._sub._callback(String(data='/subject'), Topics._CMD_LOCK_TOPIC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_LOCK_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
         state._sub._callback(Empty(), Topics._CMD_PREEMPT_TOPIC)
         outcome = self._execute(state)
-        self.assertEqual(outcome, PreemptableState._preempted_name)
+        self.assertEqual(outcome, State._preempted_name)
         PreemptableState.preempt = False
-        state._sub._callback(String(data='/subject'), Topics._CMD_UNLOCK_TOPIC)
+        state._sub._callback(Int32(data=state.state_id), Topics._CMD_UNLOCK_TOPIC)
         outcome = self._execute(state)
         self.assertIsNone(outcome)
         self.node.get_logger().info('test_cross_combinations - OK! ')
@@ -534,7 +579,7 @@ class TestCore(unittest.TestCase):
     def test_concurrency_container(self):
         """Test CC."""
         self.node.get_logger().info('test_concurrency_container ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         cc = ConcurrencyContainer(outcomes=['done', 'error'],
                                   conditions=[
                                   ('error', [('main', 'error')]),
@@ -555,7 +600,7 @@ class TestCore(unittest.TestCase):
                                        autonomy={'done': 1, 'error': 2})
 
         # self.node.get_logger().info('  after setting up OSM - call execute CC ... ')
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         # all states are called with their correct rate
         cc.execute(None)
@@ -668,7 +713,7 @@ class TestCore(unittest.TestCase):
         """Test user data."""
         self.node.get_logger().info('test_user_data ...')
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
         class TestUserdataState(EventState):
             """Local Test state."""
@@ -677,6 +722,8 @@ class TestCore(unittest.TestCase):
                 super(TestUserdataState, self).__init__(outcomes=['done'], input_keys=['data_in'], output_keys=['data_out'])
                 self.data = None
                 self._out_content = out_content
+                CoreTestState._set_state_id = CoreTestState._set_state_id + 1
+                self._state_id = CoreTestState._set_state_id
 
             def execute(self, userdata):
                 self._node.get_logger().warn('\033[0m%s\n%s' % (self.path, str(userdata)))  # log for manual inspection
@@ -689,26 +736,35 @@ class TestCore(unittest.TestCase):
         inner_sm.userdata.own = 'own_data'
         with inner_sm:
             OperatableStateMachine.add('own_state', TestUserdataState('inner_data'), transitions={'done': 'outside_state'},
-                                       remapping={'data_in': 'own', 'data_out': 'sm_out'})
+                                       remapping={'data_in': 'own', 'data_out': 'sm_out'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('outside_state', TestUserdataState(), transitions={'done': 'internal_state'},
-                                       remapping={'data_in': 'sm_in', 'data_out': 'data_in'})
+                                       remapping={'data_in': 'sm_in', 'data_out': 'data_in'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('internal_state', TestUserdataState(), transitions={'done': 'done'},
-                                       remapping={})
+                                       remapping={},
+                                       autonomy={'done': 0})
 
         sm = OperatableStateMachine(outcomes=['done'])
         sm._state_id = 8192
         sm.userdata.outside = 'outside_data'
+        sm.set_name("outer_sm")  # No one sets this name, while .add sets names of inner states
         with sm:
             OperatableStateMachine.add('before_state', TestUserdataState(), transitions={'done': 'inner_sm'},
-                                       remapping={'data_in': 'outside'})
+                                       remapping={'data_in': 'outside'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('inner_sm', inner_sm, transitions={'done': 'after_state'},
-                                       remapping={'sm_in': 'outside'})
+                                       remapping={'sm_in': 'outside'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('after_state', TestUserdataState('last_data'), transitions={'done': 'modify_state'},
-                                       remapping={'data_in': 'sm_out'})
+                                       remapping={'data_in': 'sm_out'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('modify_state', TestUserdataState(), transitions={'done': 'final_state'},
-                                       remapping={'data_out': 'outside', 'data_in': 'outside'})
+                                       remapping={'data_out': 'outside', 'data_in': 'outside'},
+                                       autonomy={'done': 0})
             OperatableStateMachine.add('final_state', TestUserdataState(), transitions={'done': 'done'},
-                                       remapping={'data_in': 'data_out'})
+                                       remapping={'data_in': 'data_out'},
+                                       autonomy={'done': 0})
 
         # can pass userdata to state and get it from state
         sm.execute(None)

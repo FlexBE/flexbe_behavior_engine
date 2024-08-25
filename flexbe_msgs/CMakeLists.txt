@@ -17,6 +17,7 @@ set(msg_files
   "msg/OutcomeCondition.msg"
   "msg/OutcomeRequest.msg"
   "msg/StateInstantiation.msg"
+  "msg/StateMapMsg.msg"
   "msg/SynthesisErrorCodes.msg"
   "msg/SynthesisRequest.msg"
   "msg/UICommand.msg"

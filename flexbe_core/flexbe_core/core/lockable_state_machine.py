@@ -95,25 +95,25 @@ class LockableStateMachine(RosStateMachine):
 
     # for locking
 
-    def lock(self, path):
+    def lock(self, st_id):
         """Lock this state."""
-        if path == self.path:
+        if st_id == self.state_id:
             self._locked = True
             return True
 
         if self._parent is not None:
-            return self._parent.lock(path)
+            return self._parent.lock(st_id)
 
         return False
 
-    def unlock(self, path):
+    def unlock(self, st_id):
         """Unlock this state."""
-        if path == self.path:
+        if st_id == self.state_id:
             self._locked = False
             return True
 
         if self._parent is not None:
-            return self._parent.unlock(path)
+            return self._parent.unlock(st_id)
 
         return False
 

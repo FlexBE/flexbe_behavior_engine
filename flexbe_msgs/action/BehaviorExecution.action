@@ -18,5 +18,5 @@ string outcome
 
 ---
 
-# path of the current state
-string current_state
+# state id of the current state
+int32 current_state
