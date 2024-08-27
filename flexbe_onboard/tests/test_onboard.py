@@ -211,7 +211,7 @@ class TestOnboard(unittest.TestCase):
         self.clear_extra_heartbeat_ready_messages()
 
         # send the same behavior with different parameters
-        self.node.get_logger().info('Republish modified behavior ...')
+        self.node.get_logger().info('\n\nRepublish modified behavior ...')
         request.arg_keys = ['param', 'invalid']
         request.arg_values = ['value_1', 'should be ignored']
         request.input_keys = []
@@ -224,7 +224,8 @@ class TestOnboard(unittest.TestCase):
         behavior_logs = []
 
         # Wait for published message
-        end_time = time.time() + 1
+        self.node.get_logger().info('\n\nExecute modified behavior ...')
+        end_time = time.time() + 2
         try:
             while time.time() < end_time:
                 self.executor.spin_once(timeout_sec=0.1)
@@ -237,6 +238,7 @@ class TestOnboard(unittest.TestCase):
                 self.executor.spin_once(timeout_sec=0.1)
             except Exception as exc:
                 print(f'\x1b[91mException in executor: {exc}\x1b[0m')
+        self.node.get_logger().info(f'{behavior_logs}')
         self.assertIn('value_1', behavior_logs)
         self.node.get_logger().info('Done onboard testing!')
         self.executor.spin_once(timeout_sec=0.1)

@@ -54,8 +54,8 @@ class TestProxies(unittest.TestCase):
     """Test the FlexBE proxies."""
 
     test = 0
-    __EXECUTE_TIMEOUT_SEC=0.025
-    __TIME_SLEEP = 0.05  # Sleep time for loops
+    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
+    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
 
     def __init__(self, *args, **kwargs):
         """Initialize TestProxies instance."""

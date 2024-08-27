@@ -85,7 +85,7 @@ class OperatableState(PreemptableState):
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
-                Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'permitting outcome '{outcome}' {self.__class__.__name__}")
+                #  Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'permitting outcome '{outcome}' {self.__class__.__name__}")
                 self._force_transition = False
 
         return outcome
@@ -101,8 +101,8 @@ class OperatableState(PreemptableState):
             return
 
         outcome_index = self.outcomes.index(outcome)
-        Logger.localinfo('Publish outcome: State result: %s > %s (%d) (%d) (%s)'
-                         % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
+        #  Logger.localinfo('Publish outcome: State result: %s > %s (%d) (%d) (%s)'
+        #                   % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
         # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
         self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
         self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))

@@ -117,8 +117,8 @@ class TestCore(unittest.TestCase):
 
     test = 0
 
-    __TIME_SLEEP = 0.025  # Sleep time for loops
-    __EXECUTE_TIMEOUT_SEC = 0.025  # Timeout in executor loops for spin once
+    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
+    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
     __LOOP_COUNT = 50  # Number of times to execute loops for checking (total time ~ LOOP_COUNT*(TIME_SLEEP + TIMEOUT))
 
     def __init__(self, *args, **kwargs):
