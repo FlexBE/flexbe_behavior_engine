@@ -62,7 +62,7 @@ class InputActionWorker(QThread):
         try:
             # Use a MultiThreadedExecutor to enable processing goals concurrently
             executor = MultiThreadedExecutor()
-            print('Begin spining ROS loop for InputActionServer ...', flush=True)
+            print('Begin spinning ROS loop for InputActionServer ...', flush=True)
             rclpy.spin(self._node, executor=executor)
         except (KeyboardInterrupt, ExternalShutdownException):
             print('Caught KeyboardInterrupt in InputActionWorker thread - shutdown ...')
