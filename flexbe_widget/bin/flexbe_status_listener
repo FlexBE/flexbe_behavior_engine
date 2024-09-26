@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+
+from flexbe_widget.flexbe_status_listener import flexbe_status_listener_main
+
+if __name__ == '__main__':
+    flexbe_status_listener_main()

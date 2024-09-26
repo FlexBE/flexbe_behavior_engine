@@ -93,9 +93,11 @@ class FlexbeOnboard(Node):
         # only at onboard level
         self._heartbeat_pub = self.create_publisher(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC, 10)
         self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 10)
-        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_TOPIC, 2)
 
+        # Latch state map so we can retreive later if desired
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_TOPIC, qos_profile=latching_qos)
+
         self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC,
                                                      self._version_callback, qos_profile=latching_qos)
 
