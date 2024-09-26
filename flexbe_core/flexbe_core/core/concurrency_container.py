@@ -35,6 +35,7 @@ A state machine that can be operated.
 It synchronizes its current state with the mirror and supports some control mechanisms.
 """
 from flexbe_core.core.event_state import EventState
+from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
 from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.operatable_state_machine import OperatableStateMachine
 from flexbe_core.core.preemptable_state import PreemptableState
@@ -259,11 +260,17 @@ class ConcurrencyContainer(OperatableStateMachine):
                 else:
                     result = state.execute(userdata)  # This is call on_exit if necessary
         except Exception as exc:  # pylint: disable=W0703
+            # catch any exception and log here, but re-raise to preempt behavior
             result = None
             self._last_exception = exc
             Logger.logerr('ConcurrencyContainer: Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
             import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))
+            if isinstance(exc, (StateError, StateMachineError, UserDataError)):
+                self._last_exception = exc
+            else:
+                self._last_exception = StateError(str(exc))
+            raise self._last_exception
         return result
 
     def on_enter(self, userdata):  # pylint: disable=W0613
