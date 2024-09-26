@@ -44,7 +44,7 @@ from flexbe_msgs.msg import CommandFeedback, OutcomeRequest
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
-from std_msgs.msg import Bool, Empty, Int32, String, UInt32
+from std_msgs.msg import Bool, Empty, Int32, UInt32
 
 
 class CoreTestState(EventState):
@@ -144,7 +144,7 @@ class TestCore(unittest.TestCase):
     def tearDown(self):
         """Tear down the TestCore test."""
         self.node.get_logger().info(' shutting down core test %d ... ' % (self.test))
-        for _ in range(int(0.25*TestCore.__LOOP_COUNT)):
+        for _ in range(int(0.25 * TestCore.__LOOP_COUNT)):
             # Allow any lingering pub/sub to clear up
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
 
@@ -161,7 +161,7 @@ class TestCore(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestCore.__TIME_SLEEP*2)
+        time.sleep(TestCore.__TIME_SLEEP * 2)
 
     def _create(self):
         """Create the test."""
@@ -215,9 +215,9 @@ class TestCore(unittest.TestCase):
             return outcome
         except Exception as exc:
             self.node.get_logger().error(f"    exception in state execute for '{state.name}' ... ")
-            self.node.get_logger().info(f"{exc}")
+            self.node.get_logger().info(f'{exc}')
             import traceback
-            self.node.get_logger().info(f"{traceback.format_exc()}")
+            self.node.get_logger().info(f'{traceback.format_exc()}')
 
     def assertMessage(self, sub, topic, msg, timeout=1):
         """Check message."""
@@ -748,7 +748,7 @@ class TestCore(unittest.TestCase):
         sm = OperatableStateMachine(outcomes=['done'])
         sm._state_id = 8192
         sm.userdata.outside = 'outside_data'
-        sm.set_name("outer_sm")  # No one sets this name, while .add sets names of inner states
+        sm.set_name('outer_sm')  # No one sets this name, while .add sets names of inner states
         with sm:
             OperatableStateMachine.add('before_state', TestUserdataState(), transitions={'done': 'inner_sm'},
                                        remapping={'data_in': 'outside'},

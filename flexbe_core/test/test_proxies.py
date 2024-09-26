@@ -93,7 +93,7 @@ class TestProxies(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestProxies.__TIME_SLEEP*5)
+        time.sleep(TestProxies.__TIME_SLEEP * 5)
 
     def test_publish_subscribe(self):
         """Test publish and subscribe."""

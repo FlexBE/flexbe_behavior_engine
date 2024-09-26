@@ -69,7 +69,7 @@ class TestExceptionsSpin(unittest.TestCase):
     def tearDown(self):
         """Tear down the TestExceptionsSpin test."""
         self.node.get_logger().info(' shutting down exceptions test %d (%d) ... ' % (self.test, self.context.ok()))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=2*TestExceptionsSpin.__EXECUTE_TIMEOUT_SEC)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=2 * TestExceptionsSpin.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in core test %d ... ' % (self.test))
         shutdown_proxies()
@@ -84,7 +84,7 @@ class TestExceptionsSpin(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestExceptionsSpin.__TIME_SLEEP*2)
+        time.sleep(TestExceptionsSpin.__TIME_SLEEP * 2)
 
     def test_invalid_outcome(self):
         """Test invalid outcome."""

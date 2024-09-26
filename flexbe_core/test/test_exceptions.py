@@ -82,7 +82,7 @@ class TestExceptions(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestExceptions.__TIME_SLEEP*2)
+        time.sleep(TestExceptions.__TIME_SLEEP * 2)
 
     def test_invalid_outcome(self):
         """Test invalid outcome."""

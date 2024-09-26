@@ -81,7 +81,7 @@ class TestLogger(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestLogger.__TIME_SLEEP*2)
+        time.sleep(TestLogger.__TIME_SLEEP * 2)
 
     def test_throttle_logger_one(self):
         """Test throttle logger one."""
@@ -202,7 +202,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC*0.5)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC * 0.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 
@@ -247,7 +247,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC*.5)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC * 0.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 
