@@ -1,4 +1,4 @@
-# If desired, custom request types can be defined and choosen here
+# If desired, custom request types can be defined and chosen here
 uint8 request_type
 
 # Basic types (used by input_action_server, but otherwise optional)

@@ -63,7 +63,7 @@ class ComplexActionServer:
     @param execute_cb Optional callback that gets called in a separate thread whenever
                       a new goal is received, allowing users to have blocking callbacks.
                       Adding an execute callback also deactivates the goalCallback.
-    @param  auto_start A boolean value that tells the ActionServer wheteher or not
+    @param  auto_start A boolean value that tells the ActionServer whether or not
                        to start publishing as soon as it comes up.
                        THIS SHOULD ALWAYS BE SET TO FALSE TO AVOID RACE CONDITIONS and
                        start() should be called after construction of the server.
@@ -196,7 +196,7 @@ class ComplexActionServer:
         self.execute_condition.acquire()
 
         try:
-            Logger.localinfo(f'A new goal {goal.goal_id} has been recieved by the single goal action server')
+            Logger.localinfo(f'A new goal {goal.goal_id} has been received by the single goal action server')
 
             self.next_goal = goal
             self.new_goal = True
@@ -220,7 +220,7 @@ class ComplexActionServer:
 
     # @brief Called from a separate thread to call blocking execute calls
     def executeLoop(self):
-        """Excute the server loop."""
+        """Execute the server loop."""
         loop_duration = Duration(seconds=0.1)
 
         while (rclpy.ok()):

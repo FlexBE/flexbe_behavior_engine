@@ -42,7 +42,7 @@ import pytest
 
 @pytest.mark.rostest
 def generate_test_description():
-    """Generate test descriptoin for flexbe_logger test."""
+    """Generate test description for flexbe_logger test."""
     path_to_test = os.path.dirname(__file__)
 
     TEST_PROC_PATH = os.path.join(path_to_test, 'test_logger.py')

@@ -6,7 +6,7 @@ SynthesisRequest request
 
 ---
 
-# Provides feedback regarding possibly occured errors
+# Provides feedback regarding possibly occurred errors
 SynthesisErrorCodes error_code
 
 # Result of behavior synthesis as a list of state instantiations

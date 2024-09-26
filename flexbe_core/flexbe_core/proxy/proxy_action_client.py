@@ -93,7 +93,7 @@ class ProxyActionClient:
         Initialize the proxy with an optionally given set of clients.
 
         @type topics: dictionary string - message class
-        @param topics: A dictionay containing a collection of topic - message type pairs.
+        @param topics: A dictionary containing a collection of topic - message type pairs.
 
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for each client in the

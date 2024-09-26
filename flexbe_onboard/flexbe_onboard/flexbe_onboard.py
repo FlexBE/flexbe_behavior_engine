@@ -94,7 +94,7 @@ class FlexbeOnboard(Node):
         self._heartbeat_pub = self.create_publisher(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC, 10)
         self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 10)
 
-        # Latch state map so we can retreive later if desired
+        # Latch state map so we can retrieve later if desired
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_TOPIC, qos_profile=latching_qos)
 
@@ -161,7 +161,7 @@ class FlexbeOnboard(Node):
             Logger.logwarn(f'Received behavior start request for {beh_sel_msg.behavior_key} '
                            f'({beh_sel_msg.behavior_id}) while prior request was starting.\n    Ignore second request!')
             return
-        self._starting = True  # Prevent two start requests from ocurring back to back
+        self._starting = True  # Prevent two start requests from occurring back to back
         self._trigger_ready = False  # We have received the behavior selection request
         self._ready_counter = 0
         thread = threading.Thread(target=self._behavior_execution, args=[beh_sel_msg])

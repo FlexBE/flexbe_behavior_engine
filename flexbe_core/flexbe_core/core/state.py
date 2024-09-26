@@ -47,7 +47,7 @@ class State:
     _preempted_name = 'preempted'  # Define name here, but handle logic in derived class
 
     def __init__(self, *args, **kwargs):
-        """Initilize state instance."""
+        """Initialize state instance."""
         self._outcomes = _remove_duplicates(kwargs.get('outcomes', []))
         io_keys = kwargs.get('io_keys', [])
         self._input_keys = _remove_duplicates(kwargs.get('input_keys', []) + io_keys)

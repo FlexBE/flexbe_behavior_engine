@@ -106,7 +106,7 @@ class EventState(OperatableState):
             repeat = True
 
         if repeat or outcome is not None:
-            # As this is currently coded, a repeat command will immedately halt
+            # As this is currently coded, a repeat command will immediately halt
             # call on_exit, then reenter the state
             # (vs. an alternative to wait until outcome and then repeat)
             self.on_exit(*args, **kwargs)

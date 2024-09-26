@@ -368,7 +368,7 @@ class ProxySubscriberCached:
     @classmethod
     def make_persistant(cls, topic):
         """
-        Make the given topic persistant which means messages can no longer be removed.
+        Make the given topic persistent which means messages can no longer be removed.
 
         Remove_last_msg will have no effect, only overwritten by a new message.
 

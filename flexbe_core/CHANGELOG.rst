@@ -336,7 +336,7 @@ Changelog for package flexbe_core
 * [flexbe_core] Added priority container
 * [flexbe_core] Added some more documentation
 * [flexbe_core] Fixed initialization of input userdata in inner statemachines
-* [flexbe_core] Correctly preempt auxilliary control flows in concurrency container
+* [flexbe_core] Correctly preempt auxiliary control flows in concurrency container
 * [flexbe_core] Fixed a bug with concurrent execution:
   State machines inside state machine inside concurrency containers still blocked during execution.
 * [flexbe_core] Slightly reworked monitoring state

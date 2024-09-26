@@ -345,7 +345,7 @@ class TestProxies(unittest.TestCase):
         client = ProxyActionClient({'/invalid': BehaviorExecution}, wait_duration=.1)
         self.assertFalse(client.is_available('/invalid'))
         self.node.get_logger().info('test_action_client - OK! ')
-        del server  # Through with instance, and explicitly calling del() to avoid ununsed warning
+        del server  # Through with instance, and explicitly calling del() to avoid unused warning
 
 
 if __name__ == '__main__':

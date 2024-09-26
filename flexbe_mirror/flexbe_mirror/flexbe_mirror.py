@@ -277,7 +277,7 @@ class FlexbeMirror(Node):
         except Exception as exc:  # pylint: disable=W0703
             Logger.logerr(f'Exception in activate mirror: {type(exc)} started at {start_time.nanoseconds} ns ...\n  {exc}')
             Logger.localerr(f"{traceback.format_exc().replace('%', '%%')}")
-            self._running = False  # normally set false in execute_mirror (but not if exeception)
+            self._running = False  # normally set false in execute_mirror (but not if exception)
 
         Logger.localwarn(f'Done executing mirror {self._active_id} from activation '
                          f'{self.get_elapsed_str(start_time)}')

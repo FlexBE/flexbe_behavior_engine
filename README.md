@@ -19,7 +19,7 @@ Jazzy ![ROS Build Farm](https://build.ros2.org/job/Jdev__flexbe_behavior_engine_
 
 Rolling ![ROS Build Farm](https://build.ros2.org/job/Rdev__flexbe_behavior_engine__ubuntu_noble_amd64/badge/icon)
 
-> Note: This version 4+ breaks compatability with the FlexBE App.  You must use the FlexBE WebUI [flexbe_webui](https://github.com/FlexBE/flexbe_webui.git) now.
+> Note: This version 4+ breaks compatibility with the FlexBE App.  You must use the FlexBE WebUI [flexbe_webui](https://github.com/FlexBE/flexbe_webui.git) now.
 
 
 ## Installation
@@ -58,7 +58,7 @@ from the `${WORKSPACE_ROOT}/src` folder will create:
 These are intended to contain your custom FlexBE state implementations and HFSM-based behaviors.
 
 This release of the FlexBE Behavior Engine requires version 4.1+ of the FlexBE UI.
-This breaks compatability with the older FlexBE App and now requires use of the FlexBE WebUI tool.
+This breaks compatibility with the older FlexBE App and now requires use of the FlexBE WebUI tool.
 
 It is recommended to install the FlexBE WebUI user interface:
 

@@ -214,7 +214,7 @@ class OperatableStateMachine(PreemptableStateMachine):
             # catch any exception and log here, but re-raise to preempt behavior
             Logger.logerr("Failed to execute state '%s':\n%s - %s" % (self.current_state_label, str(type(exc)), str(exc)))
             import traceback  # pylint: disable=C0415
-            Logger.localinfo(traceback.format_exc().replace('%', '%%'))  # Guard against exeception including format!
+            Logger.localinfo(traceback.format_exc().replace('%', '%%'))  # Guard against exception including format!
             outcome = None
             if isinstance(exc, (StateError, StateMachineError, UserDataError)):
                 self._last_exception = exc
@@ -271,7 +271,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         Provide explicit sync as back-up functionality.
 
         Should be used sparingly if there is no other choice
-        since it requires additional 8 byte + header update bandwith and time to restart mirror
+        since it requires additional 8 byte + header update bandwidth and time to restart mirror
         """
         if self._inner_sync_request:
             self._inner_sync_request = False

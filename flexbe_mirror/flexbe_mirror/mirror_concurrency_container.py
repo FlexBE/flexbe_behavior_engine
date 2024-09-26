@@ -148,5 +148,5 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
                             f" - current state is NOT a list! Error type='{type(self._current_state)}'")
             Logger.localerr(f"    '{self._current_state.name}' ({self._current_state.state_id})")
             raise TypeError(f"MirrorConcurrentContainer.get_deep_states '{self.name}' - "
-                            f"current state is NOT a list! Errror type='{type(self._current_state)}'")
+                            f"current state is NOT a list! Error type='{type(self._current_state)}'")
         return deep_states

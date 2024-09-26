@@ -64,7 +64,7 @@ class MirrorState(EventState):
         MirrorState._last_target_id = None  # reset any time that we build a new state machine
 
         if MirrorState._pub is None:
-            # Allow access to standard proxies initialied by flexbe_mirror
+            # Allow access to standard proxies initialized by flexbe_mirror
             MirrorState._pub = ProxyPublisher()
 
     @classmethod

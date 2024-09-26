@@ -124,7 +124,7 @@ class TestLogger(unittest.TestCase):
         self.node.get_logger().info('test_throttle_logger_one  - OK! ')
 
     def test_throttle_logger_err_multi(self):
-        """Test throttle logger with errrors."""
+        """Test throttle logger with errors."""
         self.node.get_logger().info('test_throttle_logger_err_multi ...')
         self.node.declare_parameter('max_throttle_logging_size', 200)
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.35)

@@ -136,9 +136,9 @@ class InputState(EventState):
         self._client.remove_result(self._action_topic)
         self._return = None
 
-        # Retrive the goal for the BehaviorInput Action.
+        # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal()
-        # Retrive the request type and message from goal.
+        # Retrieve the request type and message from goal.
         action_goal.request_type = self._request
         action_goal.msg = self._message
         Logger.loghint(f"Onboard requests '{self._message}'")
