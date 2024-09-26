@@ -147,10 +147,9 @@ class MirrorStateMachine(PreemptableStateMachine):
 
                 else:
                     # Process fast independent of simulation time in order to keep up with onboard
-                    if loop_count > 50000:
+                    if loop_count > 100000:
                         loop_count = 0   # periodic spam for updates
-                        Logger.localinfo(f"  SM spinner -'{self.name}' ({self.id}) - "
-                                         f'after {self._total_loop_count} spins in thread started at {start_time.nanoseconds}')
+                        Logger.localinfo(f"  SM spinner -'{self.name}' ({self.id}) - {self._total_loop_count} spins")
                     timing_event.wait(0.0002)  # minor wait for next message if we didn't process anything previous loop
 
             except Exception as exc:  # pylint: disable=W0703
@@ -243,8 +242,8 @@ class MirrorStateMachine(PreemptableStateMachine):
         @return: The list of active states (not state machine)
         """
         if isinstance(self._current_state, StateMachine):
-            return self._current_state.get_deep_states()
-        return [self._current_state] if self._current_state is not None else []  # Return as a list
+            return [self] + self._current_state.get_deep_states()
+        return [self, self._current_state] if self._current_state is not None else [self]  # Return as a list
 
     def get_latest_status(self):
         """Return the latest execution information as a BehaviorSync message."""

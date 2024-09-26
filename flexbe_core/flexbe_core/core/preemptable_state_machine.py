@@ -143,3 +143,14 @@ class PreemptableStateMachine(LockableStateMachine):
     def process_sync_request(cls):
         """Process sync request (ignored here - should be handled by derived state)."""
         Logger.localinfo('Ignoring PreemptableState process_sync_request')
+
+    def _notify_skipped(self):
+        # make sure we dont miss a preempt even if not being executed (e.g., due to priority container)
+        if self._current_state is not None:
+            # Prioritize handling at low level state first
+            self._current_state._notify_skipped()
+
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
+            PreemptableState.preempt = True

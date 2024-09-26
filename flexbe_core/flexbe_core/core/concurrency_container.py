@@ -37,6 +37,7 @@ It synchronizes its current state with the mirror and supports some control mech
 from flexbe_core.core.event_state import EventState
 from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.operatable_state_machine import OperatableStateMachine
+from flexbe_core.core.preemptable_state import PreemptableState
 from flexbe_core.core.priority_container import PriorityContainer
 from flexbe_core.core.state import State
 from flexbe_core.core.topics import Topics
@@ -308,23 +309,24 @@ class ConcurrencyContainer(OperatableStateMachine):
 
         Traverse all state machines down to the terminal child state that is not a container.
 
-        EXCEPT for ConcurrencyContainers.  Those are both active state and container.
-
         @return: The list of active states (not state machine)
         """
         deep_states = [self]  # Concurrency acts as both state and container for this purpose
-        if isinstance(self._current_state, list):
-            for state in self._current_state:
-                # Internal states (after skipping concurrency container self)
-                if isinstance(state, LockableStateMachine):
-                    deep_states.extend(state.get_deep_states())
-                else:
-                    deep_states.append(state)
-            # Logger.localinfo(f"Concurrent get_deep_states: {self.name} {[state.path for state in deep_states]}")
-            return deep_states
-        elif self._current_state is not None:
-            Logger.localerr(f"ConcurrentContainer.get_deep_states '{self.name}' - current state is NOT a list!")
-            raise TypeError(f"ConcurrentContainer.get_deep_states '{self.name}' - current state is NOT a list!")
-        # Otherwise, either haven't fully entered, or all have returned outcomes
-
+        for state in self._states:
+            # Internal states (after skipping concurrency container self)
+            if isinstance(state, LockableStateMachine):
+                deep_states.extend(state.get_deep_states())
+            else:
+                deep_states.append(state)
         return deep_states
+
+    def _notify_skipped(self):
+        # make sure we dont miss a preempt even if not being executed (e.g., due to priority container)
+        for state in self._current_state:
+            # Prioritize handling at low level state first
+            state._notify_skipped()
+
+        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
+            PreemptableState.preempt = True

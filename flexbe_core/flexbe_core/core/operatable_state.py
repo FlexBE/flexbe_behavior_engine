@@ -85,7 +85,8 @@ class OperatableState(PreemptableState):
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
-                #  Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'permitting outcome '{outcome}' {self.__class__.__name__}")
+                #  Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'"
+                #                   f"permitting outcome '{outcome}' {self.__class__.__name__}")
                 self._force_transition = False
 
         return outcome

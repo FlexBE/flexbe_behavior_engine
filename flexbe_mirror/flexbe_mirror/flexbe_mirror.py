@@ -129,7 +129,7 @@ class FlexbeMirror(Node):
         self._outcome_sub.subscribe(Topics._OUTCOME_TOPIC, UInt32, inst_id=id(self))
         self._outcome_sub.enable_buffer(Topics._OUTCOME_TOPIC)
 
-        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_OCS_TOPIC, 2)
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_OCS_TOPIC, latching_qos)
 
         # no clean way to wait for publisher to be ready...
         Logger.loginfo('--> Mirror - setting up publishers and subscribers ...')
@@ -521,16 +521,16 @@ class FlexbeMirror(Node):
                                 try:
                                     ob_state_id, ob_out = StateMap.unhash(state_hash)
                                     ob_state = self._state_map[ob_state_id]
-                                    Logger.localinfo(f"  onboard {ob_state_id} : '{ob_state.name.replace('_mirror', '')}'"
-                                                     f" out={ob_out} - {ob_state.path.replace('_mirror', '')}")
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
                             for state_hash in mirror_status.current_state_checksums:
                                 try:
                                     mr_state_id, mr_out = StateMap.unhash(state_hash)
                                     mr_state = self._state_map[mr_state_id]
-                                    Logger.localinfo(f"   mirror {mr_state_id} : '{mr_state.name.replace('_mirror', '')}'"
-                                                     f" out={mr_out} - {mr_state.path.replace('_mirror', '')}")
+                                    Logger.localinfo(f"   mirror {mr_state_id:10d} : '{mr_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={mr_out:3d} - {mr_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for mirror state hash {state_hash} - {type(exc)} - {exc}')
                             Logger.localinfo(30 * '=')
@@ -539,6 +539,20 @@ class FlexbeMirror(Node):
                             # Start counting mismatches
                             self._sync_heartbeat_mismatch_counter = 1
                     else:
+                        if self._sync_heartbeat_mismatch_counter > 0:
+                            Logger.localwarn(f'OCS is back in sync after {self._sync_heartbeat_mismatch_counter} heartbeats')
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f'   Onboard IDs: {msg.current_state_checksums}\n'
+                                             f'    Mirror IDs: {mirror_status.current_state_checksums}')
+                            for state_hash in msg.current_state_checksums:
+                                try:
+                                    ob_state_id, ob_out = StateMap.unhash(state_hash)
+                                    ob_state = self._state_map[ob_state_id]
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
+                                except Exception as exc:  # pylint: disable=W0703
+                                    Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
+
                         # Reset mismatch counter
                         self._sync_heartbeat_mismatch_counter = 0
                 elif self._active_id != 0:
@@ -650,7 +664,7 @@ class FlexbeMirror(Node):
             self._outcome_sub.remove_last_msg(Topics._OUTCOME_TOPIC, clear_buffer=True)
             MirrorState._last_state_id = None
             MirrorState._last_state_outcome = None
-
+            MirrorState._last_target_id = None  # reset any time that we build a new state machine
             try:
                 self._starting_path = None
                 if self._sm is not None and self._sm.id == msg.behavior_id:
@@ -718,6 +732,13 @@ class FlexbeMirror(Node):
                 Logger.localwarn(f" Restart SM with current top-level state = {curst.name if curst is not None else 'None'} "
                                  f'starting path={self._starting_path}')
                 Logger.localinfo(f'     active states = {self._sm.get_latest_status()}')
+                if self._sm._last_deep_states_list is not None and len(self._sm._last_deep_states_list) > 0:
+                    # Make sure we update the UI with latest state
+                    MirrorState.publish_update(self._sm._last_deep_states_list[-1].state_id)
+                    for st in self._sm._last_deep_states_list:
+                        Logger.localinfo(f"     '{st.name:30s}' - '{st.path}' ")
+                else:
+                    MirrorState.publish_update(curst.state_id)  # Make sure we update the UI with latest state
                 self._running = True  # set running while we have sync lock
                 self._starting = False
                 self._active_id = msg.behavior_id

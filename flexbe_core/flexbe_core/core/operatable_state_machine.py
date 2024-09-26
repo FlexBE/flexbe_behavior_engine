@@ -278,6 +278,21 @@ class OperatableStateMachine(PreemptableStateMachine):
             self._pub.publish(Topics._MIRROR_SYNC_TOPIC, self.get_latest_status())
             self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='sync', args=[]))
             Logger.localinfo('<-- Sent synchronization message to mirror.')
+
+            for state in self._last_deep_states_list[::-1]:
+                # Logger.localinfo(f"    '{state.name:30s}' - '{state.path}' "
+                #                  f"{f'({state._last_requested_outcome})' if state._last_requested_outcome is not None else ''}")
+                if state._last_requested_outcome is not None:
+                    if state._last_requested_outcome in state.outcomes:
+                        # Resend outcome request message if resync is requested
+                        self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
+                                          OutcomeRequest(outcome=state.outcomes.index(state._last_requested_outcome),
+                                                         target=state.state_id))
+                        Logger.localinfo("<-- Want result: '%s' -> '%s'" % (state.path, state._last_requested_outcome))
+                        break  # only process the deepest requested outcome
+                    else:
+                        Logger.localerr(f"    Invalid last requested outcome '{state._last_requested_outcome}'"
+                                        f" for '{state}' - '{state.path}'")
         else:
             Logger.error('Inner sync processed for %s - but no sync request flag?' % (self.name))
 

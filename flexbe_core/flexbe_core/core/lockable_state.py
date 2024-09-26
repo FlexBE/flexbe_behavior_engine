@@ -99,7 +99,6 @@ class LockableState(ManuallyTransitionableState):
 
     def _execute_lock(self, target):
         """Execute lock."""
-
         if target in (self.state_id, 0):
             target = self.state_id
             found_target = True
