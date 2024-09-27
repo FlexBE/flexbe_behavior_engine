@@ -31,11 +31,12 @@
 
 from flexbe_core import EventState
 from flexbe_core import Logger
-from flexbe_core.core.preemptable_state import PreemptableState
-from flexbe_core.core.topics import Topics
+from flexbe_core.core import State
+from flexbe_core.core import StateMap
+from flexbe_core.core import Topics
 from flexbe_core.proxy import ProxyPublisher
 
-from std_msgs.msg import String
+from std_msgs.msg import Int32
 
 
 class MirrorState(EventState):
@@ -49,7 +50,7 @@ class MirrorState(EventState):
     # Hold data from last outcome message being processed by mirror
     _last_state_id = None
     _last_state_outcome = None
-    _last_target_path = None
+    _last_target_id = None
 
     _pub = None
 
@@ -57,21 +58,21 @@ class MirrorState(EventState):
         """Initialize MirrorState instance."""
         # pylint: disable=unused-argument
         super().__init__(outcomes=given_outcomes)
-        self._outcomes.append(PreemptableState._preempted_name)  # Add preempted to outcomes list (for -1 outcome)
+        # self._outcomes.append(State._preempted_name)  # Add preempted to outcomes list (for -1 outcome)
         self._target_name = target_name
         self._target_path = '/' + '/'.join(target_path.split('/')[1:])  # Drop top-level name
-        MirrorState._last_target_path = None  # reset any time that we build a new state machine
+        MirrorState._last_target_id = None  # reset any time that we build a new state machine
 
         if MirrorState._pub is None:
-            # Allow access to standard proxies initialied by flexbe_mirror
+            # Allow access to standard proxies initialized by flexbe_mirror
             MirrorState._pub = ProxyPublisher()
 
     @classmethod
-    def publish_update(cls, target_path):
+    def publish_update(cls, target_id):
         """Publish latest deep state for UI control."""
-        if target_path != MirrorState._last_target_path:
-            MirrorState._last_target_path = target_path
-            MirrorState._pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String(data=target_path))
+        if target_id != MirrorState._last_target_id:
+            MirrorState._last_target_id = target_id
+            MirrorState._pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=target_id))
 
     def execute_mirror(self, userdata):
         """Execute the mirror state."""
@@ -97,12 +98,16 @@ class MirrorState(EventState):
         self._entering = False
         self._last_outcome = None
         self._last_execution = None
-        MirrorState.publish_update(self._target_path)
+        MirrorState.publish_update(self.state_id)
 
     def on_exit_mirror(self, userdata, desired_outcome):
         """Exit mirror state."""
         try:
-            self._last_outcome = self.outcomes[desired_outcome]
+            if desired_outcome != -1:
+                if desired_outcome == StateMap._MAX_OUTCOME:
+                    self._last_outcome = State._preempted_name
+                else:
+                    self._last_outcome = self.outcomes[desired_outcome]
             return self._last_outcome
         except Exception as exc:  # pylint: disable=W0703
             Logger.localerr(f"Error: MirrorState execute for '{self.name}': "

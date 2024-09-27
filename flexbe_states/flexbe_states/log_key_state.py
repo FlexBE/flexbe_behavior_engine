@@ -36,9 +36,13 @@ class LogKeyState(EventState):
     """
     A state that can log a predefined message including an input key.
 
-    Can be used to precisely inform the operator about what happened to the behavior.
+    The text should be a Python format string (e.g. 'Counter value:  {}'),
+    where {} is a placeholder replaced by the value of the userdata.data using the
+    text.format(userdata.data) command.
 
-    -- text         string    The message to be logged to the terminal Example:  'Counter value:  {}'.
+    This can be used to precisely inform the operator about what happened to the behavior.
+
+    -- text         string    Format string of message to be logged to the terminal; e.g., 'Counter value:  {}'.
     -- severity     uint8     Type of logging (Logger.REPORT_INFO / WARN / HINT / ERROR)
 
     #> data         object    The data provided to be printed in the message. The exact type depends on the request.

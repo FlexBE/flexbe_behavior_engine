@@ -30,7 +30,7 @@
 
 
 """This defines the superclass for all implemented behaviors."""
-from flexbe_core.core import LockableStateMachine, OperatableStateMachine, PreemptableState
+from flexbe_core.core import LockableStateMachine, OperatableStateMachine, PreemptableState, StateMap
 from flexbe_core.logger import Logger
 
 from flexbe_msgs.msg import BehaviorSync
@@ -44,6 +44,7 @@ class Behavior:
         self._state_machine = None
         self.name = 'unnamed behavior'
         self.beh_id = 0  # Behavior id checksum assigned by processing the file contents
+        self._state_map = None
 
         self.contains = {}
         self._behaviors = {}
@@ -51,7 +52,7 @@ class Behavior:
         self._autonomy_level = 3
         self._debug = False
 
-        self.requested_state_path = None
+        self.requested_state_id = None
 
     # Please implement this abstract method:
     def create(self):
@@ -178,15 +179,25 @@ class Behavior:
 
     def confirm(self):
         """Confirm that this behavior is ready for execution."""
-        LockableStateMachine.path_for_switch = self.requested_state_path
+        self._state_map = StateMap()
+        self._state_machine.confirm(self.name, self.beh_id, self._state_map)
+        LockableStateMachine.path_for_switch = None
+        if self.requested_state_id is not None:
+            requested_state = self._state_map[self.requested_state_id]
+            LockableStateMachine.path_for_switch = requested_state.path
 
-        self._state_machine.confirm(self.name, self.beh_id)
+    @property
+    def state_map_items(self):
+        """Return two lists of keys and values from state map."""
+        if self._state_machine is not None:
+            return list(zip(*self._state_map.items))
+        return [], []
 
-    # def define_structure(self):
-    #     """
-    #     Calculate all state ids and prepare the ContainerStructure message
-    #     """
-    #     self._state_machine.define_structure()
+    def get_state_by_id(self, st_id):
+        """Return state reference from state map by id."""
+        if self._state_map is not None:
+            return self._state_map.get(st_id)
+        return None
 
     def execute(self):
         """
@@ -225,7 +236,7 @@ class Behavior:
             sm.replace_userdata(state_container.userdata)
             state_container = state_container._parent
         states[1].replace_state(state)  # add to new state machine
-        self.requested_state_path = state.path  # set start after switch
+        self.requested_state_id = state.state_id  # set start after switch
 
     def get_current_states(self):
         """Get all currently active (sub-)states."""

@@ -131,7 +131,7 @@ class BehaviorLibrary:
         try:
             return self._behavior_lib[be_key]
         except KeyError:
-            Logger.logwarn(f"Did not find ID '{be_key}' in libary, updating...")
+            Logger.logwarn(f"Did not find ID '{be_key}' in library, updating...")
             self.parse_packages()
             return self._behavior_lib.get(be_key, None)
 
@@ -166,12 +166,12 @@ class BehaviorLibrary:
         try:
             return __find_behavior()
         except StopIteration:
-            Logger.logwarn("Did not find behavior '%s' in current libary, updating..." % be_name)
+            Logger.logwarn("Did not find behavior '%s' in current library, updating..." % be_name)
             self.parse_packages()
             try:
                 return __find_behavior()
             except StopIteration:
-                Logger.logerr("Still cannot find behavior '%s' in libary after update, giving up!" % be_name)
+                Logger.logerr("Still cannot find behavior '%s' in library after update, giving up!" % be_name)
                 return None, None
 
     def count_behaviors(self):

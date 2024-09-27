@@ -37,7 +37,7 @@
 # Only code inside the [MANUAL] tags will be kept.        #
 ###########################################################
 
-from flexbe_core import Autonomy, Behavior, OperatableStateMachine
+from flexbe_core import Autonomy, Behavior, OperatableStateMachine, initialize_flexbe_core
 
 from flexbe_states.log_state import LogState as flexbe_states__LogState
 from flexbe_states.wait_state import WaitState as flexbe_states__WaitState
@@ -66,9 +66,7 @@ class LogBehaviorTestSM(Behavior):
         super(LogBehaviorTestSM, self).__init__()
         self.name = 'Log Behavior Test'
         self.node = node
-        flexbe_states__WaitState.initialize_ros(node)
-        flexbe_states__LogState.initialize_ros(node)
-        OperatableStateMachine.initialize_ros(node)
+        initialize_flexbe_core(node)
 
         # parameters of this behavior
 

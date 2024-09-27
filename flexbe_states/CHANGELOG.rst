@@ -2,6 +2,23 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+* use state id consistently to avoid long path strings
+* modify preempt and published outcome to improve sync
+* add flexbe_outcome_listener node for simple monitoring
+
+3.0.7 (2024-08-24)
+------------------
+* add new states; modify BehaviorInput to allow strings and selection combo box
+* add initialize_flexbe_core for common initialization
+
 3.0.6 (2024-08-05)
 ------------------
 * update cancel for action client; define get_status to replace get_state for proxy action client

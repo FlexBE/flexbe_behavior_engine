@@ -1,4 +1,4 @@
-int32  state_id     # Unique 23-bit identifer for state
+int32  state_id     # Unique 23-bit identifier for state
 string path         # String path from top-level state machine
 string[] children
 string[] outcomes

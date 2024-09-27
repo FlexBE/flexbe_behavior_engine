@@ -10,6 +10,10 @@ jobs:
       matrix:
         ros: [jazzy]
         include:
+        # - os: ubuntu-24.04
+        #   ros: rolling
+        #   python: python3
+        #   ci_branch: ros2-devel
         - os: ubuntu-24.04
           ros: jazzy
           python: python3

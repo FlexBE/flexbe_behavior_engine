@@ -113,7 +113,14 @@ class StateMachine(State):
         """Spin the SM execute loop."""
         outcome = None
         while True:
-            outcome = self.execute(userdata)
+            try:
+                outcome = self.execute(userdata)
+            except Exception as exc:
+                Logger.logerr(f"Exception in '{self}' - stopping behavior!")
+                Logger.localinfo(f'{exc}')
+                self.on_exit(userdata)
+                Logger.logerr(f"Exception in '{self}' - {exc}")
+                return None
 
             if outcome is not None:
                 break
@@ -124,21 +131,29 @@ class StateMachine(State):
 
     def execute(self, userdata):
         """Execute the SM."""
-        if self._entering or self._current_state is None:
-            self.assert_consistent_transitions()
-            self._entering = False
-            self._current_state = self.initial_state
-            self._userdata = userdata if userdata is not None else UserData()
-            self._userdata(add_from=self._own_userdata)
-            # Logger.localinfo(f"Entering StateMachine '{self.name}' "
-            #                  f"({self._state_id}) initial state='{self._current_state.name}'")
+        if self._entering:
+            self.on_enter(userdata)
+
         outcome = self._execute_current_state()
 
         if outcome:
             # Exit this statemachine
             self.on_exit(self._userdata)
+            self._publish_outcome(outcome)
 
         return outcome
+
+    def on_enter(self, userdata):
+        """Call on entering the state machine."""
+        self.assert_consistent_transitions()
+        self._entering = False
+        self._exited = False
+        self._current_state = self.initial_state
+        self._current_state._entering = True  # Force entering action
+        self._userdata = userdata if userdata is not None else UserData()
+        self._userdata(add_from=self._own_userdata)
+        # Logger.localinfo(f"Entering StateMachine '{self.name}' of '{self.path}' "
+        #                  f"({self.state_id}) initial state='{self._current_state.name}' ({self.__class__.__name__})")
 
     def _execute_current_state(self):
         """Execute the currently active state in this SM."""
@@ -219,10 +234,10 @@ class StateMachine(State):
         @return: The list of active states (not state machine)
         """
         if isinstance(self._current_state, StateMachine):
-            return self._current_state.get_deep_states()
+            return [self] + self._current_state.get_deep_states()
 
         # Base case is current_state is not a state machine
-        return [self._current_state] if self._current_state is not None else []  # Return as a list
+        return [self, self._current_state] if self._current_state is not None else [self]  # Return as a list
 
     # consistency checks
 

@@ -11,6 +11,7 @@ install(PROGRAMS
     bin/breakpoint
     bin/create_repo
     bin/evaluate_logs
+    bin/flexbe_status_listener
     DESTINATION lib/${PROJECT_NAME}
 )
 

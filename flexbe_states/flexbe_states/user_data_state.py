@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright 2024 Christopher Newport University
 #
@@ -12,7 +12,7 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Philipp Schillinger, Team ViGIR, Christopher Newport University nor the names of its
+#    * Neither the name of the Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -28,43 +28,29 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+"""UserdataState."""
+import copy
 
-"""Test description for test proxies."""
-import os
-import sys
-
-import launch
-
-import launch_testing.actions
-
-import pytest
+from flexbe_core import EventState
 
 
-@pytest.mark.rostest
-def generate_test_description():
-    """Generate test description for flexbe_logger test."""
-    path_to_test = os.path.dirname(__file__)
+class UserdataState(EventState):
+    """
+    A state that posts data onto the userdata stream.
 
-    TEST_PROC_PATH = os.path.join(path_to_test, 'test_logger.py')
+    -- data         object  The data to be posted
 
-    # This is necessary to get unbuffered output from the process under test
-    proc_env = os.environ.copy()
-    proc_env['PYTHONUNBUFFERED'] = '1'
+    <= done                 Indicates that data was posted
+    ># data         object  A copy of the data
+    """
 
-    test_logger = launch.actions.ExecuteProcess(
-        cmd=[sys.executable, TEST_PROC_PATH],
-        env=proc_env,
-        output='screen',
-        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=90),
-        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=90)
-    )
+    def __init__(self, data):
+        super(UserdataState, self).__init__(outcomes=['done'],
+                                            output_keys=['data'])
+        self._data = data
 
-    return (
-        launch.LaunchDescription([
-            test_logger,
-            launch_testing.actions.ReadyToTest()
-        ]),
-        {
-            'test_logger': test_logger,
-        }
-    )
+    def execute(self, userdata):
+        """Execute UserdataState."""
+        # Post data to userdata and return done.
+        userdata.data = copy.copy(self._data)
+        return 'done'

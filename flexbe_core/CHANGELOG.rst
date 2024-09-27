@@ -2,6 +2,33 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+* exception inside concurrency will get re-thrown to preempt behavior
+* report all states in deep_states including containers and finished states
+* re-request outcome on sync request
+* notify skipped for containers
+* remove some stray spam;
+* use jazzy test and increase some loop timings in tests due to intermittent test failure
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+* use state id consistently to avoid long path strings
+* modify preempt and published outcome to improve sync
+* add flexbe_outcome_listener node for simple monitoring
+
+3.0.7 (2024-08-24)
+------------------
+* reduce default wait durations on proxy start ups; reduce start up spam
+* clarify state map message
+* allow controllable OSM and concurrency outputs; improve sync handling; unhandled state exception stops behavior
+* modify clear action handling; retain action result status; reduce startup spam
+* add initialize_flexbe_core for common initialization
+* updates to ConcurrencyContainer and StateMachine to handle sync and forced outcomes
+
 3.0.6 (2024-08-05)
 ------------------
 * update cancel for action client
@@ -319,7 +346,7 @@ Changelog for package flexbe_core
 * [flexbe_core] Added priority container
 * [flexbe_core] Added some more documentation
 * [flexbe_core] Fixed initialization of input userdata in inner statemachines
-* [flexbe_core] Correctly preempt auxilliary control flows in concurrency container
+* [flexbe_core] Correctly preempt auxiliary control flows in concurrency container
 * [flexbe_core] Fixed a bug with concurrent execution:
   State machines inside state machine inside concurrency containers still blocked during execution.
 * [flexbe_core] Slightly reworked monitoring state

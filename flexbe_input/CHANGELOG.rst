@@ -2,6 +2,22 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.1 (2024-09-26)
+------------------
+* codespell clean up
+* fix typo in input_action_server
+
+4.0.0 (2024-08-24)
+------------------
+* Version 4.0.0 release using state_id for communication
+* this breaks API with flexbe_app and requires version 4.1.0+ of the FlexBE WebUI API
+
+3.0.7 (2024-08-24)
+------------------
+* fix issue with input action server
+* add new states; modify BehaviorInput to allow strings and selection combo box
+* add initialize_flexbe_core for common initialization
+
 3.0.6 (2024-08-05)
 ------------------
 * allow canceling input request

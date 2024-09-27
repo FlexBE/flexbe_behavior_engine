@@ -32,8 +32,9 @@ from flexbe_msgs.action import BehaviorExecution
 from flexbe_msgs.msg import BEStatus, BehaviorLog, BehaviorRequest, BehaviorSelection, BehaviorSync
 from flexbe_msgs.msg import CommandFeedback, ContainerStructure
 from flexbe_msgs.msg import OutcomeRequest
+from flexbe_msgs.msg import StateMapMsg
 
-from std_msgs.msg import Bool, Empty, String, UInt32, UInt8
+from std_msgs.msg import Bool, Empty, Int32, String, UInt32, UInt8
 
 
 class Topics:
@@ -47,7 +48,7 @@ class Topics:
     _CMD_LOCK_TOPIC = 'flexbe/command/lock'  # OCS request to lock state
     _CMD_PAUSE_TOPIC = 'flexbe/command/pause'  # OCS request to pause execution
     _CMD_PREEMPT_TOPIC = 'flexbe/command/preempt'  # OCS request behavior preempt
-    _CMD_REPEAT_TOPIC = 'flexbe/command/repeat'  # OCS request to repeat execution of state
+    _CMD_REPEAT_TOPIC = 'flexbe/command/repeat'  # OCS request to repeat execution of a single EventState implementation
     _CMD_SYNC_TOPIC = 'flexbe/command/sync'  # OCS request synchronization
     _CMD_TRANSITION_TOPIC = 'flexbe/command/transition'  # OCS request transition
     _CMD_UNLOCK_TOPIC = 'flexbe/command/unlock'  # OCS request to unlock state
@@ -65,23 +66,25 @@ class Topics:
     _REQUEST_STRUCTURE_TOPIC = 'flexbe/request_mirror_structure'  # Request state machine structure from onboard
     _START_BEHAVIOR_TOPIC = 'flexbe/start_behavior'  # OCS or launcher command to start behavior
     _STATE_LOGGER_TOPIC = 'flexbe/state_logger'
+    _STATE_MAP_TOPIC = 'flexbe/state_map'  # Mapping of state id hash codes to state path from onboard
+    _STATE_MAP_OCS_TOPIC = 'flexbe/mirror/state_map'  # Mapping of state id hash codes to state path from mirror (should be same)
     _UI_VERSION_TOPIC = 'flexbe/ui_version'  # OCS Version topic
 
     # Action interfaces
     _EXECUTE_BEHAVIOR_ACTION = 'flexbe/execute_behavior'
 
     _topic_types = {_BEHAVIOR_LOGGING_TOPIC: BehaviorLog,
-                    _BEHAVIOR_UPDATE_TOPIC: String,
+                    _BEHAVIOR_UPDATE_TOPIC: Int32,
                     _CMD_ATTACH_TOPIC: UInt8,
                     _CMD_AUTONOMY_TOPIC: UInt8,
                     _CMD_FEEDBACK_TOPIC: CommandFeedback,
-                    _CMD_LOCK_TOPIC: String,
+                    _CMD_LOCK_TOPIC: Int32,
                     _CMD_PAUSE_TOPIC: Bool,
                     _CMD_PREEMPT_TOPIC: Empty,
                     _CMD_REPEAT_TOPIC: Empty,
                     _CMD_SYNC_TOPIC: Empty,
                     _CMD_TRANSITION_TOPIC: OutcomeRequest,
-                    _CMD_UNLOCK_TOPIC: String,
+                    _CMD_UNLOCK_TOPIC: Int32,
                     _DEBUG_TOPIC: String,
                     _EXECUTE_BEHAVIOR_ACTION: BehaviorExecution,
                     _LAUNCHER_HEARTBEAT_TOPIC: UInt32,
@@ -96,6 +99,8 @@ class Topics:
                     _REQUEST_BEHAVIOR_TOPIC: BehaviorRequest,
                     _REQUEST_STRUCTURE_TOPIC: UInt32,
                     _START_BEHAVIOR_TOPIC: BehaviorSelection,
+                    _STATE_MAP_TOPIC: StateMapMsg,
+                    _STATE_MAP_OCS_TOPIC: StateMapMsg,
                     _UI_VERSION_TOPIC: String
                     }
 

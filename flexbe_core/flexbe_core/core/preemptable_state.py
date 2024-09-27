@@ -32,6 +32,7 @@
 """PreemptableState."""
 
 from flexbe_core.core.lockable_state import LockableState
+from flexbe_core.core.state import State
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 
@@ -68,7 +69,7 @@ class PreemptableState(LockableState):
             if not self._is_controlled:
                 Logger.localinfo('Behavior will be preempted')
             self._force_transition = True
-            return self._preempted_name
+            return State._preempted_name
 
         return self.__execute(*args, **kwargs)
 

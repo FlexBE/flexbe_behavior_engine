@@ -1,2 +1,2 @@
 uint8 outcome
-string target
+int32 target   # state id

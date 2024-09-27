@@ -77,7 +77,7 @@ class ProxyPublisher:
         Automatically creates a publisher for sending status messages.
 
         @type topics: dictionary string - message class
-        @param topics: A dictionay containing a collection of topic - message type pairs.
+        @param topics: A dictionary containing a collection of topic - message type pairs.
 
         @type _latch: bool
         @param: _latch: Defines if messages on the given topics should be latched.

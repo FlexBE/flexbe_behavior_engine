@@ -43,20 +43,32 @@ from .core import OperatableStateMachine, PriorityContainer  # noqa: F401
 from .logger import Logger  # noqa: F401
 from .state_logger import StateLogger  # noqa: F401
 
-MIN_UI_VERSION = '4.0.0'  # Minimum FlexBE App or UI version required to interact with this version of flexbe_core
+MIN_UI_VERSION = '4.1.0'  # Minimum FlexBE UI version required to interact with this version of flexbe_core
 
 # pylint: disable=R0903
 
 
-def set_node(node):
+def initialize_flexbe_core(node):
     """Set node information and initialize classes."""
     from .proxy import initialize_proxies        # pylint: disable=C0415
     from .core import RosState, RosStateMachine  # pylint: disable=C0415
     Logger.initialize(node)
+    Logger.localinfo('Initialize ROS enabled classes ...')
     StateLogger.initialize_ros(node)
     initialize_proxies(node)
     RosState.initialize_ros(node)
     RosStateMachine.initialize_ros(node)
+
+
+def set_node(node):
+    """Set node information and initialize classes."""
+    import warnings
+    warnings.warn(
+        'set_node function is deprecated and will be removed in a future version. Use initialize_flexbe_core(node) instead!',
+        DeprecationWarning,
+        stacklevel=2
+    )
+    initialize_flexbe_core(node)
 
 
 class Autonomy:
@@ -93,14 +105,15 @@ class Autonomy:
 
 
 __all__ = [
+    'Autonomy'
     'Behavior',
     'BehaviorLibrary',
     'ConcurrencyContainer',
     'EventState',
+    'Logger',
     'OperatableStateMachine',
     'PriorityContainer',
-    'Logger',
     'StateLogger',
-    'set_node',
-    'Autonomy'
+    'initialize_flexbe_core',
+    'set_node',  # To be deprecated in future release
 ]

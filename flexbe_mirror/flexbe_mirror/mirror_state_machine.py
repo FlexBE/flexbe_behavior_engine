@@ -33,10 +33,11 @@ from threading import Event
 
 from flexbe_core import Logger
 from flexbe_core.core import PreemptableState, PreemptableStateMachine
+from flexbe_core.core import State
+from flexbe_core.core import StateError
 from flexbe_core.core import StateMachine
 from flexbe_core.core import StateMap
-from flexbe_core.core.exceptions import StateError
-from flexbe_core.core.topics import Topics
+from flexbe_core.core import Topics
 from flexbe_core.proxy import ProxySubscriberCached
 
 from flexbe_mirror.mirror_state import MirrorState
@@ -59,11 +60,12 @@ class MirrorStateMachine(PreemptableStateMachine):
         self._target_name = target_name
         self._target_path = '/' + '/'.join(target_path.split('/')[1:])  # Drop top-level name
 
-    def spin(self, start_time, userdata=None):
+    def spin(self, start_time, state_map):
         """Spin the execute in loop for Mirror."""
         Logger.localinfo(f"Mirror: begin spinning for '{self.name}' ({self.id}) "
                          f' in thread with start time = {start_time.nanoseconds} ns')
 
+        userdata = None  # Not used in mirror
         timing_event = Event()
 
         # Only the top-level SM needs the outcome topic subscribed by mirror
@@ -73,13 +75,14 @@ class MirrorStateMachine(PreemptableStateMachine):
         MirrorState._last_state_outcome = None
 
         MirrorStateMachine._execute_flag = True  # Force a first pass regardless of messages
+        self._last_deep_states_list = None  # Force change to send behavior update
         loop_count = 0
         self._total_loop_count = 0  # Attribute only added to top-level SM
-        outcome = PreemptableState._preempted_name
+        outcome = State._preempted_name
         if self._current_state is None:
             self.on_enter_mirror(userdata)
             Logger.localinfo(f"Mirror: set initial state for top-level '{self.name}' ({self.state_id}) ({self.id}) "
-                             f" with state = {self._current_state.name}' ({self._current_state._state_id})")
+                             f" with state = {self._current_state.name}' ({self._current_state.state_id})")
 
         while rclpy.ok() and not PreemptableState.preempt:
             self._total_loop_count += 1
@@ -91,7 +94,8 @@ class MirrorStateMachine(PreemptableStateMachine):
                     # We will process every message to ensure consistency
                     msg = outcome_sub.get_from_buffer(Topics._OUTCOME_TOPIC)
                     state_id, outcome = StateMap.unhash(msg.data)
-                    # Logger.localinfo(f"  outcome {state_id} {outcome} in thread started at {start_time.nanoseconds}")
+                    # Logger.localinfo(f"  received outcome '{outcome}' "
+                    #                  f"for '{state_map[state_id].path.replace('_mirror', '')}' ({state_id})")
 
                     # Store data for handling by execute function in appropriate state
                     MirrorState._last_state_id = state_id
@@ -99,19 +103,20 @@ class MirrorStateMachine(PreemptableStateMachine):
                     if MirrorState._last_state_id == self.state_id:
                         # Handle this top-level outcome
                         if self._last_outcome is not None:
-                            Logger.localwarn(f"Mirror SM top-level spin for '{self.name}' : "
+                            Logger.localwarn(f"Mirror SM top-level spin for '{self.name.replace('_mirror', '')}' "
+                                             f"of '{self.path.replace('_mirror', '')}: "
                                              f"Already processed outcome='{self._last_outcome}' for "
-                                             f" state '{self.name}' ({self.state_id}) given new "
+                                             f" state '{self.name.replace('_mirror', '')}' ({self.state_id}) given new "
                                              f'outcome index={MirrorState._last_state_outcome} - '
                                              f'reprocessing anyway in thread started at {start_time.nanoseconds}')
 
                         MirrorState._last_state_id = None  # Flag that the message was handled
                         if MirrorState._last_state_outcome is not None:
                             outcome = self.on_exit_mirror(userdata, MirrorState._last_state_outcome)
-                            MirrorState.publish_update(self._target_path)  # Notify back at top-level before exit
+                            MirrorState.publish_update(self.state_id)  # Notify back at top-level before exit
                             MirrorState._last_state_outcome = None  # Flag that the message was handled
-                            Logger.localinfo(f' top-level outcome {outcome} for {state_id} '
-                                             f'in thread started at {start_time.nanoseconds}')
+                            # Logger.localinfo(f' top-level outcome {outcome} for {state_id} '
+                            #                 f'in thread started at {start_time.nanoseconds}')
                             break  # Outcome at the top-level
 
                     # Some change to process
@@ -125,7 +130,7 @@ class MirrorStateMachine(PreemptableStateMachine):
 
                     if MirrorState._last_state_id is not None or MirrorState._last_state_outcome is not None:
                         # This should not happen unless system is out of sync
-                        Logger.logwarn(f"MirrorStateMachine '{self.name}' ({self._state_id}) spin() - "
+                        Logger.logwarn(f"MirrorStateMachine '{self.name}' ({self.state_id}) spin() - "
                                        f'no state handled outcome from {MirrorState._last_state_id} '
                                        f'outcome index={MirrorState._last_state_outcome}')
 
@@ -136,21 +141,15 @@ class MirrorStateMachine(PreemptableStateMachine):
                         with self._status_lock:
                             self._last_deep_states_list = deep_states
 
-                        # In case of internal return in concurrency container send another update to UI
-                        # for the deepest active state
-                        if len(deep_states) > 0:
-                            MirrorState.publish_update(deep_states[-1]._target_path)
-
                     if outcome is not None:
-                        Logger.localinfo(f"MirrorStateMachine '{self.name}' ({self._state_id}) spin() - outcome = {outcome}"
+                        Logger.localinfo(f"MirrorStateMachine '{self.name}' ({self.state_id}) spin() - outcome = {outcome}"
                                          ' - wait for confirming top-level outcome message!')
 
                 else:
                     # Process fast independent of simulation time in order to keep up with onboard
-                    if loop_count > 50000:
+                    if loop_count > 100000:
                         loop_count = 0   # periodic spam for updates
-                        Logger.localinfo(f"  SM spinner -'{self.name}' ({self.id}) - "
-                                         f'after {self._total_loop_count} spins in thread started at {start_time.nanoseconds}')
+                        Logger.localinfo(f"  SM spinner -'{self.name}' ({self.id}) - {self._total_loop_count} spins")
                     timing_event.wait(0.0002)  # minor wait for next message if we didn't process anything previous loop
 
             except Exception as exc:  # pylint: disable=W0703
@@ -192,16 +191,20 @@ class MirrorStateMachine(PreemptableStateMachine):
                 target = self._transitions[self._current_state.name][outcome]
                 self._current_state = self._labels.get(target)  # Get the new state
                 if self._current_state is None:
-                    return target
+                    # Logger.localinfo(f"SM {self.name.replace('_mirror', '')} is done, but wait for outcome message.")
+                    MirrorState.publish_update(self.state_id)  # Notify back at sm-level before exit
+                    return None
                 else:
+                    # Logger.localinfo(f"SM {self.name.replace('_mirror', '')} transitioning "
+                    #                  f"to '{self._current_state.name.replace('_mirror', '')}' ...")
                     self._current_state._entering = True
                     return None
             except KeyError as exc:
                 err_msg = f"Returned outcome '{outcome}' is not registered as a transition from '{self._current_state}'"
-                Logger.localerr(f"Mirror SM execute for '{self.name}' ({self._state_id}): {err_msg}")
-                Logger.localinfo(f'  {self.name} ({self._state_id}) - labels={self._labels}')
-                Logger.localinfo(f'  {self.name} ({self._state_id}) - transitions={self._transitions}')
-                Logger.localinfo(f'  {self.name} ({self._state_id}) - outcomes={self._outcomes}')
+                Logger.localerr(f"Mirror SM execute for '{self.name}' ({self.state_id}): {err_msg}")
+                Logger.localinfo(f'  {self.name} ({self.state_id}) - labels={self._labels}')
+                Logger.localinfo(f'  {self.name} ({self.state_id}) - transitions={self._transitions}')
+                Logger.localinfo(f'  {self.name} ({self.state_id}) - outcomes={self._outcomes}')
                 raise StateError(err_msg) from exc
 
         # we handle internal SM transitions using mirror outcome messages
@@ -214,8 +217,10 @@ class MirrorStateMachine(PreemptableStateMachine):
 
         if MirrorState._last_state_id == self.state_id:
             # Handle outcome of this internal SM
+            # Logger.localinfo(f"Handling outcome of SM '{self.name.replace('_mirror', '')}' "
+            #                  f"of '{self.path.replace('_mirror', '')}' ...")
             if self._last_outcome is not None:
-                Logger.localwarn(f"Mirror SM execute for '{self.name}' ({self._state_id}) : "
+                Logger.localwarn(f"Mirror SM execute for '{self.name}' ({self.state_id}) : "
                                  f'Already processed outcome={self._last_outcome} for '
                                  f'outcome index={MirrorState._last_state_outcome} - reprocessing anyway')
 
@@ -237,8 +242,8 @@ class MirrorStateMachine(PreemptableStateMachine):
         @return: The list of active states (not state machine)
         """
         if isinstance(self._current_state, StateMachine):
-            return self._current_state.get_deep_states()
-        return [self._current_state] if self._current_state is not None else []  # Return as a list
+            return [self] + self._current_state.get_deep_states()
+        return [self, self._current_state] if self._current_state is not None else [self]  # Return as a list
 
     def get_latest_status(self):
         """Return the latest execution information as a BehaviorSync message."""
@@ -271,17 +276,22 @@ class MirrorStateMachine(PreemptableStateMachine):
         self._last_outcome = None
         self._current_state._entering = True  # force state to handle enter on first execute
         self._userdata = None  # not used in mirror
-        MirrorState.publish_update(self._target_path)
+        MirrorState.publish_update(self.state_id)
 
     def on_exit_mirror(self, userdata, desired_outcome=-1):
         """Exit mirror statemachine."""
         try:
             if self._current_state is not None:
                 self._current_state._entering = True
-                self._current_state.on_exit(userdata, -1)  # Preempted
-            self._last_outcome = self.outcomes[desired_outcome]
+                self._current_state.on_exit_mirror(userdata, -1)  # Preempted
+            if desired_outcome != -1:
+                if desired_outcome == StateMap._MAX_OUTCOME:
+                    self._last_outcome = State._preempted_name
+                else:
+                    self._last_outcome = self.outcomes[desired_outcome]
             self._current_state = None
             self._entering = True
+            MirrorState.publish_update(self.state_id + 255)  # publish that we "entered" container to exit
             return self._last_outcome
         except Exception:  # pylint: disable=W0703
             Logger.localerr(f"Error: MirrorStateMachine execute for '{self.name}': "

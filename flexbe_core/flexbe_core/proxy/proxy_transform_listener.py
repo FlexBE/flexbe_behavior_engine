@@ -51,7 +51,7 @@ class ProxyTransformListener:
 
     @staticmethod
     def shutdown():
-        """Shut down this proxy by reseting the transform listener."""
+        """Shut down this proxy by resetting the transform listener."""
         try:
             ProxyTransformListener._listener = None
             ProxyTransformListener._buffer = None

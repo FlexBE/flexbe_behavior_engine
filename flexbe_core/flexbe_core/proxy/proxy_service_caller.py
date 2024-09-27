@@ -75,7 +75,7 @@ class ProxyServiceCaller:
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy service caller !\n{str(exc)}')
 
-    def __init__(self, topics=None, wait_duration=10):
+    def __init__(self, topics=None, wait_duration=1.0):
         """
         Initialize the proxy with optionally a given set of clients.
 
@@ -83,14 +83,14 @@ class ProxyServiceCaller:
         @param topics: A dictionary containing a collection of topic - message type pairs.
 
         @type wait_duration: float
-        @param wait_duration: Defines how long to wait (seconds) for the given services if not available right now.
+        @param wait_duration: Defines how long to wait (seconds) for the given service if not available right now.
         """
         if topics is not None:
             for topic, srv_type in topics.items():
                 ProxyServiceCaller.setup_service(topic, srv_type, wait_duration)
 
     @classmethod
-    def setupService(cls, topic, srv_type, wait_duration=10):
+    def setupService(cls, topic, srv_type, wait_duration=1.0):
         """Set up the service caller."""
         Logger.localerr('Deprecated: Use ProxyServiceCaller.setup_service instead!')
         cls.setup_service(topic, srv_type, wait_duration)
@@ -267,7 +267,7 @@ class ProxyServiceCaller:
         return ProxyServiceCaller._results[topic].result()
 
     @classmethod
-    def _check_service_available(cls, topic, wait_duration=1):
+    def _check_service_available(cls, topic, wait_duration=1.0):
         """
         Check whether a service is available.
 

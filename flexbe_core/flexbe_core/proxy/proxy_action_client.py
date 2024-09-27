@@ -32,6 +32,7 @@ from functools import partial
 from threading import Lock, Timer
 
 from action_msgs.msg import GoalStatus
+
 from flexbe_core.logger import Logger
 
 from rclpy.action import ActionClient
@@ -50,6 +51,16 @@ class ProxyActionClient:
     _feedback = {}
 
     _client_sync_lock = Lock()
+
+    _goal_status_dict = {
+        0: 'UNKNOWN',
+        1: 'ACCEPTED',
+        2: 'EXECUTING',
+        3: 'CANCELING',
+        4: 'SUCCEEDED',
+        5: 'CANCELED',
+        6: 'ABORTED'
+    }
 
     @staticmethod
     def initialize(node):
@@ -77,12 +88,12 @@ class ProxyActionClient:
         except Exception as exc:  # pylint: disable=W0703
             print(f'Something went wrong during shutdown of proxy action clients!\n{ str(exc)}')
 
-    def __init__(self, topics=None, wait_duration=10):
+    def __init__(self, topics=None, wait_duration=1.0):
         """
-        Initialize the proxy with optionally a given set of clients.
+        Initialize the proxy with an optionally given set of clients.
 
         @type topics: dictionary string - message class
-        @param topics: A dictionay containing a collection of topic - message type pairs.
+        @param topics: A dictionary containing a collection of topic - message type pairs.
 
         @type wait_duration: int
         @param wait_duration: Defines how long to wait for each client in the
@@ -93,10 +104,10 @@ class ProxyActionClient:
                 ProxyActionClient.setup_client(topic, action_type, wait_duration)
 
     @classmethod
-    def setupClient(cls, topic, action_type, wait_duration=10):
+    def setupClient(cls, topic, action_type, wait_duration=1.0):
         """Set up proxy action client (Deprecated)."""
         Logger.localerr('Deprecated: Use ProxyActionClient.setup_client instead!')
-        cls.setup_client(topic, action_type, wait_duration=10)
+        cls.setup_client(topic, action_type, wait_duration)
 
     @classmethod
     def setup_client(cls, topic, action_type, wait_duration=None):
@@ -266,7 +277,6 @@ class ProxyActionClient:
 
         if clear and result is not None:
             ProxyActionClient._result[topic] = None
-            ProxyActionClient._result_status[topic] = None
 
         return result
 
@@ -279,7 +289,6 @@ class ProxyActionClient:
         @param topic: The topic of interest.
         """
         ProxyActionClient._result[topic] = None
-        ProxyActionClient._result_status[topic] = None
 
     @classmethod
     def has_feedback(cls, topic):
@@ -345,6 +354,22 @@ class ProxyActionClient:
         return ProxyActionClient._result_status.get(topic)
 
     @classmethod
+    def get_status_string(cls, topic):
+        """
+        Return the action server status of the given action topic as a string.
+
+        A list of possible states is defined in action_msgs/GoalStatus.
+
+        @type topic: string
+        @param topic: The topic of interest.
+        """
+        status_code = ProxyActionClient._result_status.get(topic)
+        if status_code in cls._goal_status_dict:
+            return cls._goal_status_dict[status_code]
+
+        return 'Unknown Status'
+
+    @classmethod
     def is_active(cls, topic):
         """
         Determine if an action request is already being processed on the given topic.
@@ -370,18 +395,24 @@ class ProxyActionClient:
             try:
                 current_goal_handle = current_goal_future.result()
                 cancel_future = current_goal_handle.cancel_goal_async()
+                ProxyActionClient._result_status[topic] = GoalStatus.STATUS_CANCELING
+
                 # add callback to acknowledge completion of cancel_goal
                 cancel_future.add_done_callback(partial(ProxyActionClient._cancel_callback, topic=topic))
 
             except Exception as exc:
                 Logger.localinfo(f"  Error canceling '{topic}' : {exc}")
+        else:
+            Logger.localinfo(f"Failed to send cancel request for '{topic}' ...")
 
         ProxyActionClient._current_goal[topic] = None
 
     @classmethod
     def _cancel_callback(cls, future, topic):
         result = future.result()
-        Logger.localdebug(f"   cancel result for '{topic}' : result={result}")
+        Logger.localinfo(f"   cancel result for '{topic}' : result={result.return_code}")
+        ProxyActionClient._result_status[topic] = GoalStatus.STATUS_CANCELED
+        ProxyActionClient._has_active_goal[topic] = False
 
     @classmethod
     def _check_topic_available(cls, topic, wait_duration=0.1):

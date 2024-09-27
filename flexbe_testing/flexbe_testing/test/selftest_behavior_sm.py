@@ -32,7 +32,7 @@
 
 """Content is only intended for the flexbe_testing self-test."""
 
-from flexbe_core import Autonomy, Behavior, EventState, Logger, OperatableStateMachine
+from flexbe_core import Autonomy, Behavior, EventState, Logger, OperatableStateMachine, initialize_flexbe_core
 
 
 class SelftestBehaviorSM(Behavior):
@@ -44,9 +44,7 @@ class SelftestBehaviorSM(Behavior):
         self.name = 'Selftest Behavior'
 
         self.node = node
-        OperatableStateMachine.initialize_ros(self.node)
-        SelftestBehaviorSM._CalculationState.initialize_ros(self.node)
-        SelftestBehaviorSM._DecisionState.initialize_ros(self.node)
+        initialize_flexbe_core(self.node)
 
         # parameters of this behavior
         self.value = None  # avoid pylint error

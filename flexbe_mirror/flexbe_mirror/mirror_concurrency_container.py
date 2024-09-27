@@ -30,7 +30,8 @@
 """Simplified state machine for use with FlexBE UI State machine mirror."""
 
 from flexbe_core import Logger
-from flexbe_core.core import StateMachine
+from flexbe_core.core import State, StateMachine
+from flexbe_core.core import StateMap
 
 from flexbe_mirror.mirror_state import MirrorState
 from flexbe_mirror.mirror_state_machine import MirrorStateMachine
@@ -56,7 +57,7 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
             state._entering = True  # force state to handle enter on first execute
             state._last_execution = None
 
-        MirrorState.publish_update(self._target_path)
+        MirrorState.publish_update(self.state_id)
 
     def on_exit_mirror(self, userdata, desired_outcome=-1, states=None):
         """Exit state and prepare for next entry (outcome -1 means preempt)."""
@@ -69,7 +70,12 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
 
         self._current_state = None
         self._returned_outcomes = {}
-        self._last_outcome = self.outcomes[desired_outcome]
+        if desired_outcome != -1:
+            if desired_outcome == StateMap._MAX_OUTCOME:
+                self._last_outcome = State._preempted_name
+            else:
+                self._last_outcome = self.outcomes[desired_outcome]
+        MirrorState.publish_update(self.state_id + 255)  # publish that we "entered" container to exit
         return self._last_outcome
 
     def execute_mirror(self, userdata):
@@ -84,7 +90,8 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
         if MirrorState._last_state_id == self.state_id:
             # Handle outcome of this internal SM
             if self._last_outcome is not None:
-                Logger.localwarn(f"Mirror SM concurrency execute for '{self.name}' ({self._state_id}) : "
+                Logger.localwarn(f"Mirror SM concurrency execute for '{self.name.replace('_mirror', '')}' of "
+                                 f" '{self.path.replace('_mirror', '')}' ({self.state_id}) : "
                                  f"Already processed outcome='{self._last_outcome}' for "
                                  f'outcome index={MirrorState._last_state_outcome} - reprocessing anyway')
 
@@ -113,6 +120,10 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
             else:
                 self._current_state.append(state)
         # Handle container return in execute
+        if len(self._current_state) == 0:
+            # No unexited states in concurrent, so notify we have returned to concurrent level
+            # Logger.localinfo(f"Inside CC '{self}' - no active internal - publish update '{self._target_path}'")
+            MirrorState.publish_update(self.state_id)  # Notify back at top-level before exit
         return None
 
     def get_deep_states(self):
@@ -133,9 +144,9 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
                 else:
                     deep_states.append(state)
         elif self._current_state is not None:
-            Logger.localerr(f"MirrorConcurrentContainer.get_deep_states '{self.name}' ({self._current_state._state_id})\n"
+            Logger.localerr(f"MirrorConcurrentContainer.get_deep_states '{self.name}' ({self._current_state.state_id})\n"
                             f" - current state is NOT a list! Error type='{type(self._current_state)}'")
-            Logger.localerr(f"    '{self._current_state.name}' ({self._current_state._state_id})")
+            Logger.localerr(f"    '{self._current_state.name}' ({self._current_state.state_id})")
             raise TypeError(f"MirrorConcurrentContainer.get_deep_states '{self.name}' - "
-                            f"current state is NOT a list! Errror type='{type(self._current_state)}'")
+                            f"current state is NOT a list! Error type='{type(self._current_state)}'")
         return deep_states

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024 Christopher Newport University
+# Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Test description for test proxies."""
+"""Test setup."""
 import os
 import sys
 
@@ -42,29 +42,29 @@ import pytest
 
 @pytest.mark.rostest
 def generate_test_description():
-    """Generate test description for flexbe_logger test."""
+    """Generate test description for flexbe_exceptions_spin_test."""
     path_to_test = os.path.dirname(__file__)
 
-    TEST_PROC_PATH = os.path.join(path_to_test, 'test_logger.py')
+    test_proc_path = os.path.join(path_to_test, 'test_exceptions_spin.py')
 
     # This is necessary to get unbuffered output from the process under test
     proc_env = os.environ.copy()
     proc_env['PYTHONUNBUFFERED'] = '1'
 
-    test_logger = launch.actions.ExecuteProcess(
-        cmd=[sys.executable, TEST_PROC_PATH],
+    test_exceptions = launch.actions.ExecuteProcess(
+        cmd=[sys.executable, test_proc_path],
         env=proc_env,
         output='screen',
-        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=90),
-        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=90)
+        sigterm_timeout=launch.substitutions.LaunchConfiguration('sigterm_timeout', default=15),
+        sigkill_timeout=launch.substitutions.LaunchConfiguration('sigkill_timeout', default=15)
     )
 
     return (
         launch.LaunchDescription([
-            test_logger,
+            test_exceptions,
             launch_testing.actions.ReadyToTest()
         ]),
         {
-            'test_logger': test_logger,
+            'test_exceptions': test_exceptions,
         }
     )

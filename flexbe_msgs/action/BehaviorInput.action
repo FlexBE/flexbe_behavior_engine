@@ -1,4 +1,4 @@
-# If desired, custom request types can be defined and choosen here
+# If desired, custom request types can be defined and chosen here
 uint8 request_type
 
 # Basic types (used by input_action_server, but otherwise optional)
@@ -9,11 +9,15 @@ uint8 REQUEST_3D           = 3  # List of 3 floats
 uint8 REQUEST_4D           = 4  # List of 4 floats (e.g. quaternion)
 uint8 REQUEST_POSE         = 10 # Geometry message pose
 uint8 REQUEST_POSE_STAMPED = 11 # Geometry message pose stamped
-
+uint8 REQUEST_STRING       = 12 # String
+uint8 REQUEST_SELECTION    = 13 # Select from among items in list
 
 # Request message displayed to the operator
 # Provide context information, i.e. for which purpose the data is required.
 string msg
+
+# List of items for selection (used only by REQUEST_SELECTION )
+string[] items
 
 ---
 

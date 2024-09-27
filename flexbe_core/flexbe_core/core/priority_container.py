@@ -31,6 +31,7 @@
 
 """A state machine that is always executed alone when becoming active."""
 from flexbe_core.core.operatable_state_machine import OperatableStateMachine
+from flexbe_core.logger import Logger
 
 
 class PriorityContainer(OperatableStateMachine):
@@ -55,6 +56,19 @@ class PriorityContainer(OperatableStateMachine):
         outcome = OperatableStateMachine.execute(self, *args, **kwargs)
 
         if outcome is not None:
+            # Logger.localinfo(f"Priority container '{self}' outcome='{outcome}' reset active "
+            #                  f"from '{PriorityContainer.active_container}'"
+            #                  f" to  '{self._parent_active_container}'")
             PriorityContainer.active_container = self._parent_active_container
 
         return outcome
+
+    def on_enter(self, userdata=None):  # pylint: disable=W0613
+        """Call on entering the operatable state machine."""
+        Logger.localinfo(f"Enter priority container '{self}' ...")
+        super().on_enter(userdata)
+
+    def on_exit(self, userdata=None):
+        """Call on exiting the statemachine."""
+        super().on_enter(userdata)
+        Logger.localinfo(f"Exited priority container '{self}'")

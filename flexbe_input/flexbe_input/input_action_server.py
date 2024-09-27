@@ -30,7 +30,7 @@ import ast
 import pickle
 import time
 
-from PySide6.QtCore import Signal, Slot, QCoreApplication, Qt, QThread
+from PySide6.QtCore import QCoreApplication, QThread, Qt, Signal, Slot
 from PySide6.QtWidgets import QApplication
 
 from flexbe_core import Logger
@@ -48,7 +48,9 @@ from rclpy.node import Node
 
 
 class InputActionWorker(QThread):
-    _show_dialog_signal = Signal(str)
+    """Worker thread for InputAction server."""
+
+    _show_dialog_signal = Signal(str, object)
     _hide_dialog_signal = Signal()
 
     def __init__(self, node):
@@ -56,10 +58,11 @@ class InputActionWorker(QThread):
         self._node = node
 
     def run(self):
+        """Run loop for worker thread."""
         try:
             # Use a MultiThreadedExecutor to enable processing goals concurrently
             executor = MultiThreadedExecutor()
-            print('Begin spining ROS loop for InputActionServer ...', flush=True)
+            print('Begin spinning ROS loop for InputActionServer ...', flush=True)
             rclpy.spin(self._node, executor=executor)
         except (KeyboardInterrupt, ExternalShutdownException):
             print('Caught KeyboardInterrupt in InputActionWorker thread - shutdown ...')
@@ -91,7 +94,7 @@ class InputActionServer(Node):
             cancel_callback=self.cancel_callback
         )
 
-        self._input_dialog = InputGUI("default")
+        self._input_dialog = InputGUI('default')
 
         self._input = None
         self._canceled = False
@@ -107,12 +110,14 @@ class InputActionServer(Node):
 
         @return prompt, instance type, number of elements
         """
-        # Thse are the only types handled by this simple UI
+        # These are the only types handled by this simple UI
         types = {BehaviorInput.Goal.REQUEST_INT: ('int', int, 1),
                  BehaviorInput.Goal.REQUEST_FLOAT: ('float', (float, int), 1),  # int acceptable for desired float
                  BehaviorInput.Goal.REQUEST_2D: ('list of 2 numbers', (list, tuple), 2),  # allow either list or tuple
                  BehaviorInput.Goal.REQUEST_3D: ('list of 3 numbers', (list, tuple), 3),  # e.g., '[1, 2]', '(1, 2)', or '1, 2'
                  BehaviorInput.Goal.REQUEST_4D: ('list of 4 numbers', (list, tuple), 4),
+                 BehaviorInput.Goal.REQUEST_STRING: ('string', str, 1),
+                 BehaviorInput.Goal.REQUEST_SELECTION: ('selected item', str, 1)
                  }
 
         if request_type in types:
@@ -141,7 +146,10 @@ class InputActionServer(Node):
         # Get data from user
         try:
             # Request input from GUI running in a separate thread
-            self._worker._show_dialog_signal.emit(prompt_text)
+            if goal_handle.request.request_type == BehaviorInput.Goal.REQUEST_SELECTION:
+                self._worker._show_dialog_signal.emit(prompt_text, goal_handle.request.items)
+            else:
+                self._worker._show_dialog_signal.emit(prompt_text, None)
 
             while self._input_dialog.is_none() and not self._canceled:
                 time.sleep(0.02)  # Add a short sleep to avoid busy-waiting
@@ -163,15 +171,25 @@ class InputActionServer(Node):
                 goal_handle.abort()
                 return result
             else:
-                input_data = ast.literal_eval(self._input)  # convert string to Python data
-                if not isinstance(input_data, type_class):
-                    result.data = f"Invalid input type '{type(input_data)}' not '{type_class}' - expected '{type_text}'"
-                    result.result_code = BehaviorInput.Result.RESULT_FAILED
-                    Logger.localwarn(result.data)
-                    goal_handle.abort()
-                    return result
+                if type_class is str:
+                    print(f"Process data as string '{self._input}' with request {type_class}", flush=True)
+                    result.data = self._input
+                    data_len = 1
+                else:
+                    print(f"Process data '{self._input}' as {type_class}", flush=True)
+                    input_data = ast.literal_eval(self._input)  # convert string to Python data
+                    print(f"  input data[{type(input_data)}] = '{input_data}'", flush=True)
+                    data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
 
-                data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
+                    if not isinstance(input_data, type_class):
+                        result.data = f"Invalid input type '{type(result.data)}' not '{type_class}' - expected '{type_text}'"
+                        result.result_code = BehaviorInput.Result.RESULT_FAILED
+                        Logger.localwarn(result.data)
+                        goal_handle.abort()
+                        return result
+                    # Convert binary to string for transport
+                    result.data = str(pickle.dumps(input_data))
+
                 if data_len != expected_elements:
                     result.data = (f'Invalid number of elements {data_len} not {expected_elements} '
                                    f"of {type_class} - expected '{type_text}'")
@@ -179,7 +197,6 @@ class InputActionServer(Node):
                     Logger.localwarn(result.data)
                     goal_handle.abort()
                 else:
-                    result.data = str(pickle.dumps(input_data))
                     result.result_code = BehaviorInput.Result.RESULT_OK
                     goal_handle.succeed()
         except Exception as exc:  # pylint: disable=W0703
@@ -192,12 +209,14 @@ class InputActionServer(Node):
         return result
 
     def cancel_callback(self, goal_handle):
+        """Cancel the active goal."""
         Logger.localwarn(f"Canceling goal for '{self._action_topic}' ...")
         self._canceled = True
         return rclpy.action.CancelResponse.ACCEPT
 
     @Slot()
-    def on_get_input(self, val=0):
+    def on_get_input(self):
+        """Get the input from edit box."""
         self._input = self._input_dialog.get_input()
 
 
@@ -228,9 +247,9 @@ def main(args=[]):
     print('Ensure shutdown of ROS worker thread ...', flush=True)
     worker.quit()
 
-    print("wait on ROS thread to close ...", flush=True)
+    print('wait on ROS thread to close ...', flush=True)
     worker.wait()
-    print("done!", flush=True)
+    print('done!', flush=True)
 
 
 if __name__ == '__main__':

@@ -42,13 +42,13 @@ except Exception:
         # print('Python thread names are not visible in ps/top unless you install prctl')
         pass
 
-from flexbe_core import Logger, MIN_UI_VERSION
+from flexbe_core import Logger, MIN_UI_VERSION, initialize_flexbe_core
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine
-from flexbe_core.core import PreemptableState, PreemptableStateMachine, StateMap
+from flexbe_core.core import PreemptableState, State, StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 
-from flexbe_msgs.msg import BEStatus, BehaviorSync, ContainerStructure
+from flexbe_msgs.msg import BEStatus, BehaviorSync, ContainerStructure, StateMapMsg
 
 from rclpy.clock import Clock
 from rclpy.node import Node
@@ -82,19 +82,12 @@ class FlexbeMirror(Node):
         super().__init__('flexbe_mirror')
 
         self._sm = None
-        ProxyPublisher.initialize(self)
-        ProxySubscriberCached.initialize(self)
-        Logger.initialize(self)
-
-        MirrorState.initialize_ros(self)
-        PreemptableState.initialize_ros(self)
-        PreemptableStateMachine.initialize_ros(self)
-        LockableStateMachine.initialize_ros(self)
+        initialize_flexbe_core(self)
 
         self._timing_event = threading.Event()  # Used for wait timer
 
         # Keep track of mirror thread status
-        # starting one while other is stoppin is valid,
+        # starting one while other is stopping is valid,
         # but only one thread should be running at a time
         self._starting = False
         self._running = False
@@ -110,7 +103,7 @@ class FlexbeMirror(Node):
         self._system_clock = Clock()
         self._active_thread_start = None
 
-        # set up proxys for sm <--> GUI communication
+        # set up proxies for sm <--> GUI communication
         # publish topics
         self._heartbeat_pub = self.create_publisher(Int32, Topics._MIRROR_HEARTBEAT_TOPIC, 2)
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
@@ -130,11 +123,13 @@ class FlexbeMirror(Node):
 
         # Use proxy publisher/subscriber for access in states
         # but just initialize here once for all
-        self._beh_update_pub = ProxyPublisher({Topics._BEHAVIOR_UPDATE_TOPIC: String})
+        self._beh_update_pub = ProxyPublisher({Topics._BEHAVIOR_UPDATE_TOPIC: Int32})
 
         self._outcome_sub = ProxySubscriberCached()
         self._outcome_sub.subscribe(Topics._OUTCOME_TOPIC, UInt32, inst_id=id(self))
         self._outcome_sub.enable_buffer(Topics._OUTCOME_TOPIC)
+
+        self._state_map_pub = self.create_publisher(StateMapMsg, Topics._STATE_MAP_OCS_TOPIC, latching_qos)
 
         # no clean way to wait for publisher to be ready...
         Logger.loginfo('--> Mirror - setting up publishers and subscribers ...')
@@ -150,10 +145,10 @@ class FlexbeMirror(Node):
         vui = FlexbeMirror._parse_version(msg.data)
         vex = FlexbeMirror._parse_version(MIN_UI_VERSION)
         if vui < vex:
-            Logger.logwarn('FlexBE App needs to be updated!\n'
+            Logger.logwarn('FlexBE WebUI needs to be updated!\n'
                            f'Mirror requires at least version {MIN_UI_VERSION}, '
                            f' but you have {msg.data}\n'
-                           'Please update the flexbe_app software.')
+                           'Please update the flexbe_webui software.')
 
     @staticmethod
     def _parse_version(v):
@@ -162,7 +157,7 @@ class FlexbeMirror(Node):
         offset = 1
         for n in reversed(v.split('.')):
             result += int(n) * offset
-            offset *= 100
+            offset *= 1000
         return result
 
     def get_elapsed_str(self, start_time):
@@ -282,7 +277,7 @@ class FlexbeMirror(Node):
         except Exception as exc:  # pylint: disable=W0703
             Logger.logerr(f'Exception in activate mirror: {type(exc)} started at {start_time.nanoseconds} ns ...\n  {exc}')
             Logger.localerr(f"{traceback.format_exc().replace('%', '%%')}")
-            self._running = False  # normally set false in execute_mirror (but not if exeception)
+            self._running = False  # normally set false in execute_mirror (but not if exception)
 
         Logger.localwarn(f'Done executing mirror {self._active_id} from activation '
                          f'{self.get_elapsed_str(start_time)}')
@@ -424,16 +419,16 @@ class FlexbeMirror(Node):
                     Logger.logwarn('Onboard behavior stop request (from sync)!')
                 elif msg.code == BEStatus.FINISHED:
                     Logger.loginfo('Onboard behavior finished successfully.')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
                 elif msg.code == BEStatus.SWITCHING:
                     self._starting_path = None
                     Logger.loginfo('Onboard performing behavior switch.')
                 elif msg.code == BEStatus.READY:
                     Logger.loginfo('Onboard engine just started, stopping currently running mirror.')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
                 else:
                     Logger.logwarn('Onboard behavior failed!')
-                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, String())
+                    self._beh_update_pub.publish(Topics._BEHAVIOR_UPDATE_TOPIC, Int32(data=-1))
 
                 self._wait_stop_running(start_time)
 
@@ -460,6 +455,12 @@ class FlexbeMirror(Node):
             thread = threading.Thread(target=self._restart_mirror, args=[msg, start_time])
             thread.daemon = True
             thread.start()
+
+            # Force a new update after sync
+            Logger.localinfo('\x1b[93mReceived sync for current behavior - request behavior update message\x1b[0m')
+            MirrorStateMachine._execute_flag = True  # Execute once more after any change,
+            self._sm._last_deep_states_list = None
+
         else:
             Logger.localerr('Mirror synchronize request id='
                             f'{msg.behavior_id} mismatch active= {self._active_id}')
@@ -511,7 +512,8 @@ class FlexbeMirror(Node):
                                          f'    Check UI and consider manual re-sync!\n'
                                          '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
                                          f' {self._sync_heartbeat_mismatch_counter}')
-                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id} {self._sync_heartbeat_mismatch_counter}: \n'
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f' {self._sync_heartbeat_mismatch_counter}: \n'
                                              f'   Onboard IDs: {msg.current_state_checksums}\n'
                                              f'    Mirror IDs: {mirror_status.current_state_checksums}')
 
@@ -519,16 +521,16 @@ class FlexbeMirror(Node):
                                 try:
                                     ob_state_id, ob_out = StateMap.unhash(state_hash)
                                     ob_state = self._state_map[ob_state_id]
-                                    Logger.localinfo(f"  onboard {ob_state_id} : '{ob_state.name.replace('_mirror', '')}'"
-                                                     f" out={ob_out} - {ob_state.path.replace('_mirror', '')}")
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
                             for state_hash in mirror_status.current_state_checksums:
                                 try:
                                     mr_state_id, mr_out = StateMap.unhash(state_hash)
                                     mr_state = self._state_map[mr_state_id]
-                                    Logger.localinfo(f"   mirror {mr_state_id} : '{mr_state.name.replace('_mirror', '')}'"
-                                                     f" out={mr_out} - {mr_state.path.replace('_mirror', '')}")
+                                    Logger.localinfo(f"   mirror {mr_state_id:10d} : '{mr_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={mr_out:3d} - {mr_state.path.replace('_mirror', '')}")
                                 except Exception as exc:  # pylint: disable=W0703
                                     Logger.localinfo(f' error for mirror state hash {state_hash} - {type(exc)} - {exc}')
                             Logger.localinfo(30 * '=')
@@ -537,6 +539,20 @@ class FlexbeMirror(Node):
                             # Start counting mismatches
                             self._sync_heartbeat_mismatch_counter = 1
                     else:
+                        if self._sync_heartbeat_mismatch_counter > 0:
+                            Logger.localwarn(f'OCS is back in sync after {self._sync_heartbeat_mismatch_counter} heartbeats')
+                            Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
+                                             f'   Onboard IDs: {msg.current_state_checksums}\n'
+                                             f'    Mirror IDs: {mirror_status.current_state_checksums}')
+                            for state_hash in msg.current_state_checksums:
+                                try:
+                                    ob_state_id, ob_out = StateMap.unhash(state_hash)
+                                    ob_state = self._state_map[ob_state_id]
+                                    Logger.localinfo(f"  onboard {ob_state_id:10d} : '{ob_state.name.replace('_mirror', ''):30s}'"
+                                                     f" out={ob_out:3d} - {ob_state.path.replace('_mirror', '')}")
+                                except Exception as exc:  # pylint: disable=W0703
+                                    Logger.localinfo(f' error for onboard state hash {state_hash} - {type(exc)} - {exc}')
+
                         # Reset mismatch counter
                         self._sync_heartbeat_mismatch_counter = 0
                 elif self._active_id != 0:
@@ -648,7 +664,7 @@ class FlexbeMirror(Node):
             self._outcome_sub.remove_last_msg(Topics._OUTCOME_TOPIC, clear_buffer=True)
             MirrorState._last_state_id = None
             MirrorState._last_state_outcome = None
-
+            MirrorState._last_target_id = None  # reset any time that we build a new state machine
             try:
                 self._starting_path = None
                 if self._sm is not None and self._sm.id == msg.behavior_id:
@@ -716,6 +732,13 @@ class FlexbeMirror(Node):
                 Logger.localwarn(f" Restart SM with current top-level state = {curst.name if curst is not None else 'None'} "
                                  f'starting path={self._starting_path}')
                 Logger.localinfo(f'     active states = {self._sm.get_latest_status()}')
+                if self._sm._last_deep_states_list is not None and len(self._sm._last_deep_states_list) > 0:
+                    # Make sure we update the UI with latest state
+                    MirrorState.publish_update(self._sm._last_deep_states_list[-1].state_id)
+                    for st in self._sm._last_deep_states_list:
+                        Logger.localinfo(f"     '{st.name:30s}' - '{st.path}' ")
+                else:
+                    MirrorState.publish_update(curst.state_id)  # Make sure we update the UI with latest state
                 self._running = True  # set running while we have sync lock
                 self._starting = False
                 self._active_id = msg.behavior_id
@@ -753,9 +776,9 @@ class FlexbeMirror(Node):
             Logger.loginfo('Starting mirror in state ' + self._starting_path)
             self._starting_path = None
 
-        result = PreemptableStateMachine._preempted_name
+        result = State._preempted_name
         try:
-            result = self._sm.spin(start_time)
+            result = self._sm.spin(start_time, self._state_map)
             Logger.localinfo(f"Mirror finished spin with result '{result}' after {self.get_elapsed_str(start_time)} s")
             self._sm.destroy()
         except Exception as exc:
@@ -767,7 +790,7 @@ class FlexbeMirror(Node):
                 # so just try a simple print
                 print('\n(_execute_mirror Traceback): Caught exception on preempt:\n%s' % str(exc), flush=True)
                 print(traceback.format_exc().replace('%', '%%'), flush=True)
-            result = PreemptableStateMachine._preempted_name
+            result = State._preempted_name
 
         self._active_thread_start = None
         self._running = False
@@ -788,8 +811,9 @@ class FlexbeMirror(Node):
             self._add_node(msg, root)
 
             if self._sm:
-                Logger.localinfo(f"Constructed mirror for behavior id ='{self._sm.id}' - begin validation ...")
+                Logger.localinfo('---------------------------------')
                 self._sm.id = msg.behavior_id
+                Logger.localinfo(f"Constructed mirror for behavior id ='{self._sm.id}' - begin validation ...")
                 # verify checksums of all states
                 for con_msg in msg.containers:
                     if con_msg.path.find('/') != -1:
@@ -801,6 +825,16 @@ class FlexbeMirror(Node):
                                                                 f'({con_msg.state_id}) {con_msg.path}')
                         else:
                             raise KeyError(f'State id {con_msg.state_id} not found in {self._state_map}!')
+
+                try:
+                    state_ids, state_paths = list(zip(*self._state_map.items))
+                    state_map_msg = StateMapMsg(behavior_id=self._sm.id,
+                                                state_ids=state_ids,
+                                                state_paths=[path.replace('_mirror', '') for path in state_paths])
+                    self._state_map_pub.publish(state_map_msg)  # Used by the WebUI
+                except Exception as exc:
+                    Logger.localerr(f'Failed to publish state map: {exc}')
+
                 end = time.time()
                 Logger.localinfo(f"Validated constructed mirror for behavior id ='{self._sm.id}' in {end - start} seconds !")
                 return  # success here
@@ -809,9 +843,6 @@ class FlexbeMirror(Node):
 
         except Exception as exc:
             Logger.localwarn(f"_mirror_statemachine Exception: '{type(exc)}' - {exc}")
-            # self.get_logger().warn(f"{traceback.format_exc().replace('%', '%%')}")
-            # print(f"\x1b[93m{self._state_map}", flush=True)
-            # print('------------------\x1b[0m', flush=True)
             if self._sm is not None:
                 Logger.localwarn(f'    destroy constructed SM id={self._sm.id} - failed validation!')
                 self._sm.destroy()
@@ -846,7 +877,7 @@ class FlexbeMirror(Node):
             else:
                 sm = MirrorStateMachine(container_name, path, outcomes=sm_outcomes)
 
-            self._state_map.add_state(path, sm)
+            self._state_map.add_state(path, sm)  # also calculates the state id given path
             assert sm.state_id == container.state_id, ('Failed to validate container state_id '
                                                        f'= {sm.state_id} vs. {container.state_id}')
 
@@ -860,9 +891,7 @@ class FlexbeMirror(Node):
                 MirrorStateMachine.add(container_name + '_mirror', sm, transitions=container_transitions)
             else:
                 # Add instance attributes to top-level state machine
-                sm._state_map = self._state_map
                 sm._total_loop_count = 0
-
                 self._sm = sm
 
         else:

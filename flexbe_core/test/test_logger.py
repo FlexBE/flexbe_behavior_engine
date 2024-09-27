@@ -33,9 +33,9 @@
 import time
 import unittest
 
-from flexbe_core import EventState, OperatableStateMachine, set_node
+from flexbe_core import EventState, OperatableStateMachine, initialize_flexbe_core
 from flexbe_core.logger import Logger
-from flexbe_core.proxy import initialize_proxies, shutdown_proxies
+from flexbe_core.proxy import shutdown_proxies
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
@@ -45,6 +45,8 @@ class TestLogger(unittest.TestCase):
     """Test FlexBE Logger handling."""
 
     test = 0
+    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
+    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
 
     def __init__(self, *args, **kwargs):
         """Initialize TestLogger instance."""
@@ -55,49 +57,45 @@ class TestLogger(unittest.TestCase):
         TestLogger.test += 1
         self.context = rclpy.context.Context()
         rclpy.init(context=self.context)
-
         self.executor = MultiThreadedExecutor(context=self.context)
         self.node = rclpy.create_node('logger_test_' + str(self.test), context=self.context)
         self.node.get_logger().info(' set up logger test %d (%d) ... ' % (self.test, self.context.ok()))
         self.executor.add_node(self.node)
-        initialize_proxies(self.node)
+        initialize_flexbe_core(self.node)
 
     def tearDown(self):
         """Tear down the test."""
         self.node.get_logger().info(' shutting down logger test %d (%d) ... ' % (self.test, self.context.ok()))
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.1)
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in logger test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
 
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
         self.executor.shutdown()
-        time.sleep(0.1)
+        time.sleep(TestLogger.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(0.2)
+        time.sleep(TestLogger.__TIME_SLEEP * 2)
 
     def test_throttle_logger_one(self):
         """Test throttle logger one."""
         self.node.get_logger().info('test_throttle_logger_one ...')
         self.node.declare_parameter('max_throttle_logging_size', 100)
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.25)
-        set_node(self.node)  # Update the logger node
+        initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleSingleLog(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                self.initialize_ros(node)
                 super().__init__(outcomes=['done'])
                 self._trials = Logger.MAX_LAST_LOGGED_SIZE * 2
                 Logger.logerr_throttle(0.0, 'test')
@@ -126,21 +124,18 @@ class TestLogger(unittest.TestCase):
         self.node.get_logger().info('test_throttle_logger_one  - OK! ')
 
     def test_throttle_logger_err_multi(self):
-        """Test throttle logger with errrors."""
+        """Test throttle logger with errors."""
         self.node.get_logger().info('test_throttle_logger_err_multi ...')
         self.node.declare_parameter('max_throttle_logging_size', 200)
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.35)
-        set_node(self.node)  # Update the logger node
+        initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                self.initialize_ros(node)
                 super().__init__(outcomes=['done'])
                 self._trials = Logger.MAX_LAST_LOGGED_SIZE * 2
                 Logger.logerr_throttle(0.01, '0_test')
@@ -174,17 +169,14 @@ class TestLogger(unittest.TestCase):
         self.node.declare_parameter('max_throttle_logging_size', 100)
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.7)
 
-        set_node(self.node)  # Update the logger node
+        initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                self.initialize_ros(node)
                 super().__init__(outcomes=['done'])
                 self._trials = Logger.MAX_LAST_LOGGED_SIZE * 2
                 Logger.logerr_throttle(0.01, '0_test')
@@ -210,7 +202,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.001)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC * 0.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 
@@ -222,17 +214,14 @@ class TestLogger(unittest.TestCase):
         self.node.get_logger().info('test_throttle_logger_multiple_params ...')
         self.node.declare_parameter('max_throttle_logging_size', 120)
         self.node.declare_parameter('throttle_logging_clear_ratio', 0.22)
-        set_node(self.node)  # Update the logger node
+        initialize_flexbe_core(self.node)  # Update the logger node
 
-        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=1)
-        OperatableStateMachine.initialize_ros(self.node)
-        node = self.node
+        rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC)
 
         class ThrottleMultiLog(EventState):
             """Local Test state definition."""
 
             def __init__(self):
-                self.initialize_ros(node)
                 super().__init__(outcomes=['done'])
                 self._trials = Logger.MAX_LAST_LOGGED_SIZE * 2
                 Logger.logerr_throttle(0.01, '0_test')
@@ -258,7 +247,7 @@ class TestLogger(unittest.TestCase):
         while outcome is None:
             outcome = sm.execute(None)
             self.assertTrue(1 < len(Logger._last_logged) <= Logger.MAX_LAST_LOGGED_SIZE)
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.001)
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestLogger.__EXECUTE_TIMEOUT_SEC * 0.5)
         self.assertEqual(outcome, 'done')
         self.assertEqual(state_instance._trials, 0)
 

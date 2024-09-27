@@ -32,6 +32,7 @@
 """OperatableState."""
 
 from flexbe_core.core.preemptable_state import PreemptableState
+from flexbe_core.core.state import State
 from flexbe_core.core.state_map import StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
@@ -64,9 +65,9 @@ class OperatableState(PreemptableState):
         outcome = self.__execute(*args, **kwargs)
 
         if self._is_controlled:
-            # reset previously requested outcome if applicable
+            # reset previously requested outcome if applicable (not reset in on_enter/exit like OSM)
             if self._last_requested_outcome is not None and outcome is None:
-                self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.path))
+                self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest(outcome=255, target=self.state_id))
                 self._last_requested_outcome = None
 
             # request outcome because autonomy level is too low
@@ -74,8 +75,8 @@ class OperatableState(PreemptableState):
                                                or outcome is not None and self.is_breakpoint):
                 if outcome != self._last_requested_outcome:
                     self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
-                                      OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.path))
-                    Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.name, outcome))
+                                      OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.state_id))
+                    Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.path, outcome))
                     StateLogger.log('flexbe.operator', self, type='request', request=outcome,
                                     autonomy=self.parent.autonomy_level,
                                     required=self.parent.get_required_autonomy(outcome, self))
@@ -84,15 +85,26 @@ class OperatableState(PreemptableState):
 
             # autonomy level is high enough, report the executed transition
             elif outcome is not None and outcome in self.outcomes:
-                self._publish_outcome(outcome)
+                #  Logger.localinfo(f"controlled State '{self.name}' from '{self.path}'"
+                #                   f"permitting outcome '{outcome}' {self.__class__.__name__}")
                 self._force_transition = False
+
         return outcome
 
     def _publish_outcome(self, outcome):
         """Update the UI and logs about this outcome."""
-        # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
+        if outcome == State._preempted_name:
+            # special case of preempted outcome specify max outcome hash
+            Logger.localinfo('Publish Preempted: State result: %s > %s (%d) (%d) (%s)'
+                             % (self.name, outcome, StateMap._MAX_OUTCOME, self.state_id, self.__class__.__name__))
+            self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, StateMap._MAX_OUTCOME)))
+            self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
+            return
+
         outcome_index = self.outcomes.index(outcome)
-        Logger.localinfo(f"State result: '{self.name}' -> '{outcome}'")
+        #  Logger.localinfo('Publish outcome: State result: %s > %s (%d) (%d) (%s)'
+        #                   % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
+        # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
         self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
         self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
         if self._force_transition:
