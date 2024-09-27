@@ -2,6 +2,16 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* codespell clean up
+* exception inside concurrency will get re-thrown to preempt behavior
+* report all states in deep_states including containers and finished states
+* re-request outcome on sync request
+* notify skipped for containers
+* remove some stray spam;
+* use jazzy test and increase some loop timings in tests due to intermittent test failure
+
 4.0.0 (2024-08-24)
 ------------------
 * Version 4.0.0 release using state_id for communication

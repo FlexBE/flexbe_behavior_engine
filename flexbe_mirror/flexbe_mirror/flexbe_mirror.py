@@ -87,7 +87,7 @@ class FlexbeMirror(Node):
         self._timing_event = threading.Event()  # Used for wait timer
 
         # Keep track of mirror thread status
-        # starting one while other is stoppin is valid,
+        # starting one while other is stopping is valid,
         # but only one thread should be running at a time
         self._starting = False
         self._running = False
@@ -103,7 +103,7 @@ class FlexbeMirror(Node):
         self._system_clock = Clock()
         self._active_thread_start = None
 
-        # set up proxys for sm <--> GUI communication
+        # set up proxies for sm <--> GUI communication
         # publish topics
         self._heartbeat_pub = self.create_publisher(Int32, Topics._MIRROR_HEARTBEAT_TOPIC, 2)
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)

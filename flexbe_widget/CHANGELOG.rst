@@ -2,6 +2,12 @@
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* codespell clean up
+* rename to flexbe_status_listener with heartbeat and sync updates
+* use latched state_map topic
+
 4.0.0 (2024-08-24)
 ------------------
 * Version 4.0.0 release using state_id for communication

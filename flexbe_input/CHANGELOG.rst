@@ -2,6 +2,11 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* codespell clean up
+* fix typo in input_action_server
+
 4.0.0 (2024-08-24)
 ------------------
 * Version 4.0.0 release using state_id for communication

@@ -2,6 +2,13 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* codespell clean up
+* report all states in deep_states including containers and finished states
+* re-request outcome on sync request
+* notify skipped for containers
+
 4.0.0 (2024-08-24)
 ------------------
 * Version 4.0.0 release using state_id for communication
