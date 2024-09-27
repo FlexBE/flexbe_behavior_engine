@@ -2,8 +2,8 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.1 (2024-09-26)
+------------------
 * codespell clean up
 * exception inside concurrency will get re-thrown to preempt behavior
 * report all states in deep_states including containers and finished states

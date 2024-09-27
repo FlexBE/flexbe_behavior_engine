@@ -2,8 +2,8 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.1 (2024-09-26)
+------------------
 * codespell clean up
 * report all states in deep_states including containers and finished states
 * re-request outcome on sync request

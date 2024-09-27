@@ -2,8 +2,8 @@
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.1 (2024-09-26)
+------------------
 * codespell clean up
 * rename to flexbe_status_listener with heartbeat and sync updates
 * use latched state_map topic
