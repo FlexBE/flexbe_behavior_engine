@@ -29,13 +29,14 @@
 
 """A proxy for calling actions provides a single point for all state action interfaces."""
 from functools import partial
-from threading import Lock, Timer
+from threading import Event, Lock, Timer
 
 from action_msgs.msg import GoalStatus
 
 from flexbe_core.logger import Logger
 
 from rclpy.action import ActionClient
+from rclpy.duration import Duration
 
 
 class ProxyActionClient:
@@ -95,7 +96,7 @@ class ProxyActionClient:
         @type topics: dictionary string - message class
         @param topics: A dictionary containing a collection of topic - message type pairs.
 
-        @type wait_duration: int
+        @type wait_duration: float
         @param wait_duration: Defines how long to wait for each client in the
             given set to become available (if it is not already available).
         """
@@ -120,7 +121,7 @@ class ProxyActionClient:
         @type action_type: action type
         @param action_type: The type of Action for this action client.
 
-        @type wait_duration: int
+        @type wait_duration: float
         @param wait_duration: Defines how long to wait for the given client if it is not available right now.
         """
         with cls._client_sync_lock:
@@ -285,10 +286,21 @@ class ProxyActionClient:
         """
         Remove the latest results of the given action call.
 
+        Typically called in on_enter before making sending new goal.
         @type topic: string
         @param topic: The topic of interest.
         """
+        if topic not in ProxyActionClient._result:
+            return
+
+        if ProxyActionClient._has_active_goal[topic]:
+            Logger.localwarn(f"Request to remove result of action '{topic}' with active goal!")
+
+        # Clear old data
+        ProxyActionClient._feedback[topic] = None
+        ProxyActionClient._has_active_goal[topic] = False
         ProxyActionClient._result[topic] = None
+        ProxyActionClient._result_status[topic] = None
 
     @classmethod
     def has_feedback(cls, topic):
@@ -415,6 +427,36 @@ class ProxyActionClient:
         ProxyActionClient._has_active_goal[topic] = False
 
     @classmethod
+    def verify_action_status(cls, topic, wait_duration=0.1):
+        """
+        Verify action is in terminal status if topic is available.
+
+        This is a blocking call with polling and should be used sparingly!
+
+        @type topic: string
+        @param topic: The topic of the action.
+
+        @return (is_terminal, status code)
+        """
+        if topic not in ProxyActionClient._result_status:
+            return None
+
+        rate = Event()
+        timeout = Duration(seconds=wait_duration)
+        start = cls._node.get_clock().now()
+        terminal_statuses = (GoalStatus.STATUS_ABORTED,
+                             GoalStatus.STATUS_CANCELED,
+                             GoalStatus.STATUS_SUCCEEDED)
+        while cls._node.get_clock().now() - start < timeout:
+            if ProxyActionClient._result_status[topic] in terminal_statuses:
+                Logger.localinfo(f"Action '{topic}' returned terminal status "
+                                 f"'{ProxyActionClient.get_status_string(topic)}' after "
+                                 f'{(cls._node.get_clock().now() - start).nanoseconds * 1e-9:.6f} seconds')
+                return True, ProxyActionClient._result_status[topic]
+            rate.wait(0.002)
+        return False, ProxyActionClient._result_status[topic]
+
+    @classmethod
     def _check_topic_available(cls, topic, wait_duration=0.1):
         """
         Check whether a topic is available.
@@ -422,7 +464,7 @@ class ProxyActionClient:
         @type topic: string
         @param topic: The topic of the action.
 
-        @type wait_duration: int
+        @type wait_duration: float
         @param wait_duration: Defines how long to wait for the given client if it is not available right now.
         """
         client_dict = ProxyActionClient._clients.get(topic)
