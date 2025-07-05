@@ -63,14 +63,18 @@ class BehaviorLibrary:
         """Parse all ROS2 packages to update the internal behavior library."""
         self._behavior_lib = {}
         for pkg_name, pkg_path in get_packages_with_prefixes().items():
-            pkg = parse_package(os.path.join(pkg_path, 'share', pkg_name))
-            for export in pkg.exports:
-                if export.tagname == 'flexbe_behaviors':
-                    try:
-                        self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
-                    except KeyError as exc:
-                        print(f"Error : duplicate behavior name found in '{pkg_name}' \n  {exc}", flush=True)
-                        raise exc
+            pkg_share_path = os.path.join(pkg_path, 'share', pkg_name)
+            try:
+                pkg = parse_package(pkg_share_path)
+                for export in pkg.exports:
+                    if export.tagname == 'flexbe_behaviors':
+                        try:
+                            self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
+                        except KeyError as exc:
+                            print(f"Error : duplicate behavior name found in '{pkg_name}' \n  {exc}", flush=True)
+                            raise exc
+            except OSError as exc:
+                print(f"BehaviorLibrary - '{pkg_share_path}' cannot be parsed to find FlexBE relevant behaviors.")
 
     def _add_behavior_manifests(self, path, pkg=None):
         """
