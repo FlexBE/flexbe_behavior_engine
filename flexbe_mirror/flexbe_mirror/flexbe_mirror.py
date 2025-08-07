@@ -508,7 +508,7 @@ class FlexbeMirror(Node):
                                 onboard_state_path = ob_state.path
 
                         if self._sync_heartbeat_mismatch_counter % 5 == 1:
-                            Logger.error(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
+                            Logger.localerr(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
                                          f'    Check UI and consider manual re-sync!\n'
                                          '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
                                          f' {self._sync_heartbeat_mismatch_counter}')
@@ -517,6 +517,9 @@ class FlexbeMirror(Node):
                                              f'   Onboard IDs: {msg.current_state_checksums}\n'
                                              f'    Mirror IDs: {mirror_status.current_state_checksums}')
 
+                            if self._sync_heartbeat_mismatch_counter % 20 == 1:
+                                Logger.info("Verify sync with onboard.")
+                                
                             for state_hash in msg.current_state_checksums:
                                 try:
                                     ob_state_id, ob_out = StateMap.unhash(state_hash)
