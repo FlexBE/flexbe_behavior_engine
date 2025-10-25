@@ -19,7 +19,6 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_mirror implements functionality to remotely mirror an executed behavior.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'behavior_mirror_sm = flexbe_mirror.behavior_mirror_sm:main'

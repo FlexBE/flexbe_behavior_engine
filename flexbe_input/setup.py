@@ -20,7 +20,6 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_input enables to send data to onboard behavior when required.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'flexbe_input = flexbe_input.bin.flexbe_input:main',

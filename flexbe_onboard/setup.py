@@ -29,7 +29,6 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_onboard implements the robot-side of the behavior engine from where all behaviors are started.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'flexbe_onboard = flexbe_onboard.flexbe_onboard',

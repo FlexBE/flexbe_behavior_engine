@@ -24,7 +24,6 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_states provides a collection of predefined states.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
         ],

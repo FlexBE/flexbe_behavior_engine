@@ -18,5 +18,4 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_core provides the core components for the FlexBE behavior engine.',
     license='BSD',
-    tests_require=['pytest'],
 )

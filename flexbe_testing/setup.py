@@ -22,5 +22,4 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_testing provides a framework for unit testing states.',
     license='BSD',
-    tests_require=['pytest'],
 )

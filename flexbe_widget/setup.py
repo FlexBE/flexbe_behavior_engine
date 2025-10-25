@@ -52,7 +52,6 @@ setup(
     maintainer_email='philsplus@gmail.com',
     description='flexbe_widget implements some smaller scripts for the behavior engine.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'behavior_launcher = flexbe_widget.behavior_launcher',
