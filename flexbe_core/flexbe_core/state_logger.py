@@ -282,7 +282,7 @@ class StateLogger:
 class YamlFormatter(logging.Formatter):
     """Special yaml formatting class."""
 
-    def format(self, record):
+    def format(self, record):  # noqa: A003
         """Format yaml with prefix."""
         record.msg.update(logger=record.name, loglevel=record.levelname)
         return '- %s' % super().format(record)

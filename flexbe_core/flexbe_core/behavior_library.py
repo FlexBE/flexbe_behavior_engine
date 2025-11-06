@@ -73,7 +73,7 @@ class BehaviorLibrary:
                         except KeyError as exc:
                             print(f"Error : duplicate behavior name found in '{pkg_name}' \n  {exc}", flush=True)
                             raise exc
-            except OSError as exc:
+            except OSError:
                 print(f"BehaviorLibrary - '{pkg_share_path}' cannot be parsed to find FlexBE relevant behaviors.")
 
     def _add_behavior_manifests(self, path, pkg=None):
@@ -155,7 +155,7 @@ class BehaviorLibrary:
             be_package, be_name = be_split[0], '/'.join(be_split[1:])
 
             def __find_behavior():
-                return next((id, be) for (id, be)
+                return next((beh_id, be) for (beh_id, be)
                             in self._behavior_lib.items()
                             if be['name'] == be_name and be['package'] == be_package)
         else:

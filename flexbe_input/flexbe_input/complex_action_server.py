@@ -113,7 +113,7 @@ class ComplexActionServer:
             with self.terminate_mutex:
                 self.need_to_terminate = True
 
-            assert(self.execute_thread)
+            assert self.execute_thread
             self.execute_thread.join()
 
     # @brief Accepts a new goal when one is available The status of this

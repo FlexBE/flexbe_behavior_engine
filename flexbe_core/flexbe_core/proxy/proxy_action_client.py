@@ -87,7 +87,7 @@ class ProxyActionClient:
             ProxyActionClient._has_active_goal.clear()
             ProxyActionClient._current_goal.clear()
         except Exception as exc:  # pylint: disable=W0703
-            print(f'Something went wrong during shutdown of proxy action clients!\n{ str(exc)}')
+            print(f'Something went wrong during shutdown of proxy action clients!\n{str(exc)}')
 
     def __init__(self, topics=None, wait_duration=1.0):
         """

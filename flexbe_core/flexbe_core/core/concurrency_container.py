@@ -289,7 +289,7 @@ class ConcurrencyContainer(OperatableStateMachine):
             if state.name in self._returned_outcomes and self._returned_outcomes[state.name] is not None:
                 if not state._exited:
                     Logger.localinfo(f"\x1b[93mCC '{self.name}'  - '{state.name}' is in returned outcomes "
-                                     f"w/ '{self._returned_outcomes[state.name] }' but has not exited!\x1b[0m")
+                                     f"w/ '{self._returned_outcomes[state.name]}' but has not exited!\x1b[0m")
                 continue  # skip states that already exited themselves
             self._execute_single_state(state, force_exit=True)
 

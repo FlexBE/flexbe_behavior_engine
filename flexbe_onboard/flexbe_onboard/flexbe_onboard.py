@@ -396,8 +396,8 @@ class FlexbeOnboard(Node):
                                        f"occurrences of key='{request.userdata_key}' "
                                        f"from be='{self.be._state_machine._name}'")
                 for ud in userdata:
-                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10*'-'}")
-                self.get_logger().info(f"{10*'='} End get user data {10*'='}")
+                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10 * '-'}")
+                self.get_logger().info(f"{10 * '='} End get user data {10 * '='}")
                 response.success = True
             else:
                 response.success = False

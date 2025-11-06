@@ -119,7 +119,7 @@ class BehaviorActionServer:
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
-        except Exception as e:
+        except Exception as e:  # noqa: B902
             self._node.get_logger().warn('Failed to parse and substitute behavior arguments, will use direct input.\n%s' % str(e))
             be_selection.arg_keys = goal.arg_keys
             be_selection.arg_values = goal.arg_values

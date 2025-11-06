@@ -125,6 +125,6 @@ class State:
         return '' if self.parent is None else self.parent.path + '/' + self.name
 
     @property
-    def type(self):
+    def type(self):  # noqa: A003
         """Return state type."""
         return self._type
