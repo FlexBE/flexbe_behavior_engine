@@ -608,8 +608,8 @@ class TestCore(unittest.TestCase):
         try:
             self.assertAlmostEqual(cc.sleep_duration, .1, places=2)
         except AssertionError:  # pylint: disable=W0703
-            self.node.get_logger().warn(f' Caught error with cc.sleep_duration = {cc.sleep_duration:.6f} =/= 0.1 '
-                                        f'- Sometimes fails if OS interruption! ... ')
+            self.node.get_logger().warning(f' Caught error with cc.sleep_duration = {cc.sleep_duration:.6f} =/= 0.1 '
+                                           f'- Sometimes fails if OS interruption! ... ')
 
         # Not controlled yet (e.g. as if no UI connected)
         self.assertFalse(cc['main']._is_controlled)
@@ -726,7 +726,7 @@ class TestCore(unittest.TestCase):
                 self._state_id = CoreTestState._set_state_id
 
             def execute(self, userdata):
-                self._node.get_logger().warn('\033[0m%s\n%s' % (self.path, str(userdata)))  # log for manual inspection
+                self._node.get_logger().warning('\033[0m%s\n%s' % (self.path, str(userdata)))  # log for manual inspection
                 self.data = userdata.data_in
                 userdata.data_out = self._out_content
                 return 'done'

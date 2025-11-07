@@ -422,7 +422,7 @@ class FlexbeOnboard(Node):
                 raise ValueError(beh_sel_msg.behavior_key)
             be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key, add_tmp=True)
             if os.path.isfile(be_filepath):
-                self.get_logger().warn('Found a tmp version of the referred behavior! Assuming local test run.')
+                self.get_logger().warning('Found a tmp version of the referred behavior! Assuming local test run.')
             else:
                 be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key)
 
@@ -509,8 +509,8 @@ class FlexbeOnboard(Node):
                     suffix = ' (' + behavior + ')' if behavior != '' else ''
                     self.get_logger().info(key + ' = ' + beh_sel_msg.arg_values[i] + suffix)
                 else:
-                    self.get_logger().warn(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
-                                           f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
+                    self.get_logger().warning(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
+                                              f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
         except Exception as exc:
             Logger.logerr(f'Failed to initialize parameters for '
                           f"behavior key='{beh_sel_msg.behavior_key}':\n  {type(exc)} - {exc}")
