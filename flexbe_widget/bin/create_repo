@@ -16,21 +16,21 @@ else
 fi
 
 # Check the desired directory
-# Note, someone may want to put this in another folder, so it 
+# Note, someone may want to put this in another folder, so it
 #       is not necessarily incorrect to run from different folder
 if [[ ":$WORKSPACE_ROOT/src:" != ":$PWD:" ]]; then
   echo -e "\e[93mNormally we run this command from the \$WORKSPACE_ROOT/src folder.\e[0m"
   echo -e "\e[93m  not ${PWD}\e[0m"
   while $interactive; do
     read -p "Do you want to continue at current location? (yes/no) " yn
-    case $yn in 
-      yes|Yes|y|Y|YES ) 
+    case $yn in
+      yes|Yes|y|Y|YES )
         break;;
-      no|No|n|N|NO ) 
+      no|No|n|N|NO )
           while true; do
             read -p "Do you want to change to \$WORKSPACE_ROOT/src and continue? (yes/no) " yn
-            case $yn in 
-              yes|Yes|y|Y|YES ) 
+            case $yn in
+              yes|Yes|y|Y|YES )
                 cd ${WORKSPACE_ROOT}/src
                 if [[ ":$WORKSPACE_ROOT/src:" != *":$PWD"* ]]; then
                   echo "Invalid folder ${PWD} - quit!"
@@ -38,7 +38,7 @@ if [[ ":$WORKSPACE_ROOT/src:" != ":$PWD:" ]]; then
                 fi
                 echo "Continuing from ${PWD} ..."
                 break;;
-              no|No|n|N|NO ) 
+              no|No|n|N|NO )
                 echo -e "\e[93mChange to appropriate directory and retry!\e[0m";
                 exit;;
               * ) echo invalid response;;
@@ -66,7 +66,7 @@ cd ${name}_behaviors
 
 echo -e "\e[96mSet up for ROS 2 development ...\033[0m"
 git fetch
-git checkout ros2-devel  # use new ROS 2 flexbe_app workspace layout, remove when merged into main
+git checkout humble
 
 echo ""
 echo -e "\e[96m(3/5) Configuring project template...\033[0m"
@@ -97,7 +97,7 @@ sed -i -e "s/PROJECT_flexbe_behaviors/${name}_flexbe_behaviors/g" \
   PROJECT_flexbe_behaviors/setup.py \
   PROJECT_flexbe_behaviors/setup.cfg
 
-sed -i -e "s/PROJECT/${name}/g" PROJECT_flexbe_behaviors/bin/copy_behavior 
+sed -i -e "s/PROJECT/${name}/g" PROJECT_flexbe_behaviors/bin/copy_behavior
 
 mv PROJECT_flexbe_behaviors/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/${name}_flexbe_behaviors
 mv PROJECT_flexbe_behaviors/resource/PROJECT_flexbe_behaviors PROJECT_flexbe_behaviors/resource/${name}_flexbe_behaviors
@@ -120,8 +120,8 @@ rm -rf .git
 while $interactive; do
   read -p "(5/5) Do you want to initialize a new Git repository for this project? (yes/no) " yn
 
-  case $yn in 
-    yes|Yes|y|Y|YES ) 
+  case $yn in
+    yes|Yes|y|Y|YES )
       echo -e "\e[96m(5/5) Initializing new repository...\033[0m";
       git init -b main
       git add .
