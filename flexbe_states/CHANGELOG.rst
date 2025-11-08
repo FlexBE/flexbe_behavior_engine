@@ -2,6 +2,11 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* update test set up for colcon testing and build farm
+* specify python3
+
 4.0.1 (2024-09-26)
 ------------------
 * codespell clean up

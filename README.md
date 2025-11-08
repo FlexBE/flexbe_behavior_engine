@@ -13,9 +13,13 @@ Please refer to the FlexBE Homepage ([flexbe.github.io](http://flexbe.github.io)
 
 You may also want to check out the quick start tutorial demonstrations at [FlexBE Turtlesim Demo](https://github.com/FlexBE/flexbe_turtlesim_demo).
 
-![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/workflows/FlexBE%20CI/badge.svg?branch=jazzy)
+[![FlexBE CI](https://github.com/FlexBE/flexbe_behavior_engine/actions/workflows/flexbe_ci.yml/badge.svg)](https://github.com/FlexBE/flexbe_behavior_engine/actions/workflows/flexbe_ci.yml)
 
-Jazzy ![ROS Build Farm](https://build.ros2.org/job/Jdev__flexbe_behavior_engine__ubuntu_noble_amd64/badge/icon)
+Jazzy [![Jazzy ROS Build Status](https://build.ros2.org/buildStatus/icon?job=Jdev__flexbe_behavior_engine__ubuntu_noble_amd64)](https://build.ros2.org/job/Jdev__flexbe_behavior_engine__ubuntu_noble_amd64/)
+
+Kilted [![Kilted ROS Build Status](https://build.ros2.org/buildStatus/icon?job=Kdev__flexbe_behavior_engine__ubuntu_noble_amd64)](https://build.ros2.org/job/Kdev__flexbe_behavior_engine__ubuntu_noble_amd64/)
+
+Rolling [![Rolling ROS Build Status](https://build.ros2.org/buildStatus/icon?job=Rdev__flexbe_behavior_engine__ubuntu_noble_amd64)](https://build.ros2.org/job/Rdev__flexbe_behavior_engine__ubuntu_noble_amd64/)
 
 > Note: This version 4+ breaks compatibility with the FlexBE App.  You must use the FlexBE WebUI [flexbe_webui](https://github.com/FlexBE/flexbe_webui.git) now.
 

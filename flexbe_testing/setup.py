@@ -18,9 +18,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='phil',
-    maintainer_email='philsplus@gmail.com',
+    author='phil',
+    author_email='philsplus@gmail.com',
+    maintainer='David Conner',
+    maintainer_email='robotics@cnu.edu',
     description='flexbe_testing provides a framework for unit testing states.',
     license='BSD',
-    tests_require=['pytest'],
 )

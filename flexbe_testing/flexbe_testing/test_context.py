@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -172,7 +172,7 @@ class LaunchContext(TestContext):
         self._launchrunner = None
         self._wait_cond = None
         self._valid = False
-        raise NotImplementedError(f"Not implemented for ROS 2 - TODO!\n {launchpath}\n {launchcontent}\n{10*'='}")
+        raise NotImplementedError(f"Not implemented for ROS 2 - TODO!\n {launchpath}\n {launchcontent}\n{10 * '='}")
         # def store(process_name, exit_code):
         #     self._exit_codes[process_name] = exit_code
         # self._launchrunner.add_process_listener(Callback(store))

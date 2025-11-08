@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -162,7 +162,7 @@ class BehaviorLauncher(Node):
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
-        except Exception as exc:
+        except Exception as exc:  # noqa: B902
             self.get_logger().warn('Failed to parse and substitute behavior arguments, '
                                    f'will use direct input.\n {type(exc)} - {str(exc)}')
             be_selection.arg_keys = msg.arg_keys
@@ -175,7 +175,7 @@ class BehaviorLauncher(Node):
             for container in be_structure.containers:
                 state_map.add_state(container.path, container)
             self.get_logger().info(f'Built Statemachine {state_map}')
-        except Exception as exc:
+        except Exception as exc:  # noqa: B902
             self.get_logger().info(f"Failed to build state map for container {behavior['name']} ")
             self.get_logger().info(f'{exc}')
             self.get_logger().info(f'{state_map}')
@@ -183,7 +183,7 @@ class BehaviorLauncher(Node):
 
         try:
             be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
-        except Exception:  # pylint: disable=W0703
+        except Exception:  # pylint: disable=W0703 # noqa: B902
             self.get_logger().error("Could not find behavior package '%s'" % (behavior['package']))
             self.get_logger().info('Have you built and updated your setup after creating the behavior?')
             self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
@@ -225,7 +225,7 @@ class BehaviorLauncher(Node):
                                         state_paths=state_paths)
             self._state_map_pub.publish(state_map_msg)  # Used by the WebUI
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: B902
             self.get_logger().warn(f'Failed to publish state map from launcher!\n{exc}')
 
         if msg.autonomy_level != 255:
@@ -279,7 +279,7 @@ def behavior_launcher_main():
         node_args = sys.argv[stop_index:]
         args = parser.parse_args(behavior_args)
 
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         parser.print_help()
         print(exc)
         sys.exit(-1)
@@ -367,21 +367,21 @@ def behavior_launcher_main():
         executor.spin()
     except KeyboardInterrupt:
         print(f'Keyboard interrupt request  at {datetime.now()} - ! Shut the behavior launcher down!', flush=True)
-    except Exception as exc:
+    except Exception as exc:  # noqa: B902
         print(f'Exception in executor       at {datetime.now()} - ! {type(exc)}\n  {exc}', flush=True)
         import traceback
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     try:
         launcher.destroy_node()
-    except Exception as exc:  # pylint: disable=W0703
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         print(f'Exception from destroy behavior launcher node at {datetime.now()}: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
     print(f'Done with behavior launcher at {datetime.now()}!', flush=True)
     try:
         rclpy.try_shutdown()
-    except Exception as exc:  # pylint: disable=W0703
+    except Exception as exc:  # pylint: disable=W0703 # noqa: B902
         print(f'Exception from rclpy.try_shutdown for behavior launcher: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Christopher Newport University
 #
@@ -140,6 +140,6 @@ class StateMap:
         return state_id, outcome_index
 
     @classmethod
-    def hash(cls, state, outcome_index):
+    def hash(cls, state, outcome_index):  # noqa: A003
         """Convert state id and outcome to hashed identifier for outcome reports."""
         return state.state_id + 1 + outcome_index

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Christopher Newport University
 #
@@ -107,9 +107,9 @@ class FlexbeStatusListener(Node):
         self.get_logger().info(f'New state map received for {msg.behavior_id}')
 
         state_map = {}
-        for id, path in zip(msg.state_ids, msg.state_paths):
-            self.get_logger().info(f"  adding {id:11d} at '{path}'")
-            state_map[id] = path
+        for state_id, path in zip(msg.state_ids, msg.state_paths):
+            self.get_logger().info(f"  adding {state_id:11d} at '{path}'")
+            state_map[state_id] = path
 
         self._state_map = state_map
 

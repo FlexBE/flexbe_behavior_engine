@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -48,11 +48,12 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='phil',
-    maintainer_email='philsplus@gmail.com',
+    author='phil',
+    author_email='philsplus@gmail.com',
+    maintainer='David Conner',
+    maintainer_email='robotics@cnu.edu',
     description='flexbe_widget implements some smaller scripts for the behavior engine.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'behavior_launcher = flexbe_widget.behavior_launcher',

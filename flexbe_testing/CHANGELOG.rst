@@ -2,6 +2,12 @@
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* flake8 cleanup and CI badge update
+* update test set up for colcon testing and build farm
+* specify python3
+
 4.0.1 (2024-09-26)
 ------------------
 

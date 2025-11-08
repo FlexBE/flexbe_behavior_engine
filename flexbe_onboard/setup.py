@@ -9,7 +9,7 @@ package_name = 'flexbe_onboard'
 
 setup(
     name=package_name,
-    version='4.0.1',
+    version='4.0.2',
     packages=find_packages(),
     data_files=[
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
@@ -24,12 +24,14 @@ setup(
             glob('tests/flexbe_onboard_test_data/*.xml')),
     ],
     install_requires=['setuptools'],
+    extras_require={'test': ['pytest']},
     zip_safe=True,
-    maintainer='phil',
-    maintainer_email='philsplus@gmail.com',
+    author='phil',
+    author_email='philsplus@gmail.com',
+    maintainer='David Conner',
+    maintainer_email='robotics@cnu.edu',
     description='flexbe_onboard implements the robot-side of the behavior engine from where all behaviors are started.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'flexbe_onboard = flexbe_onboard.flexbe_onboard',

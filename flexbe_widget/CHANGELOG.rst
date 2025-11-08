@@ -2,6 +2,14 @@
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* flake8 cleanup and CI badge update
+* fixed state_logger and be_action_server for ros2
+* clean of latest flake8 tests
+* update test set up for colcon testing and build farm
+* specify python3
+
 4.0.1 (2024-09-26)
 ------------------
 * codespell clean up

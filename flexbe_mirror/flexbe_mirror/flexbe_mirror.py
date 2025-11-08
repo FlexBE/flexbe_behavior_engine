@@ -164,7 +164,7 @@ class FlexbeMirror(Node):
         """Return a truncated time string for debugging."""
         elapsed = self._system_clock.now() - start_time
         sec, nsec = start_time.seconds_nanoseconds()
-        return f'started at {sec & 0xFFFF}.{nsec//1000:06d} s (elapsed={elapsed.nanoseconds/1e9} s)'
+        return f'started at {sec & 0xFFFF}.{nsec // 1000:06d} s (elapsed={elapsed.nanoseconds / 1e9} s)'
 
     def heartbeat_timer_callback(self):
         """
@@ -508,14 +508,17 @@ class FlexbeMirror(Node):
                                 onboard_state_path = ob_state.path
 
                         if self._sync_heartbeat_mismatch_counter % 5 == 1:
-                            Logger.error(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
-                                         f'    Check UI and consider manual re-sync!\n'
-                                         '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
-                                         f' {self._sync_heartbeat_mismatch_counter}')
+                            Logger.localerr(f'OCS is possibly out of sync - onboard state is {onboard_state_path}\n'
+                                            f'    Check UI and consider manual re-sync!\n'
+                                            '    (mismatch may be temporarily understandable for rapidly changing outcomes)'
+                                            f' {self._sync_heartbeat_mismatch_counter}')
                             Logger.localinfo(f'IDs {msg.behavior_id} {self._active_id}'
                                              f' {self._sync_heartbeat_mismatch_counter}: \n'
                                              f'   Onboard IDs: {msg.current_state_checksums}\n'
                                              f'    Mirror IDs: {mirror_status.current_state_checksums}')
+
+                            if self._sync_heartbeat_mismatch_counter % 20 == 1:
+                                Logger.info('Verify sync with onboard.')
 
                             for state_hash in msg.current_state_checksums:
                                 try:

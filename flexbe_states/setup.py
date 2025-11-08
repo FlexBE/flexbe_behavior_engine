@@ -9,7 +9,7 @@ PACKAGE_NAME = 'flexbe_states'
 
 setup(
     name=PACKAGE_NAME,
-    version='4.0.1',
+    version='4.0.2',
     packages=find_packages(),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
@@ -19,12 +19,14 @@ setup(
         # ros2 bag issues - ('share/' + PACKAGE_NAME + '/tests/bags', glob('tests/bags/*.bag')),
     ],
     install_requires=['setuptools'],
+    extras_require={'test': ['pytest']},
     zip_safe=True,
-    maintainer='phil',
-    maintainer_email='philsplus@gmail.com',
+    author='phil',
+    author_email='philsplus@gmail.com',
+    maintainer='David Conner',
+    maintainer_email='robotics@cnu.edu',
     description='flexbe_states provides a collection of predefined states.',
     license='BSD',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
         ],

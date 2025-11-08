@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -396,8 +396,8 @@ class FlexbeOnboard(Node):
                                        f"occurrences of key='{request.userdata_key}' "
                                        f"from be='{self.be._state_machine._name}'")
                 for ud in userdata:
-                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10*'-'}")
-                self.get_logger().info(f"{10*'='} End get user data {10*'='}")
+                    self.get_logger().info(f"\tuser data key={ud.key}:\n{ud.data}\n{10 * '-'}")
+                self.get_logger().info(f"{10 * '='} End get user data {10 * '='}")
                 response.success = True
             else:
                 response.success = False
@@ -422,7 +422,7 @@ class FlexbeOnboard(Node):
                 raise ValueError(beh_sel_msg.behavior_key)
             be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key, add_tmp=True)
             if os.path.isfile(be_filepath):
-                self.get_logger().warn('Found a tmp version of the referred behavior! Assuming local test run.')
+                self.get_logger().warning('Found a tmp version of the referred behavior! Assuming local test run.')
             else:
                 be_filepath = self._behavior_lib.get_sourcecode_filepath(beh_sel_msg.behavior_key)
 
@@ -509,8 +509,8 @@ class FlexbeOnboard(Node):
                     suffix = ' (' + behavior + ')' if behavior != '' else ''
                     self.get_logger().info(key + ' = ' + beh_sel_msg.arg_values[i] + suffix)
                 else:
-                    self.get_logger().warn(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
-                                           f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
+                    self.get_logger().warning(f"Parameter '{beh_sel_msg.arg_keys[i]}' "
+                                              f"(set to '{beh_sel_msg.arg_values[i]}') not defined")
         except Exception as exc:
             Logger.logerr(f'Failed to initialize parameters for '
                           f"behavior key='{beh_sel_msg.behavior_key}':\n  {type(exc)} - {exc}")

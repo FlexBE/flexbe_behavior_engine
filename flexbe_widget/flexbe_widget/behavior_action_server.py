@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -33,6 +33,7 @@
 
 import difflib
 import os
+import time
 import zlib
 
 from flexbe_core import BehaviorLibrary
@@ -41,7 +42,10 @@ from flexbe_core.core.topics import Topics
 from flexbe_msgs.action import BehaviorExecution
 from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorSelection
 
+import rclpy
 from rclpy.action import ActionServer
+from rclpy.action.server import ServerGoalHandle
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 from rosidl_runtime_py import get_interface_path
 
@@ -62,24 +66,32 @@ class BehaviorActionServer:
         self._current_state = None
         self._active_behavior_id = None
 
+        self.topic_group = MutuallyExclusiveCallbackGroup()
+        self.action_group = MutuallyExclusiveCallbackGroup()
+
         self._pub = self._node.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
         self._preempt_pub = self._node.create_publisher(Empty, Topics._CMD_PREEMPT_TOPIC, 100)
-        self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb, 100)
-        self._state_pub = self._node.create_subscription(Int32, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb, 100)
+
+        self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb,
+                                                          100, callback_group=self.topic_group)
+        self._state_pub = self._node.create_subscription(Int32, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb,
+                                                         100, callback_group=self.topic_group)
 
         self._as = ActionServer(self._node, BehaviorExecution,
                                 Topics._EXECUTE_BEHAVIOR_ACTION,
-                                goal_callback=self._goal_cb,
+                                handle_accepted_callback=self._goal_cb,
                                 cancel_callback=self._preempt_cb,
-                                execute_callback=self._execute_cb)
+                                execute_callback=self._execute_cb,
+                                callback_group=self.action_group)
 
         self._behavior_lib = BehaviorLibrary(node)
 
         self._node.get_logger().info('%d behaviors available, ready for start request.' % self._behavior_lib.count_behaviors())
+        self.running = False
 
-    def _goal_cb(self, goal_handle):
+    def _goal_cb(self, goal_handle: ServerGoalHandle):
         self._current_goal = goal_handle
-        goal = goal_handle.request()
+        goal = goal_handle.request
 
         if self._preempt_requested:
             goal_handle.canceled()
@@ -119,7 +131,7 @@ class BehaviorActionServer:
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
-        except Exception as e:
+        except Exception as e:  # noqa: B902
             self._node.get_logger().warn('Failed to parse and substitute behavior arguments, will use direct input.\n%s' % str(e))
             be_selection.arg_keys = goal.arg_keys
             be_selection.arg_values = goal.arg_values
@@ -152,24 +164,46 @@ class BehaviorActionServer:
         self._current_state = None
         self._behavior_started = False
         self._preempt_requested = False
+        self.running = True
+        self.outcome = ''
 
         # start new behavior
         self._pub.publish(be_selection)
+        self._current_goal.execute()
 
     def _preempt_cb(self, goal_handle):
         self._preempt_requested = True
         if not self._behavior_started:
             return
+        # Send the preempt request to real behavior
         self._preempt_pub.publish(Empty())
         self._node.get_logger().info('Behavior execution preempt requested!')
 
+    def clean_me(self):
+        """Clean up flags."""
+        self.running = False
+        self._current_state = None
+        self._behavior_started = False
+        self._preempt_requested = False
+
     def _execute_cb(self, goal_handle):
         self._node.get_logger().info('Executing behavior')
+
+        while rclpy.ok() and self.running:
+            time.sleep(0.01)
+        print('End execution')
+        self.clean_me()
+        result = BehaviorExecution.Result()
+        result.outcome = self.outcome
+        self.outcome = ''
+        return result
 
     def _status_cb(self, msg):
         if msg.code == BEStatus.ERROR:
             self._node.get_logger().error('Failed to run behavior! Check onboard terminal for further infos.')
             self._current_goal.abort()
+            self.outcome = 'error'
+            self.clean_me()
             return
 
         if not self._behavior_started and msg.code == BEStatus.STARTED:
@@ -191,10 +225,19 @@ class BehaviorActionServer:
         elif msg.code == BEStatus.FINISHED:
             result = msg.args[0] if len(msg.args) >= 1 else ''
             self._node.get_logger().info("Finished behavior execution with result '%s'!" % result)
-            self._current_goal.succeed()
+            if result == 'preempted':
+                self._current_goal.succeed()  # .canceled()
+                self.outcome = 'preempted'
+                self.clean_me()
+            else:
+                self._current_goal.succeed()
+                self.outcome = 'success'
+                self.clean_me()
         elif msg.code == BEStatus.FAILED:
             self._node.get_logger().error("Behavior execution failed in state '%s'!" % str(self._current_state))
             self._current_goal.abort()
+            self.outcome = 'failed'
+            self.clean_me()
 
     def _state_cb(self, msg):
         self._current_state = msg.data

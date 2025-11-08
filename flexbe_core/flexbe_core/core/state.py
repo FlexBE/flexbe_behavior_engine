@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -125,6 +125,6 @@ class State:
         return '' if self.parent is None else self.parent.path + '/' + self.name
 
     @property
-    def type(self):
+    def type(self):  # noqa: A003
         """Return state type."""
         return self._type

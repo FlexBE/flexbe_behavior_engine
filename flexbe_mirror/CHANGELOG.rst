@@ -2,6 +2,13 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.2 (2025-11-08)
+------------------
+* clean of latest flake8 tests
+* update test set up for colcon testing and build farm
+* specify python3
+* reduce spam for potential (likely short lived) sync issues
+
 4.0.1 (2024-09-26)
 ------------------
 * codespell clean up
