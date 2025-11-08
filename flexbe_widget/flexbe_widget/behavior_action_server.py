@@ -33,6 +33,7 @@
 
 import difflib
 import os
+import time
 import zlib
 
 from flexbe_core import BehaviorLibrary
@@ -41,8 +42,10 @@ from flexbe_core.core.topics import Topics
 from flexbe_msgs.action import BehaviorExecution
 from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorSelection
 
+import rclpy
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 from rosidl_runtime_py import get_interface_path
 
@@ -50,9 +53,6 @@ from std_msgs.msg import Empty, Int32
 
 import yaml
 
-import rclpy
-import time
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 
 class BehaviorActionServer:
     """Behavior action server."""
@@ -72,8 +72,10 @@ class BehaviorActionServer:
         self._pub = self._node.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
         self._preempt_pub = self._node.create_publisher(Empty, Topics._CMD_PREEMPT_TOPIC, 100)
 
-        self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb, 100, callback_group = self.topic_group)
-        self._state_pub = self._node.create_subscription(Int32, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb, 100, callback_group = self.topic_group)
+        self._status_pub = self._node.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_cb,
+                                                          100, callback_group=self.topic_group)
+        self._state_pub = self._node.create_subscription(Int32, Topics._BEHAVIOR_UPDATE_TOPIC, self._state_cb,
+                                                         100, callback_group=self.topic_group)
 
         self._as = ActionServer(self._node, BehaviorExecution,
                                 Topics._EXECUTE_BEHAVIOR_ACTION,
@@ -87,8 +89,7 @@ class BehaviorActionServer:
         self._node.get_logger().info('%d behaviors available, ready for start request.' % self._behavior_lib.count_behaviors())
         self.running = False
 
-
-    def _goal_cb(self, goal_handle : ServerGoalHandle):
+    def _goal_cb(self, goal_handle: ServerGoalHandle):
         self._current_goal = goal_handle
         goal = goal_handle.request
 
@@ -179,6 +180,7 @@ class BehaviorActionServer:
         self._node.get_logger().info('Behavior execution preempt requested!')
 
     def clean_me(self):
+        """Clean up flags."""
         self.running = False
         self._current_state = None
         self._behavior_started = False
@@ -189,18 +191,18 @@ class BehaviorActionServer:
 
         while rclpy.ok() and self.running:
             time.sleep(0.01)
-        print("End execution")
+        print('End execution')
         self.clean_me()
         result = BehaviorExecution.Result()
         result.outcome = self.outcome
-        self.outcome = ""
+        self.outcome = ''
         return result
 
     def _status_cb(self, msg):
         if msg.code == BEStatus.ERROR:
             self._node.get_logger().error('Failed to run behavior! Check onboard terminal for further infos.')
             self._current_goal.abort()
-            self.outcome = "error"
+            self.outcome = 'error'
             self.clean_me()
             return
 
@@ -225,16 +227,16 @@ class BehaviorActionServer:
             self._node.get_logger().info("Finished behavior execution with result '%s'!" % result)
             if result == 'preempted':
                 self._current_goal.succeed()  # .canceled()
-                self.outcome = "preempted"
+                self.outcome = 'preempted'
                 self.clean_me()
             else:
                 self._current_goal.succeed()
-                self.outcome = "success"
+                self.outcome = 'success'
                 self.clean_me()
         elif msg.code == BEStatus.FAILED:
             self._node.get_logger().error("Behavior execution failed in state '%s'!" % str(self._current_state))
             self._current_goal.abort()
-            self.outcome = "failed"
+            self.outcome = 'failed'
             self.clean_me()
 
     def _state_cb(self, msg):

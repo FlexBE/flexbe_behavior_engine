@@ -110,11 +110,11 @@ class StateLogger:
 
         StateLogger._serialize_impl = StateLogger._log_serialize.get_parameter_value().string_value
 
-        if StateLogger._log_config.get_parameter_value().string_value != "":
+        if StateLogger._log_config.get_parameter_value().string_value != '':
             yaml_extra_params = yaml.safe_load(StateLogger._log_config.get_parameter_value().string_value)
         else:
             yaml_extra_params = {}
-      
+
         logger_config = dict({
             'version': 1,
             'disable_existing_loggers': False,
