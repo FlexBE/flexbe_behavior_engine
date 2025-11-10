@@ -2,6 +2,9 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.3 (2025-11-10)
+------------------
+
 4.0.2 (2025-11-08)
 ------------------
 * clean of latest flake8 tests

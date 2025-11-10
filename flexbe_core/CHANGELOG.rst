@@ -2,6 +2,10 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.3 (2025-11-10)
+------------------
+* fix missing python3 in shebang
+
 4.0.2 (2025-11-08)
 ------------------
 * flake8 cleanup and CI badge update

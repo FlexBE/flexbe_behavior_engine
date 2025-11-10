@@ -2,6 +2,9 @@
 Changelog for package flexbe_behavior_engine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.3 (2025-11-10)
+------------------
+
 4.0.2 (2025-11-08)
 ------------------
 * update test set up for colcon testing and build farm

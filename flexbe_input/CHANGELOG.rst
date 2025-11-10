@@ -2,6 +2,10 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.3 (2025-11-10)
+------------------
+* fix missing python3 in shebang
+
 4.0.2 (2025-11-08)
 ------------------
 * clean of latest flake8 tests

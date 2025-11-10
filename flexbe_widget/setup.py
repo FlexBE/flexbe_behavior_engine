@@ -38,7 +38,7 @@ PACKAGE_NAME = 'flexbe_widget'
 
 setup(
     name=PACKAGE_NAME,
-    version='4.0.2',
+    version='4.0.3',
     packages=[PACKAGE_NAME],
     data_files=[
         (os.path.join('share', PACKAGE_NAME), glob('launch/*.launch.py')),

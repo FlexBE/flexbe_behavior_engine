@@ -2,6 +2,10 @@
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.0.3 (2025-11-10)
+------------------
+* correct 4.0.2 version in setup.py
+
 4.0.2 (2025-11-08)
 ------------------
 * flake8 cleanup and CI badge update
