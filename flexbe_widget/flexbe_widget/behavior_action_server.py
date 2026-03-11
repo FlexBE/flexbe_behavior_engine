@@ -243,4 +243,4 @@ class BehaviorActionServer:
         self._current_state = msg.data
         if self._current_goal and self._current_goal.is_active:
             self._current_goal.publish_feedback(BehaviorExecution.Feedback(current_state=self._current_state))
-            self._node.get_logger().loginfo('Current state id = %d' % self._current_state)
+            self._node.get_logger().info('Current state id = %d' % self._current_state)
