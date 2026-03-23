@@ -35,6 +35,8 @@ Provides a single point for comminications for all states in behavior
 
 from threading import Event, Lock, Timer
 
+from flexbe_core.core.exceptions import ProxyTypeError
+from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 from flexbe_core.proxy.qos import QOS_DEFAULT
 
@@ -45,11 +47,14 @@ class ProxyPublisher:
     _node = None
     _topics = {}
     _publisher_sync_lock = Lock()
+    _outcome_publish_total = 0
+    _outcome_publish_nonzero = 0
 
     @staticmethod
     def initialize(node):
         """Initialize ROS setup for proxy publisher."""
         ProxyPublisher._node = node
+        ProxyPublisher.reset_outcome_publish_counters()
         Logger.initialize(node)
 
     @staticmethod
@@ -66,9 +71,26 @@ class ProxyPublisher:
                                  type(exc), str(exc))
 
             ProxyPublisher._topics.clear()
+            ProxyPublisher.reset_outcome_publish_counters()
 
         except Exception as exc:  # pylint: disable=W0703
             Logger.error(f'Something went wrong during shutdown of proxy publisher !\n{str(exc)}')
+
+    @classmethod
+    def reset_outcome_publish_counters(cls):
+        """Reset publish counters for the mirror outcome topic."""
+        with cls._publisher_sync_lock:
+            cls._outcome_publish_total = 0
+            cls._outcome_publish_nonzero = 0
+
+    @classmethod
+    def get_outcome_publish_counters(cls):
+        """Return a snapshot of outcome-topic publish counters."""
+        with cls._publisher_sync_lock:
+            return {
+                'outcome_pub_total': cls._outcome_publish_total,
+                'outcome_pub_nonzero': cls._outcome_publish_nonzero,
+            }
 
     def __init__(self, topics=None, qos=None, **kwargs):
         """
@@ -132,7 +154,7 @@ class ProxyPublisher:
                         Logger.info(f"Mis-matched msg_types ('{msg_type.__name__}' vs."
                                     f" {ProxyPublisher._topics[topic]['publisher'].msg_type.__name__}) for '{topic}'"
                                     ' (possibly due to reload of behavior)!')
-                        raise TypeError(f"Trying to replace existing publisher with different msg type for '{topic}'")
+                        raise ProxyTypeError(f"Trying to replace existing publisher with different msg type for '{topic}'")
                 else:
                     ProxyPublisher._topics[topic]['count'] = ProxyPublisher._topics[topic]['count'] + 1
 
@@ -158,7 +180,7 @@ class ProxyPublisher:
             Logger.localdebug(f"Publisher for '{topic}' has {count} references remaining ({id(pub)}).")
             ProxyPublisher._node.executor.create_task(ProxyPublisher.destroy_publisher, pub, topic)
         else:
-            Logger.localdebug(f"Publisher for '{topic}' remains with {count} references ({id(pub)})!")
+            Logger.localdebug(f"Publisher for '{topic}' remains with {count} references!")
 
     @classmethod
     def is_available(cls, topic):
@@ -181,12 +203,12 @@ class ProxyPublisher:
         @type msg: message class (defined when created publisher)
         @param msg: The message to publish.
         """
-        if topic not in ProxyPublisher._topics:
-            Logger.warning('ProxyPublisher: topic %s not yet registered!' % topic)
-            return
-
         with cls._publisher_sync_lock:
-            msg_type = ProxyPublisher._topics[topic]['publisher'].msg_type
+            pub_entry = ProxyPublisher._topics.get(topic)
+            if pub_entry is None:
+                Logger.warning('ProxyPublisher: topic %s not yet registered!' % topic)
+                return
+            msg_type = pub_entry['publisher'].msg_type
 
         if not isinstance(msg, msg_type):
             # Change in required msg_type for topic name  - update publisher with new type
@@ -204,15 +226,23 @@ class ProxyPublisher:
                     setattr(new_msg, attr, getattr(msg, attr))
 
             else:
-                raise TypeError(f"Invalid request type '{msg.__class__.__name__}'"
-                                f" (vs. {msg_type.__name__}) for topic '{topic}'")
+                raise ProxyTypeError(f"Invalid request type '{msg.__class__.__name__}'"
+                                     f" (vs. {msg_type.__name__}) for topic '{topic}'")
         else:
             # Same class definition instance as stored
             new_msg = msg
 
         try:
             with cls._publisher_sync_lock:
-                ProxyPublisher._topics[topic]['publisher'].publish(new_msg)
+                pub_entry = ProxyPublisher._topics.get(topic)
+                if pub_entry is None:
+                    Logger.warning('ProxyPublisher: topic %s not yet registered!' % topic)
+                    return
+                pub_entry['publisher'].publish(new_msg)
+                if topic == Topics._OUTCOME_TOPIC:
+                    cls._outcome_publish_total += 1
+                    if getattr(new_msg, 'data', None) != 0:
+                        cls._outcome_publish_nonzero += 1
         except Exception as exc:  # pylint: disable=W0703
             Logger.warning("Something went wrong when publishing to '%s'!\n%s: %s" % (topic, str(type(exc)), str(exc)))
             import traceback  # pylint: disable=C0415
@@ -248,15 +278,14 @@ class ProxyPublisher:
             Logger.error("Publisher '%s' not yet registered, need to add it first!" % topic)
             return False
 
-        tmr = Timer(.5, ProxyPublisher._print_wait_warning, [topic])
+        warning_event = Event()
+        tmr = Timer(.5, ProxyPublisher._mark_wait_warning, [warning_event, topic])
         tmr.start()
-        available = ProxyPublisher._wait_for_subscribers(pub['publisher'], timeout)
-        warning_sent = False
         try:
+            available = ProxyPublisher._wait_for_subscribers(pub['publisher'], timeout)
+        finally:
             tmr.cancel()
-        except Exception:  # pylint: disable=W0703
-            # already printed the warning
-            warning_sent = True
+        warning_sent = warning_event.is_set()
 
         # Problem here
         if not available:
@@ -271,6 +300,12 @@ class ProxyPublisher:
     @classmethod
     def _print_wait_warning(cls, topic):
         Logger.warning("Waiting for subscribers on '%s'..." % (topic))
+
+    @classmethod
+    def _mark_wait_warning(cls, warning_event, topic):
+        """Record warning emission and log warning once."""
+        warning_event.set()
+        cls._print_wait_warning(topic)
 
     @classmethod
     def _wait_for_subscribers(cls, pub, timeout=5.0):

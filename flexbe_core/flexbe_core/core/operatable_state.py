@@ -36,6 +36,7 @@ from flexbe_core.core.state import State
 from flexbe_core.core.state_map import StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
+from flexbe_core.proxy.qos import QOS_OUTCOME
 from flexbe_core.state_logger import StateLogger
 
 from flexbe_msgs.msg import OutcomeRequest
@@ -74,13 +75,16 @@ class OperatableState(PreemptableState):
             if not self._force_transition and (not self.parent.is_transition_allowed(self.name, outcome)
                                                or outcome is not None and self.is_breakpoint):
                 if outcome != self._last_requested_outcome:
-                    self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
-                                      OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.state_id))
-                    Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.path, outcome))
-                    StateLogger.log('flexbe.operator', self, type='request', request=outcome,
-                                    autonomy=self.parent.autonomy_level,
-                                    required=self.parent.get_required_autonomy(outcome, self))
-                    self._last_requested_outcome = outcome
+                    if outcome not in self.outcomes:
+                        Logger.localerr(f"State '{self.name}' returned undeclared outcome '{outcome}', ignoring.")
+                    else:
+                        self._pub.publish(Topics._OUTCOME_REQUEST_TOPIC,
+                                          OutcomeRequest(outcome=self.outcomes.index(outcome), target=self.state_id))
+                        Logger.localinfo("<-- Want result: '%s' > '%s'" % (self.path, outcome))
+                        StateLogger.log('flexbe.operator', self, type='request', request=outcome,
+                                        autonomy=self.parent.autonomy_level,
+                                        required=self.parent.get_required_autonomy(outcome, self))
+                        self._last_requested_outcome = outcome
                 outcome = None
 
             # autonomy level is high enough, report the executed transition
@@ -106,7 +110,8 @@ class OperatableState(PreemptableState):
         #                   % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
         # 0 outcome status denotes no outcome, not index so add +1 for valid outcome (subtract in mirror)
         self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
-        self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
+        if self._pub.number_of_subscribers(Topics._DEBUG_TOPIC) > 0:
+            self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
         if self._force_transition:
             StateLogger.log('flexbe.operator', self, type='forced', forced=outcome,
                             requested=self._last_requested_outcome)
@@ -115,7 +120,7 @@ class OperatableState(PreemptableState):
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
-            self._pub.create_publisher(Topics._OUTCOME_TOPIC, UInt32)
+            self._pub.create_publisher(Topics._OUTCOME_TOPIC, UInt32, qos=QOS_OUTCOME)
             self._pub.create_publisher(Topics._DEBUG_TOPIC, String)
             self._pub.create_publisher(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest)
 

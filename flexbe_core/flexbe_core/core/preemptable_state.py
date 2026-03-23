@@ -55,11 +55,22 @@ class PreemptableState(LockableState):
         super().__init__(*args, **kwargs)
         self.__execute = self.execute
         self.execute = self._preemptable_execute
+        self._global_preempt_handled = False  # cached at enable time
 
         PreemptableState.preempt = False
 
+    def _uses_global_preempt_subscription(self):
+        """Return whether an ancestor machine owns the preempt subscription."""
+        parent = self.parent
+        while parent is not None:
+            if parent._handles_preempt_globally and parent._global_preempt_subscription_active:
+                return True
+            parent = parent.parent
+        return False
+
     def _preemptable_execute(self, *args, **kwargs):
-        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+        if self._is_controlled and not self._global_preempt_handled \
+                and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
             self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
             self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
             PreemptableState.preempt = True
@@ -75,7 +86,8 @@ class PreemptableState(LockableState):
 
     def _notify_skipped(self):
         # make sure we dont miss a preempt even if not being executed
-        if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+        if self._is_controlled and not self._global_preempt_handled \
+                and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
             self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
             self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
             PreemptableState.preempt = True
@@ -83,12 +95,14 @@ class PreemptableState(LockableState):
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
-            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
-            self._sub.subscribe(Topics._CMD_PREEMPT_TOPIC, Empty, inst_id=id(self))
+            self._global_preempt_handled = self._uses_global_preempt_subscription()
+            if not self._global_preempt_handled:
+                self._sub.subscribe(Topics._CMD_PREEMPT_TOPIC, Empty, inst_id=id(self))
             PreemptableState.preempt = False
 
     def _disable_ros_control(self):
         if self._is_controlled:
             super()._disable_ros_control()
-            self._sub.unsubscribe_topic(Topics._CMD_PREEMPT_TOPIC, inst_id=id(self))
-            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
+            if not self._global_preempt_handled:
+                self._sub.unsubscribe_topic(Topics._CMD_PREEMPT_TOPIC, inst_id=id(self))
+            self._global_preempt_handled = False

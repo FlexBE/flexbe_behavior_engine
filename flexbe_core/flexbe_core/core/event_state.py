@@ -72,12 +72,12 @@ class EventState(OperatableState):
                 self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='pause'))
                 self._last_active_container = PriorityContainer.active_container
                 # claim priority to propagate pause event
-                PriorityContainer.active_container = self.path
+                PriorityContainer.set_active_container(self.path)
                 self._paused = True
             else:
                 Logger.localinfo("--> Resuming in state '%s'", self.name)
                 self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='resume'))
-                PriorityContainer.active_container = self._last_active_container
+                PriorityContainer.set_active_container(self._last_active_container)
                 self._last_active_container = None
                 self._paused = False
 
@@ -96,6 +96,7 @@ class EventState(OperatableState):
             self.on_resume(*args, **kwargs)
 
         self._last_execution = EventState._node.get_clock().now()
+        self._last_execution_ns = self._last_execution.nanoseconds
         outcome = self.__execute(*args, **kwargs)
 
         repeat = False
@@ -130,19 +131,17 @@ class EventState(OperatableState):
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
-            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
             self._sub.subscribe(Topics._CMD_REPEAT_TOPIC, Empty, inst_id=id(self))
             self._sub.subscribe(Topics._CMD_PAUSE_TOPIC, Bool, inst_id=id(self))
 
     def _disable_ros_control(self):
         if self._is_controlled:
             super()._disable_ros_control()
-            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
             self._sub.unsubscribe_topic(Topics._CMD_REPEAT_TOPIC, inst_id=id(self))
             self._sub.unsubscribe_topic(Topics._CMD_PAUSE_TOPIC, inst_id=id(self))
             self._last_active_container = None
             if self._paused:
-                PriorityContainer.active_container = None
+                PriorityContainer.set_active_container(None)
 
     # Events
     # (just implement the ones you need)
@@ -161,6 +160,7 @@ class EventState(OperatableState):
 
     def on_enter(self, userdata):
         """Execute each time the state is entered from any other state (but not from itself)."""
+        super().on_enter(userdata)
 
     def on_exit(self, userdata):
         """Execute each time the state will be left to any other state (but not to itself)."""

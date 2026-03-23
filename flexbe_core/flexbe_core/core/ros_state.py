@@ -32,9 +32,12 @@
 """A state to interface with ROS."""
 
 from flexbe_core.core.state import State
+from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 from flexbe_core.state_logger import StateLogger
+
+from flexbe_msgs.msg import CommandFeedback
 
 from rclpy.exceptions import ParameterNotDeclaredException
 
@@ -44,7 +47,9 @@ class RosState(State):
 
     _breakpoints = None
     _default_rate_hz = 10.0  # Default best effort update rate
+    _logged_desired_rates = set()
     _node = None
+    _current_execution_time_ns = None  # Expected to be updated in spin()
 
     @staticmethod
     def initialize_ros(node):
@@ -67,9 +72,12 @@ class RosState(State):
         super().__init__(*args, **kwargs)
 
         if 'desired_rate' in kwargs:
-            Logger.localinfo('RosState: Set desired state update '
-                             f"rate to {kwargs['desired_rate']} Hz.")
-            self.set_rate(kwargs['desired_rate'])
+            desired_rate = kwargs['desired_rate']
+            if desired_rate not in RosState._logged_desired_rates:
+                Logger.localinfo('RosState: Set desired state update '
+                                 f'rate to {desired_rate} Hz.')
+                RosState._logged_desired_rates.add(desired_rate)
+            self.set_rate(desired_rate)
         else:
             self.set_rate(RosState._default_rate_hz)
 
@@ -79,17 +87,15 @@ class RosState(State):
         self._sub = ProxySubscriberCached()
 
         self._last_execution = None
+        self._last_execution_ns = None
 
     @property
-    def sleep_duration(self):
-        """Return desired sleep duration in seconds."""
-        if self._last_execution is None:
+    def target_wakeup_ns(self):
+        """Return the absolute wakeup time in nanoseconds, or a negative sentinel to skip sleeping."""
+        if self._last_execution_ns is None:
             return -1  # No sleep if not executed since last entry
 
-        elapsed = RosState._node.get_clock().now() - self._last_execution
-
-        # Take how long the timer should sleep for and subtract elapsed time
-        return (self._desired_period_ns - elapsed.nanoseconds) * 1e-9
+        return int(self._desired_period_ns + self._last_execution_ns)
 
     def set_rate(self, desired_rate):
         """
@@ -102,6 +108,8 @@ class RosState(State):
         @type desired_rate: float
         @param desired_rate: The desired rate in Hz.
         """
+        if desired_rate <= 0:
+            raise ValueError(f'desired_rate must be positive, got {desired_rate}')
         self._desired_period_ns = (1 / desired_rate) * 1e9
 
     @classmethod
@@ -125,15 +133,19 @@ class RosState(State):
         @type desired_rate: float
         @param desired_rate: The desired rate in Hz.
         """
+        if desired_rate <= 0:
+            raise ValueError(f'desired_rate must be positive, got {desired_rate}')
         cls._default_rate_hz = desired_rate
         Logger.localinfo('RosState: Set the default state update '
                          f'rate for behavior to {desired_rate} Hz.')
 
     def _enable_ros_control(self):
         self._is_controlled = True
+        self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
 
     def _disable_ros_control(self):
         self._is_controlled = False
+        self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
 
     @property
     def is_breakpoint(self):

@@ -34,12 +34,15 @@ A state machine that can be operated.
 
 It synchronizes its current state with the mirror and supports some control mechanisms.
 """
+from sys import maxsize as MAX_SIZE
+
 from flexbe_core.core.event_state import EventState
 from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
 from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.operatable_state_machine import OperatableStateMachine
 from flexbe_core.core.preemptable_state import PreemptableState
 from flexbe_core.core.priority_container import PriorityContainer
+from flexbe_core.core.ros_state import RosState
 from flexbe_core.core.state import State
 from flexbe_core.core.topics import Topics
 from flexbe_core.core.user_data import UserData
@@ -61,17 +64,18 @@ class ConcurrencyContainer(OperatableStateMachine):
         self._conditions = conditions if conditions else {}
         self._returned_outcomes = {}
         self._current_state = None
+        self._deep_states_cache_active_states = None
         self._type = OperatableStateMachine.ContainerType.ConcurrencyContainer.value
         self._manual_transition_requested = None
 
     @property
-    def sleep_duration(self):
-        """Sleep duration in seconds."""
-        sleep_dur = float('inf')
+    def target_wakeup_ns(self):
+        """Return the earliest absolute wakeup time across active child states."""
+        target_wakeup_ns = MAX_SIZE  # Absurdly large for our use
         for state in self._states:
-            sleep_dur = min(sleep_dur, state.sleep_duration)
+            target_wakeup_ns = min(target_wakeup_ns, state.target_wakeup_ns)
 
-        return sleep_dur
+        return target_wakeup_ns
 
     @property
     def current_state(self):
@@ -88,7 +92,7 @@ class ConcurrencyContainer(OperatableStateMachine):
         try:
             assert state in self._states, "get required autonomy in ConcurrencyContainer - state doesn't match!"
             return self._autonomy[state.name][outcome]
-        except Exception as exc:
+        except (AssertionError, AttributeError, KeyError, TypeError) as exc:
             Logger.error(f"Failure to retrieve autonomy for '{self.name}' in ConcurrencyContainer - "
                          f"  current state label='{self.name}' state='{state.name}' outcome='{outcome}'.")
             Logger.localerr(f'error={type(exc)} - {exc}')
@@ -102,14 +106,23 @@ class ConcurrencyContainer(OperatableStateMachine):
         self._current_state = []  # Concurrency container has multiple active states so use list
 
         self._manual_transition_requested = None
-        if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
+        if self._is_controlled:
             # Special handling in concurrency container - can be either ConcurrencyContainer or one of several internal states.
-            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+            command_msg = self._sub.peek_if_buffered(Topics._CMD_TRANSITION_TOPIC)
 
-            if command_msg.target == self.state_id:
+            if command_msg is not None and command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
-                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
+                if cmd_msg2 is not command_msg:
+                    Logger.localerr(f"ConcurrencyContainer '{self.path}': unexpected change in CMD_TRANSITION_TOPIC buffer "
+                                    f'(expected {command_msg}, got {cmd_msg2}) - dropping transition.')
+                    return None
                 Logger.localinfo(f"ConcurrencyContainer '{self.path}' is handling the transition cmd msg={command_msg}")
+
+                if not 0 <= command_msg.outcome < len(self.outcomes):
+                    self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                      CommandFeedback(command='transition', args=['invalid', f'{command_msg.target}']))
+                    Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for concurrency container '{self.name}'")
+                    return None
 
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
@@ -125,7 +138,9 @@ class ConcurrencyContainer(OperatableStateMachine):
                 self._last_outcome = outcome
                 return outcome
             else:
-                Logger.localinfo(f"\x1b[94mConcurrencyContainer '{self.name}' - storing {command_msg} transition request\x1b[0m")
+                if command_msg is not None:
+                    Logger.localinfo(f"\x1b[94mConcurrencyContainer '{self.name}' - "
+                                     f'storing {command_msg} transition request\x1b[0m')
                 self._manual_transition_requested = command_msg
 
         if self._is_controlled and self._last_requested_outcome is not None:
@@ -142,10 +157,16 @@ class ConcurrencyContainer(OperatableStateMachine):
             if self._manual_transition_requested is not None:
                 if self._manual_transition_requested.target == state.state_id:
                     # Transition request applies to this state
-                    # @TODO - Should we be using path not name here?
+                    # Use state label keys (state.name) consistently in this container.
+                    # Labels are unique per container and align with _remappings/_conditions.
                     command_msg = self._manual_transition_requested
                     cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
-                    assert cmd_msg2 is command_msg, 'Something is up with handling of buffer for CMD_TRANSITION_TOPIC'
+                    if cmd_msg2 is not command_msg:
+                        msg = (f"ConcurrencyContainer '{self.name}': unexpected change in CMD_TRANSITION_TOPIC buffer "
+                               f"for state '{state.path}' (expected {command_msg}, got {cmd_msg2}) - dropping transition.")
+                        Logger.localerr(msg)
+                        self._manual_transition_requested = None
+                        continue
                     Logger.localinfo(f"ConcurrencyContainer '{self.name}' state '{state.path}' is handling "
                                      f"the cmd msg='{command_msg}'")
                     self._manual_transition_requested = None  # Reset at this level
@@ -160,6 +181,9 @@ class ConcurrencyContainer(OperatableStateMachine):
                             Logger.localinfo(f"ConcurrencyContainer '{self}' manual transition"
                                              f" '{outcome}' and on exit for '{state}'")
                             state.on_exit(userdata)
+                        state._exited = True
+                        state._entering = True
+                        state._last_outcome = outcome
 
                         # ConcurrencyContainer bypasses normal operatable state handling of manual request, so do that here
                         state._publish_outcome(outcome)
@@ -167,16 +191,18 @@ class ConcurrencyContainer(OperatableStateMachine):
                         self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
                                           CommandFeedback(command='transition',
                                                           args=[f'{command_msg.target}', f'{state.state_id}']))
-                        Logger.localerr(f'--> Manually triggered outcome {outcome} ({command_msg.outcome}) '
-                                        f"of state '{state.name}' from inside ConcurrencyContainer '{self.name}'")
+                        Logger.localwarn(f'--> Manually triggered outcome {outcome} ({command_msg.outcome}) '
+                                         f"of state '{state.name}' from inside ConcurrencyContainer '{self.name}'")
                         continue
                     else:
                         Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for state '{state.name}' "
                                         f"from inside concurrency '{self.name}'\n{state.outcomes}")
 
-            if (PriorityContainer.active_container is not None
-                and not all(a == s for a, s in zip(PriorityContainer.active_container.split('/'),
-                                                   state.path.split('/')))):
+            active_segments = PriorityContainer.active_container_segments
+            if (
+                active_segments is not None
+                and not all(a == s for a, s in zip(active_segments, state.path_segments))
+            ):
                 if isinstance(state, EventState):
                     # Base state not a container
                     state._notify_skipped()
@@ -190,7 +216,8 @@ class ConcurrencyContainer(OperatableStateMachine):
 
                 continue  # other state has priority
 
-            if state.sleep_duration <= 0 or self._manual_transition_requested is not None:  # ready to execute
+            now_ns = RosState._current_execution_time_ns
+            if state.target_wakeup_ns <= now_ns or self._manual_transition_requested is not None:  # ready to execute
                 # Execute if we have a pending manual transition command or state tic rate elapsed
                 out = self._execute_single_state(state)
                 self._returned_outcomes[state.name] = out
@@ -260,16 +287,12 @@ class ConcurrencyContainer(OperatableStateMachine):
                 else:
                     result = state.execute(userdata)  # This is call on_exit if necessary
         except Exception as exc:  # pylint: disable=W0703
-            # catch any exception and log here, but re-raise to preempt behavior
             result = None
-            self._last_exception = exc
+            wrapped = exc if isinstance(exc, (StateError, StateMachineError, UserDataError)) else StateError(str(exc))
+            self._last_exception = wrapped
             Logger.logerr('ConcurrencyContainer: Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
             import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))
-            if isinstance(exc, (StateError, StateMachineError, UserDataError)):
-                self._last_exception = exc
-            else:
-                self._last_exception = StateError(str(exc))
             raise self._last_exception
         return result
 
@@ -281,6 +304,7 @@ class ConcurrencyContainer(OperatableStateMachine):
             # Force on_enter at state level (userdata passed by _execute_single_state)
             state._entering = True  # force state to handle enter on first execute
             state._last_execution = None
+            state._last_execution_ns = None
 
     def on_exit(self, userdata, states=None):
         """Call when concurrency container exits."""
@@ -312,26 +336,39 @@ class ConcurrencyContainer(OperatableStateMachine):
 
     def get_deep_states(self):
         """
-        Recursively look for the currently executing states.
+        Return the currently active execution paths for this concurrency container.
 
-        Traverse all state machines down to the terminal child state that is not a container.
+        The returned tuple starts with this concurrency container and then
+        includes the active path for each currently active child branch,
+        including nested containers.
 
-        @return: The list of active states (not state machine)
+        @return: Tuple of active states and containers across active branches.
         """
+        active_states = self._current_state if isinstance(self._current_state, list) else []
+        active_key = tuple(active_states)
+
+        if (self._deep_states_list_cache is not None
+                and self._deep_states_cache_active_states == active_key):
+            return self._deep_states_list_cache
+
         deep_states = [self]  # Concurrency acts as both state and container for this purpose
-        for state in self._states:
+        for state in active_states:
             # Internal states (after skipping concurrency container self)
             if isinstance(state, LockableStateMachine):
                 deep_states.extend(state.get_deep_states())
             else:
                 deep_states.append(state)
-        return deep_states
+
+        self._deep_states_list_cache = tuple(deep_states)
+        self._deep_states_cache_active_states = active_key
+        return self._deep_states_list_cache
 
     def _notify_skipped(self):
         # make sure we dont miss a preempt even if not being executed (e.g., due to priority container)
-        for state in self._current_state:
-            # Prioritize handling at low level state first
-            state._notify_skipped()
+        if self._current_state is not None:
+            for state in self._current_state:
+                # Prioritize handling at low level state first
+                state._notify_skipped()
 
         if self._is_controlled and self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
             self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)

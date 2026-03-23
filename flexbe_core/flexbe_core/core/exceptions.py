@@ -42,3 +42,35 @@ class StateMachineError(Exception):
 
 class UserDataError(Exception):
     """UserData Error."""
+
+
+class FlexBEError(Exception):
+    """Base class for FlexBE domain-specific errors."""
+
+
+class ProxyError(FlexBEError):
+    """Base class for proxy-layer errors."""
+
+
+class ProxyAvailabilityError(ValueError, ProxyError):
+    """Raised when a proxy operation cannot proceed due to unavailable resources."""
+
+
+class ProxyTypeError(TypeError, ProxyError):
+    """Raised when proxy payload or interface types are invalid."""
+
+
+class TransitionError(FlexBEError):
+    """Raised for invalid state transition or transition handling failures."""
+
+
+class SyncError(FlexBEError):
+    """Raised when distributed state synchronization fails."""
+
+
+class BehaviorLoadError(FlexBEError):
+    """Raised when loading/preparing a behavior fails."""
+
+
+class ShutdownError(FlexBEError):
+    """Raised when shutdown/cleanup operations fail."""

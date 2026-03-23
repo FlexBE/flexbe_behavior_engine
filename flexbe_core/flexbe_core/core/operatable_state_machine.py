@@ -41,6 +41,7 @@ from flexbe_core.core.state_map import StateMap
 from flexbe_core.core.topics import Topics
 from flexbe_core.core.user_data import UserData
 from flexbe_core.logger import Logger
+from flexbe_core.proxy.qos import QOS_OUTCOME
 from flexbe_core.state_logger import StateLogger
 
 from flexbe_msgs.msg import BehaviorSync, CommandFeedback, Container, ContainerStructure, OutcomeRequest
@@ -56,6 +57,7 @@ class OperatableStateMachine(PreemptableStateMachine):
     """
 
     autonomy_level = 3
+    __FULL_AUTONOMY = 3  # Must match flexbe_core.Autonomy.Full
 
     class ContainerType(Enum):
         """Define ContainerTypes used in ContainerStructure messages."""
@@ -74,6 +76,9 @@ class OperatableStateMachine(PreemptableStateMachine):
         self._last_exception = None
         self._structure = None
         self._type = OperatableStateMachine.ContainerType.OperatableStateMachine.value
+        self._latest_status_msg_cache = None
+        self._latest_status_active_states = None
+        self._latest_status_behavior_id = None
 
         # Allow state machines to accept forced transitions
         self._last_requested_outcome = None
@@ -156,19 +161,28 @@ class OperatableStateMachine(PreemptableStateMachine):
             except Exception as exc:  # pylint: disable=W0703
                 Logger.logerr(f"Error building container structure for '{state.name}'!")
                 Logger.localerr(f"'{type(exc)}' - {exc}")
+                raise StateMachineError(
+                    f"Failed to build container structure for '{state.name}' in '{self.path}': {exc}"
+                ) from exc
         return container_msg
 
     def get_latest_status(self):
         """Return the latest execution information as a BehaviorSync message."""
-        msg = BehaviorSync()
         with self._status_lock:
             active_states = self._last_deep_states_list
-            msg.behavior_id = self.id if self.id is not None else 0
+            behavior_id = self.id if self.id is not None else 0
+            if (self._latest_status_msg_cache is not None
+                    and self._latest_status_active_states is active_states
+                    and self._latest_status_behavior_id == behavior_id):
+                return self._latest_status_msg_cache
+
+        msg = BehaviorSync()
+        msg.behavior_id = behavior_id
 
         if active_states is not None:
             for active in active_states:
                 if active is not None:
-                    outcome_index = 0
+                    outcome_index = None
                     if active._last_outcome is not None:
                         try:
                             outcome_index = active._outcomes.index(active._last_outcome)
@@ -176,20 +190,33 @@ class OperatableStateMachine(PreemptableStateMachine):
                             Logger.localerr(f"Invalid outcome='{active._last_outcome} for '{active}' - ignore outcome!")
 
                     msg.current_state_checksums.append(StateMap.hash(active, outcome_index))
+
+        self._latest_status_msg_cache = msg
+        self._latest_status_active_states = active_states
+        self._latest_status_behavior_id = behavior_id
         return msg
 
     # execution
     def _execute_current_state(self):
         self._manual_transition_requested = None
-        if self._is_controlled and self._sub.has_buffered(Topics._CMD_TRANSITION_TOPIC):
+        if self._is_controlled:
             # Special handling in statemachine container
-            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+            command_msg = self._sub.peek_if_buffered(Topics._CMD_TRANSITION_TOPIC)
 
-            if command_msg.target == self.state_id:
+            if command_msg is not None and command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)  # Using here, so clear from buffer
-                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
+                if cmd_msg2 is not command_msg:
+                    Logger.localerr(f"Statemachine '{self.name}': unexpected change in CMD_TRANSITION_TOPIC buffer "
+                                    f'(expected {command_msg}, got {cmd_msg2}) - dropping transition.')
+                    return None
                 Logger.localinfo(f"Statemachine '{self.name}' from '{self.path}' is "
                                  f"handling the transition cmd msg='{command_msg}'")
+
+                if not 0 <= command_msg.outcome < len(self.outcomes):
+                    self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                      CommandFeedback(command='transition', args=['invalid', f'{command_msg.target}']))
+                    Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for statemachine '{self.name}'")
+                    return None
 
                 self._force_transition = True
                 outcome = self.outcomes[command_msg.outcome]
@@ -260,7 +287,8 @@ class OperatableStateMachine(PreemptableStateMachine):
         # Logger.localinfo('Publish outcome: State Machine result: %s > %s (%d) (%d) (%s)'
         #                  % (self.name, outcome, outcome_index, self.state_id, self.__class__.__name__))
         self._pub.publish(Topics._OUTCOME_TOPIC, UInt32(data=StateMap.hash(self, outcome_index)))
-        self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
+        if self._pub.number_of_subscribers(Topics._DEBUG_TOPIC) > 0:
+            self._pub.publish(Topics._DEBUG_TOPIC, String(data='%s > %s' % (self.path, outcome)))
         if self._force_transition:
             StateLogger.log('flexbe.operator', self, type='forced', forced=outcome,
                             requested=self._last_requested_outcome)
@@ -367,7 +395,7 @@ class OperatableStateMachine(PreemptableStateMachine):
         # Update mirror with currently active state (high bandwidth mode)
         self._pub.create_publisher(Topics._MIRROR_SYNC_TOPIC, BehaviorSync)
         # Transition outcome information used by mirror to track onboard state
-        self._pub.create_publisher(Topics._OUTCOME_TOPIC, UInt32)
+        self._pub.create_publisher(Topics._OUTCOME_TOPIC, UInt32, qos=QOS_OUTCOME)
         # Pass hints to the UI
         self._pub.create_publisher(Topics._OUTCOME_REQUEST_TOPIC, OutcomeRequest)
 
@@ -382,7 +410,7 @@ class OperatableStateMachine(PreemptableStateMachine):
             self._enable_ros_control()
 
         Logger.localinfo(f"--> Wait for behavior '{self.name}': {self.id} publishers to activate ...")
-        self.wait(seconds=0.25)  # no clean way to wait for publisher to be ready...
+        # Intentionally avoid fixed startup sleep here; BEStatus uses durable QoS for discovery lag tolerance.
 
         Logger.localinfo(f"--> Notify behavior '{self.name}': {self.id} states to start ...")
         self._notify_start()
@@ -394,27 +422,33 @@ class OperatableStateMachine(PreemptableStateMachine):
         """Set the current autonomy level."""
         if OperatableStateMachine.autonomy_level != msg.data:
             Logger.localinfo(f"--> Request autonomy changed to {msg.data} on '{self.name}'")
-        if msg.data < 0:
-            Logger.localinfo(f"--> Negative autonomy level={msg.data} - Preempt '{self.name}'!")
-            self._preempt_cb(msg)
+        if msg.data > OperatableStateMachine.__FULL_AUTONOMY:
+            Logger.logwarn(f"--> Invalid autonomy level={msg.data} - ignore '{self.name}'!")
+            # deprecated as invalid check < 0 for UInt8 :  self._preempt_cb(msg)
         else:
             OperatableStateMachine.autonomy_level = msg.data
+
         self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='autonomy', args=[]))
 
     def _sync_callback(self, msg):
-        Logger.localwarn(f"--> Synchronization requested ... ({self.id}) '{self.name}' ")
+        Logger.localwarn_throttle(2.0, "--> Synchronization requested ... (%s) '%s' ", self.id, self.name)
         self._inner_sync_request = True  # Flag to process at the end of spin loop
 
     def _attach_callback(self, msg):
         Logger.localinfo('--> Enabling attach control...')
-        # set autonomy level
-        OperatableStateMachine.autonomy_level = msg.data
+        # msg.data > Full (e.g. 255) is a sentinel meaning "preserve current autonomy level".
+        if msg.data <= OperatableStateMachine.__FULL_AUTONOMY:
+            OperatableStateMachine.autonomy_level = msg.data
+        elif OperatableStateMachine.autonomy_level > OperatableStateMachine.__FULL_AUTONOMY:
+            # Was running fully autonomous (255); clamp to Full so OCS dropdown gets a valid value.
+            OperatableStateMachine.autonomy_level = OperatableStateMachine.__FULL_AUTONOMY
         # enable control of states
         self._enable_ros_control()
         self._inner_sync_request = True
-        # send command feedback
+        # send command feedback; args[0]=behavior name, args[1]=current autonomy level (always 0-3)
         cfb = CommandFeedback(command='attach')
         cfb.args.append(self.name)
+        cfb.args.append(str(OperatableStateMachine.autonomy_level))
         self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, cfb)
         Logger.localinfo('<-- Sent attach confirm.')
 
@@ -428,10 +462,10 @@ class OperatableStateMachine(PreemptableStateMachine):
                 # enable control of states since a mirror is listening
                 self._enable_ros_control()
             else:
-                Logger.localinfo(f"Structure for '{self.name}' id={sm_struct.behavior_id} mismatch "
-                                 f' with request from mirror id={msg.data} - ignore request!')
+                Logger.localinfo_throttle(2.0, "Structure for '%s' id=%s mismatch with request from mirror id=%s "
+                                          '- ignore request!', self.name, sm_struct.behavior_id, msg.data)
         else:
-            Logger.logwarn(f"No structure defined for '{self.name}'! - nothing sent to mirror.")
+            Logger.logwarn_throttle(2.0, "No structure defined for '%s'! - nothing sent to mirror.", self.name)
 
     # handle state events
     def _notify_start(self):

@@ -97,6 +97,11 @@ class LockableState(ManuallyTransitionableState):
 
         return outcome
 
+    def on_enter(self, userdata):
+        """Reset lock state on entry to handle re-entry within a behavior run."""
+        self._locked = False
+        self._stored_outcome = None
+
     def _execute_lock(self, target):
         """Execute lock."""
         if target in (self.state_id, 0):
@@ -131,14 +136,12 @@ class LockableState(ManuallyTransitionableState):
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
-            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
             self._sub.subscribe(Topics._CMD_LOCK_TOPIC, Int32, inst_id=id(self))
             self._sub.subscribe(Topics._CMD_UNLOCK_TOPIC, Int32, inst_id=id(self))
 
     def _disable_ros_control(self):
         if self._is_controlled:
             super()._disable_ros_control()
-            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
             self._sub.unsubscribe_topic(Topics._CMD_LOCK_TOPIC, inst_id=id(self))
             self._sub.unsubscribe_topic(Topics._CMD_UNLOCK_TOPIC, inst_id=id(self))
 

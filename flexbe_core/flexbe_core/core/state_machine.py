@@ -49,6 +49,8 @@ class StateMachine(State):
         self._transitions = {}
         self._remappings = {}
         self._current_state = None
+        self._deep_states_list_cache = None
+        self._deep_states_cache_key = None
         self._own_userdata = UserData()
         self._userdata = None
         self._previously_opened_container = None
@@ -101,13 +103,13 @@ class StateMachine(State):
         """Get open container from this SM."""
         return StateMachine._currently_opened_container
 
-    def wait(self, seconds=None):
+    def wait(self, target_wakeup_ns=None):
         """Wait."""
         # This should not be called; expect to call ros_state_machine version instead!
         Logger.localinfo(f'Error calling StateMachine.wait Dummy wait method for '
-                         f"'{self.name}' seconds={seconds}")
+                         f"'{self.name}' target_wakeup_ns={target_wakeup_ns}")
         raise RuntimeError(f'Error calling StateMachine.wait Dummy wait method for '
-                           f"'{self.name}' seconds={seconds}")
+                           f"'{self.name}' target_wakeup_ns={target_wakeup_ns}")
 
     def spin(self, userdata=None):
         """Spin the SM execute loop."""
@@ -125,7 +127,7 @@ class StateMachine(State):
             if outcome is not None:
                 break
 
-            self.wait(seconds=self.sleep_duration)
+            self.wait(target_wakeup_ns=self.target_wakeup_ns)
 
         return outcome
 
@@ -136,7 +138,7 @@ class StateMachine(State):
 
         outcome = self._execute_current_state()
 
-        if outcome:
+        if outcome is not None:
             # Exit this statemachine
             self.on_exit(self._userdata)
             self._publish_outcome(outcome)
@@ -149,6 +151,7 @@ class StateMachine(State):
         self._entering = False
         self._exited = False
         self._current_state = self.initial_state
+        self._invalidate_deep_states_cache()
         self._current_state._entering = True  # Force entering action
         self._userdata = userdata if userdata is not None else UserData()
         self._userdata(add_from=self._own_userdata)
@@ -174,10 +177,18 @@ class StateMachine(State):
                 raise StateError(err_msg) from exc
 
             self._current_state = self._labels.get(target)
+            self._invalidate_deep_states_cache()
             if self._current_state is None:
                 return target
 
         return None
+
+    def _invalidate_deep_states_cache(self):
+        """Clear cached active-state traversal locally and in parent containers."""
+        self._deep_states_list_cache = None
+        self._deep_states_cache_key = None
+        if isinstance(self.parent, StateMachine):
+            self.parent._invalidate_deep_states_cache()
 
     # properties
 
@@ -216,28 +227,38 @@ class StateMachine(State):
         return self.initial_state.name
 
     @property
-    def sleep_duration(self):
-        """Return how long to sleep between execute steps."""
+    def target_wakeup_ns(self):
+        """Return the absolute wakeup time for the next execute step in nanoseconds."""
         if self._current_state is not None:
-            return self._current_state.sleep_duration
+            return self._current_state.target_wakeup_ns
         elif self._entering:
-            return -0.1  # No sleep when entering
-        return 0.00005  # return some minimal wait
+            return -1  # No sleep when entering
+        return 0
 
     def get_deep_states(self):
         """
-        Recursively look for the currently executing states.
+        Return the currently active execution path for this state machine.
 
-        Traverse all state machines down to the terminal child state that is not a container.
-        (Except concurrency containers, which override this method)
+        Traverses the active child chain down to the terminal child state.
+        The returned tuple includes this container and any nested active
+        state-machine containers along the way. Concurrency containers
+        override this to include each active branch.
 
-        @return: The list of active states (not state machine)
+        @return: Tuple of active states and containers along the current path.
         """
-        if isinstance(self._current_state, StateMachine):
-            return [self] + self._current_state.get_deep_states()
+        if self._deep_states_list_cache is not None and self._deep_states_cache_key is self._current_state:
+            return self._deep_states_list_cache
 
-        # Base case is current_state is not a state machine
-        return [self, self._current_state] if self._current_state is not None else [self]  # Return as a list
+        if isinstance(self._current_state, StateMachine):
+            deep_states = [self]
+            deep_states.extend(self._current_state.get_deep_states())
+        else:
+            # Base case is current_state is not a state machine
+            deep_states = [self, self._current_state] if self._current_state is not None else [self]
+
+        self._deep_states_list_cache = tuple(deep_states)
+        self._deep_states_cache_key = self._current_state
+        return self._deep_states_list_cache
 
     # consistency checks
 

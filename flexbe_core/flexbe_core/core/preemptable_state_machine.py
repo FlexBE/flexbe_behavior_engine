@@ -34,6 +34,7 @@ import threading
 
 from flexbe_core.core.lockable_state_machine import LockableStateMachine
 from flexbe_core.core.preemptable_state import PreemptableState
+from flexbe_core.core.ros_state import RosState
 from flexbe_core.core.state import State
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
@@ -55,6 +56,8 @@ class PreemptableStateMachine(LockableStateMachine):
     def __init__(self, *args, **kwargs):
         """Initialize instance."""
         super().__init__(*args, **kwargs)
+        self._handles_preempt_globally = True
+        self._global_preempt_subscription_active = False
         self._status_lock = threading.Lock()
         self._last_deep_states_list = None
         self._last_outcome = None
@@ -62,17 +65,25 @@ class PreemptableStateMachine(LockableStateMachine):
     def _notify_start(self):
         # always listen to preempt so that the behavior can be stopped even if unsupervised (e.g not ROS controlled via OCS)
         self._sub.subscribe(Topics._CMD_PREEMPT_TOPIC, Empty, self._preempt_cb, inst_id=id(self))
+        self._global_preempt_subscription_active = True
 
     def _notify_stop(self):
+        self._global_preempt_subscription_active = False
         self._sub.unsubscribe_topic(Topics._CMD_PREEMPT_TOPIC, inst_id=id(self))
 
     def _preempt_cb(self, msg):
-        if not self._is_controlled:
+        if self._sub.has_msg(Topics._CMD_PREEMPT_TOPIC):
+            self._sub.remove_last_msg(Topics._CMD_PREEMPT_TOPIC)
+
+        if self._is_controlled:
+            self._pub.publish(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback(command='preempt'))
+        else:
             Logger.localinfo(f'Preempting {self.name}!')
-            PreemptableState.preempt = True
+
+        PreemptableState.preempt = True
 
     @staticmethod
-    def add(label, state, transitions=None, remapping=None):
+    def add(label, state, transitions, remapping=None):
         """Add state to SM."""
         transitions[State._preempted_name] = State._preempted_name
         LockableStateMachine.add(label, state, transitions, remapping)
@@ -85,7 +96,9 @@ class PreemptableStateMachine(LockableStateMachine):
         """Spin the execute loop for preemptable portion."""
         outcome = None
         while rclpy.ok(context=rclpy_context):
-            command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+            RosState._current_execution_time_ns = self._node.get_clock().now().nanoseconds
+
+            command_msg = self._sub.peek_if_buffered(Topics._CMD_TRANSITION_TOPIC)
 
             try:
                 outcome = self.execute(userdata)
@@ -97,7 +110,7 @@ class PreemptableStateMachine(LockableStateMachine):
                 return None
 
             if command_msg is not None:
-                command_msg2 = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
+                command_msg2 = self._sub.peek_if_buffered(Topics._CMD_TRANSITION_TOPIC)
                 if command_msg is command_msg2:
                     # Execute loop went through process and did not handle the requested transition
                     Logger.loginfo(f"'{self.name}' did not handle transition "
@@ -109,8 +122,9 @@ class PreemptableStateMachine(LockableStateMachine):
 
             # Store the information for safely passing to heartbeat thread
             deep_states = self.get_deep_states()
-            assert isinstance(deep_states, list), f'Expecting a list here, not {deep_states}'
-            if deep_states != self._last_deep_states_list:
+            if not isinstance(deep_states, tuple):
+                raise TypeError(f'Expecting a tuple here, not {deep_states}')
+            if deep_states is not self._last_deep_states_list:
                 # Logger.localinfo(f"New deep states for '{self.name}' len={len(deep_states)} "
                 #                  f'deep states: {[dpst.path for dpst in deep_states if dpst is not None]}')
                 with self._status_lock:
@@ -127,7 +141,7 @@ class PreemptableStateMachine(LockableStateMachine):
                 Logger.loginfo(f"PreemptableStateMachine '{self.name}' spin() - done with outcome={outcome}")
                 break
 
-            self.wait(seconds=self.sleep_duration)
+            self.wait(target_wakeup_ns=self.target_wakeup_ns)
         return outcome
 
     def get_latest_status(self):
@@ -142,7 +156,7 @@ class PreemptableStateMachine(LockableStateMachine):
     @classmethod
     def process_sync_request(cls):
         """Process sync request (ignored here - should be handled by derived state)."""
-        Logger.localinfo('Ignoring PreemptableState process_sync_request')
+        Logger.localinfo_throttle(2.0, 'Ignoring PreemptableState process_sync_request')
 
     def _notify_skipped(self):
         # make sure we dont miss a preempt even if not being executed (e.g., due to priority container)

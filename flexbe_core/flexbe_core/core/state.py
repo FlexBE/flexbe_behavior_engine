@@ -69,9 +69,9 @@ class State:
         """Execute this state."""
 
     @property
-    def sleep_duration(self):
-        """Return desired sleep duration."""
-        return 0.
+    def target_wakeup_ns(self):
+        """Return the absolute wakeup time in nanoseconds."""
+        return 0
 
     @property
     def outcomes(self):
@@ -123,6 +123,13 @@ class State:
     def path(self):
         """Return path from root state machine."""
         return '' if self.parent is None else self.parent.path + '/' + self.name
+
+    @property
+    def path_segments(self):
+        """Return normalized path segments from the root container."""
+        if self.parent is None:
+            return ()
+        return self.parent.path_segments + (self.name,)
 
     @property
     def type(self):  # noqa: A003

@@ -38,6 +38,16 @@ class PriorityContainer(OperatableStateMachine):
     """A state machine that is always executed alone when becoming active."""
 
     active_container = None
+    active_container_segments = None
+
+    @classmethod
+    def set_active_container(cls, path):
+        """Store the active-container path together with normalized path segments."""
+        cls.active_container = path
+        if path is None:
+            cls.active_container_segments = None
+        else:
+            cls.active_container_segments = tuple(segment for segment in path.split('/') if segment)
 
     def __init__(self, conditions=None, *args, **kwargs):
         """Initialize instance of PriorityContainer."""
@@ -47,19 +57,29 @@ class PriorityContainer(OperatableStateMachine):
 
     def execute(self, *args, **kwargs):
         """Execute the priority container."""
-        if (PriorityContainer.active_container is None
-            or not all(p == PriorityContainer.active_container.split('/')[i]
-                       for i, p in enumerate(self.path.split('/')))):
+        path_segments = self.path_segments
+        active_segments = PriorityContainer.active_container_segments
+        if (
+            active_segments is None
+            or len(active_segments) < len(path_segments)
+            or any(p != active_segments[i] for i, p in enumerate(path_segments))
+        ):
             self._parent_active_container = PriorityContainer.active_container
-            PriorityContainer.active_container = self.path
+            PriorityContainer.set_active_container(self.path)
 
-        outcome = OperatableStateMachine.execute(self, *args, **kwargs)
+        outcome = None
+        try:
+            outcome = OperatableStateMachine.execute(self, *args, **kwargs)
+        except Exception:
+            if PriorityContainer.active_container is not None:
+                PriorityContainer.set_active_container(self._parent_active_container)
+            raise
 
         if outcome is not None:
             # Logger.localinfo(f"Priority container '{self}' outcome='{outcome}' reset active "
             #                  f"from '{PriorityContainer.active_container}'"
             #                  f" to  '{self._parent_active_container}'")
-            PriorityContainer.active_container = self._parent_active_container
+            PriorityContainer.set_active_container(self._parent_active_container)
 
         return outcome
 
@@ -70,5 +90,5 @@ class PriorityContainer(OperatableStateMachine):
 
     def on_exit(self, userdata=None):
         """Call on exiting the statemachine."""
-        super().on_enter(userdata)
+        super().on_exit(userdata)
         Logger.localinfo(f"Exited priority container '{self}'")

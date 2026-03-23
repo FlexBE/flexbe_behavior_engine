@@ -70,6 +70,9 @@ class BehaviorLibrary:
                     if export.tagname == 'flexbe_behaviors':
                         try:
                             self._add_behavior_manifests(os.path.join(pkg_path, 'lib', pkg_name, 'manifest'), pkg_name)
+                        except OSError as exc:
+                            Logger.logwarn(f"BehaviorLibrary - skipping '{pkg_name}' due to missing or unreadable "
+                                           f'manifest directory: {exc}')
                         except KeyError as exc:
                             print(f"Error : duplicate behavior name found in '{pkg_name}' \n  {exc}", flush=True)
                             raise exc
@@ -217,5 +220,5 @@ class BehaviorLibrary:
                 Logger.logerr(f"""Cannot import behavior package '{be_entry["package"]}' """)
                 raise exc
 
-        filename = be_entry['file'] + '.py' if not add_tmp else '_tmp.py'
+        filename = be_entry['file'] + ('.py' if not add_tmp else '_tmp.py')
         return os.path.join(module_path, filename)

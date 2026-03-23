@@ -62,15 +62,19 @@ class RosStateMachine(StateMachine):
     def _notify_stop(self):
         """Call when state machine shuts down."""
 
-    def wait(self, seconds=None, context=None):
+    def wait(self, target_wakeup_ns=None, context=None):
         """
         Wait for designated ROS clock time to keep APPROXIMATELY on scheduled tic rate.
 
-        @param seconds - floating point seconds to sleep
+        @param target_wakeup_ns - absolute wakeup time in nanoseconds
         @param context - rclpy Context, normally None for default context, but specific context used in testing
         """
-        if seconds is not None and seconds > 0:
-            self._node.get_clock().sleep_for(Duration(seconds=seconds), context=context)
+        if target_wakeup_ns is None:
+            return
+
+        sleep_duration_ns = target_wakeup_ns - self._node.get_clock().now().nanoseconds
+        if sleep_duration_ns > 0:
+            self._node.get_clock().sleep_for(Duration(nanoseconds=int(sleep_duration_ns)), context=context)
 
     def _enable_ros_control(self):
         if not self._is_controlled:

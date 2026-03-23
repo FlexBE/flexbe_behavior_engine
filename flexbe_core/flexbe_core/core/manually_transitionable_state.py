@@ -61,14 +61,21 @@ class ManuallyTransitionableState(RosState):
             if command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
                 assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
-                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
-                                  CommandFeedback(command='transition', args=[f'{command_msg.target}', f'{self.state_id}']))
+                if 0 <= command_msg.outcome < len(self.outcomes):
+                    self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                      CommandFeedback(command='transition', args=[f'{command_msg.target}',
+                                                                                  f'{self.state_id}']))
 
-                self._force_transition = True
-                outcome = self.outcomes[command_msg.outcome]
-                self._manual_transition_requested = outcome
-                Logger.localinfo("--> Manually triggered outcome '%s' of state '%s'" % (outcome, self.name))
-                return outcome
+                    self._force_transition = True
+                    outcome = self.outcomes[command_msg.outcome]
+                    self._manual_transition_requested = outcome
+                    Logger.localinfo("--> Manually triggered outcome '%s' of state '%s'" % (outcome, self.name))
+                    return outcome
+
+                self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
+                                  CommandFeedback(command='transition', args=['invalid', f'{command_msg.target}']))
+                Logger.localerr(f"--> Invalid outcome {command_msg.outcome} request for state '{self.name}'")
+                return None
             else:
                 Logger.loginfo(f"Requested outcome for state '{command_msg.target}' "
                                f" but this active state is '{self.path}' - keep looking for potential nested state")
@@ -80,12 +87,10 @@ class ManuallyTransitionableState(RosState):
     def _enable_ros_control(self):
         if not self._is_controlled:
             super()._enable_ros_control()
-            self._pub.create_publisher(Topics._CMD_FEEDBACK_TOPIC, CommandFeedback)
             self._sub.subscribe(Topics._CMD_TRANSITION_TOPIC, OutcomeRequest, inst_id=id(self))
             self._sub.enable_buffer(Topics._CMD_TRANSITION_TOPIC)
 
     def _disable_ros_control(self):
         if self._is_controlled:
             super()._disable_ros_control()
-            self._pub.remove_publisher(Topics._CMD_FEEDBACK_TOPIC)
             self._sub.unsubscribe_topic(Topics._CMD_TRANSITION_TOPIC, inst_id=id(self))

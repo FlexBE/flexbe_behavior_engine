@@ -1,4 +1,4 @@
-#!/user/bin/env python3
+#!/usr/bin/env python3
 
 # Copyright 2024 Philipp Schillinger, Team ViGIR, Christopher Newport University
 #
@@ -72,13 +72,10 @@ class UserData:
                                 "No data found for key '%s'" % key)
         value = self._reference[self._remap.get(key, key)]
         if self._output_keys is not None and key not in self._output_keys:
+            # Protect input-only data from in-place mutation leaking back into the shared reference.
+            value = deepcopy(value)
             self._data[key] = value
             self._hashes[key] = hash(repr(value))
-            if getattr(value.__class__, '_has_header', False):
-                # This is specific to rospy: If the value here is a message and has a header,
-                #   it will automatically be modified during publishing by rospy.
-                #   So to avoid hash issues, we need to return a copy.
-                value = deepcopy(value)
         return value
 
     def __setitem__(self, key, value):
@@ -128,6 +125,7 @@ class UserData:
                 self._data[key] = value
         if remove_key is not None and remove_key in self._data:
             del self._data[remove_key]
+            self._hashes.pop(remove_key, None)
 
     def __len__(self):
         """Get total length of data and references."""

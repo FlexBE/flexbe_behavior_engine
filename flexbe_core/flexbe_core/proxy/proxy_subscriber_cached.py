@@ -33,10 +33,11 @@ A proxy for subscribing topics that caches and buffers received messages.
 Provides a single point for comminications for all states in behavior
 """
 
-from collections import defaultdict, deque
+from collections import deque
 from functools import partial
-from threading import Lock
+from threading import Event, Lock
 
+from flexbe_core.core.exceptions import ProxyTypeError
 from flexbe_core.logger import Logger
 from flexbe_core.proxy.qos import QOS_DEFAULT
 
@@ -49,6 +50,11 @@ class ProxySubscriberCached:
     _persistant_topics = []
 
     _subscription_lock = Lock()  # Prevent modifications during processing
+
+    @staticmethod
+    def _refresh_callback_items(topic_dict):
+        """Refresh the immutable callback snapshot for a topic entry."""
+        topic_dict['callback_items'] = tuple(topic_dict['callbacks'].items())
 
     @staticmethod
     def initialize(node):
@@ -118,56 +124,119 @@ class ProxySubscriberCached:
         if inst_id is None:
             inst_id = id(self)
 
-        if topic not in ProxySubscriberCached._topics:
-            qos = qos or QOS_DEFAULT
-            sub = ProxySubscriberCached._node.create_subscription(msg_type, topic,
-                                                                  partial(self._callback, topic=topic), qos)
+        create_subscription = False
+        register_initial_callback = False
+        callback_name = None
+        ready_event = None
+        setup_error = None
+        with ProxySubscriberCached._subscription_lock:
+            stale_setup = ProxySubscriberCached._topics.get(topic)
+            if stale_setup is not None and stale_setup['subscription'] is None \
+                    and stale_setup.get('setup_error') is not None:
+                ProxySubscriberCached._topics.pop(topic)
 
-            with ProxySubscriberCached._subscription_lock:
-                # Lock to prevent modifications during callback
-                ProxySubscriberCached._topics[topic] = {'subscription': sub,
+            if topic not in ProxySubscriberCached._topics:
+                # Insert a placeholder before create_subscription so the first message cannot race
+                # ahead of proxy registration and be dropped as an "unknown topic".
+                ProxySubscriberCached._topics[topic] = {'subscription': None,
+                                                        'ready_event': Event(),
+                                                        'setup_error': None,
                                                         'last_msg': None,
                                                         'buffered': buffered,
                                                         'msg_queue': deque(),
-                                                        'callbacks': defaultdict(None),
+                                                        'callbacks': {},
+                                                        'callback_items': (),
                                                         'subscribers': [inst_id]}
-
-            # Logger.localinfo(f"Created subscription for '{topic}' with message type '{msg_type.__name__}'!")
-
-        else:
-            with ProxySubscriberCached._subscription_lock:
-                if msg_type is not ProxySubscriberCached._topics[topic]['subscription'].msg_type:
+                create_subscription = True
+                ready_event = ProxySubscriberCached._topics[topic]['ready_event']
+                if callback is not None:
+                    ProxySubscriberCached._topics[topic]['callbacks'][inst_id] = callback
+                    ProxySubscriberCached._refresh_callback_items(ProxySubscriberCached._topics[topic])
+                    register_initial_callback = True
+                    callback_name = callback.__name__
+            else:
+                topic_dict = ProxySubscriberCached._topics[topic]
+                if topic_dict['subscription'] is None:
+                    ready_event = topic_dict['ready_event']
+                    if inst_id not in topic_dict['subscribers']:
+                        topic_dict['subscribers'].append(inst_id)
+                    if callback is not None and inst_id not in topic_dict['callbacks']:
+                        topic_dict['callbacks'][inst_id] = callback
+                        ProxySubscriberCached._refresh_callback_items(topic_dict)
+                        register_initial_callback = True
+                        callback_name = callback.__name__
+                elif msg_type is not topic_dict['subscription'].msg_type:
                     # Change in required msg_type for topic name  - update subscription with new type
-                    if msg_type.__name__ == ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__:
+                    if msg_type.__name__ == topic_dict['subscription'].msg_type.__name__:
                         # Same message type name, so likely due to reloading Python module on behavior change
                         # Since we don't throw TypeErrors based on isinstance, and count on Python's duck typing
                         # for callbacks, we will ignore on FlexBE side for subscribers
-                        if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
+                        if inst_id not in topic_dict['subscribers']:
                             # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'"
                             #                  ' - keep existing subscriber! ('
                             #                  f"{len(ProxySubscriberCached._topics[topic]['subscribers'])})")
-                            ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
+                            topic_dict['subscribers'].append(inst_id)
                         # else:
                         #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type name"
                         #                     ' - keep existing subscriber! '
                         #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
                     else:
                         Logger.info(f'Mis-matched msg_types ({msg_type.__name__} vs. '
-                                    f"{ProxySubscriberCached._topics[topic]['subscription'].msg_type.__name__})"
+                                    f"{topic_dict['subscription'].msg_type.__name__})"
                                     f" for '{topic}' subscription (possibly due to reload of behavior)!")
-                        raise TypeError(f"Trying to replace existing subscription with different msg type for '{topic}'")
+                        raise ProxyTypeError(f"Trying to replace existing subscription with different msg type for '{topic}'")
                 else:
-                    if inst_id not in ProxySubscriberCached._topics[topic]['subscribers']:
+                    if inst_id not in topic_dict['subscribers']:
                         # Logger.localinfo(f"Add subscriber to existing subscription for '{topic}'!  "
                         #                  f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
-                        ProxySubscriberCached._topics[topic]['subscribers'].append(inst_id)
+                        topic_dict['subscribers'].append(inst_id)
                     # else:
                     #    Logger.localinfo(f"Existing subscription for '{topic}' with same message type "
                     #                     '- keep existing subscriber! '
                     #                     f"({len(ProxySubscriberCached._topics[topic]['subscribers'])})")
 
-        # Register the local callback for topic message
-        if callback is not None:
+                    if callback is not None and inst_id not in topic_dict['callbacks']:
+                        topic_dict['callbacks'][inst_id] = callback
+                        ProxySubscriberCached._refresh_callback_items(topic_dict)
+                        register_initial_callback = True
+                        callback_name = callback.__name__
+
+        if create_subscription:
+            qos = qos or QOS_DEFAULT
+            try:
+                sub = ProxySubscriberCached._node.create_subscription(msg_type, topic,
+                                                                      partial(self._callback, topic=topic), qos)
+                with ProxySubscriberCached._subscription_lock:
+                    if topic in ProxySubscriberCached._topics:
+                        ProxySubscriberCached._topics[topic]['subscription'] = sub
+                        ProxySubscriberCached._topics[topic]['ready_event'].set()
+            except Exception as exc:
+                with ProxySubscriberCached._subscription_lock:
+                    if topic in ProxySubscriberCached._topics:
+                        ProxySubscriberCached._topics[topic]['setup_error'] = exc
+                        ProxySubscriberCached._topics[topic]['ready_event'].set()
+                        ProxySubscriberCached._topics.pop(topic, None)
+                raise
+
+            if register_initial_callback:
+                Logger.localinfo(f"   Set local callback '{callback_name}' of "
+                                 f"{len(ProxySubscriberCached._topics[topic]['callbacks'])} for '{topic}'!")
+
+        elif ready_event is not None:
+            ready_event.wait()
+            with ProxySubscriberCached._subscription_lock:
+                topic_dict = ProxySubscriberCached._topics.get(topic)
+                if topic_dict is None:
+                    raise RuntimeError(f"Subscription setup for '{topic}' failed.")
+                if topic_dict['subscription'] is None:
+                    setup_error = topic_dict.get('setup_error')
+                    ProxySubscriberCached._topics.pop(topic, None)
+                    if setup_error is not None:
+                        raise RuntimeError(f"Subscription setup for '{topic}' failed.") from setup_error
+                    raise RuntimeError(f"Subscription setup for '{topic}' did not complete.")
+
+        # Register later callback updates via executor thread
+        elif callback is not None and not register_initial_callback:
             self.set_callback(topic, callback, inst_id)
 
     @classmethod
@@ -181,21 +250,21 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic to which this callback belongs.
         """
-        if topic not in ProxySubscriberCached._topics:
-            Logger.localinfo(f"-- invalid topic='{topic}' for callback!")
-            return
-
         with ProxySubscriberCached._subscription_lock:
-            ProxySubscriberCached._topics[topic]['last_msg'] = msg
-            if ProxySubscriberCached._topics[topic]['buffered']:
-                ProxySubscriberCached._topics[topic]['msg_queue'].append(msg)
-            callbacks = dict(ProxySubscriberCached._topics[topic]['callbacks'])
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                Logger.localinfo(f"-- invalid topic='{topic}' for callback!")
+                return
+            topic_dict['last_msg'] = msg
+            if topic_dict['buffered']:
+                topic_dict['msg_queue'].append(msg)
+            callbacks = topic_dict.get('callback_items', ())
 
         try:
             # Use copy of callbacks in case something changes in dictionary subscription during processing
             # which caused a RuntimeError if updates happened during callback
             # but don't hold subscription lock during callbacks
-            for inst_id, callback in callbacks.items():
+            for inst_id, callback in callbacks:
                 try:
                     callback(msg)
                 except Exception as exc:  # pylint: disable=W0703
@@ -233,6 +302,7 @@ class ProxySubscriberCached:
             try:
                 if inst_id not in ProxySubscriberCached._topics[topic]['callbacks']:
                     ProxySubscriberCached._topics[topic]['callbacks'][inst_id] = callback
+                    ProxySubscriberCached._refresh_callback_items(ProxySubscriberCached._topics[topic])
                     Logger.localinfo(f"   Set local callback '{callback.__name__}' of "
                                      f"{len(ProxySubscriberCached._topics[topic]['callbacks'])} for '{topic}'!")
                 else:
@@ -241,6 +311,7 @@ class ProxySubscriberCached:
                                      f"{callback.__name__} of {len(ProxySubscriberCached._topics[topic]['callbacks'])}"
                                      f" for '{topic}'!")
                     ProxySubscriberCached._topics[topic]['callbacks'][inst_id] = callback
+                    ProxySubscriberCached._refresh_callback_items(ProxySubscriberCached._topics[topic])
             except KeyError:
                 Logger.localwarn(f"Error: topic '{topic}' is not longer available - cannot set callback!")
 
@@ -282,8 +353,14 @@ class ProxySubscriberCached:
 
         @type topic: string
         @param topic: The topic of interest.
+
+        @raises KeyError: If the topic is not currently subscribed.
         """
-        return ProxySubscriberCached._topics[topic]['last_msg']
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                raise KeyError(topic)
+            return topic_dict['last_msg']
 
     @classmethod
     def get_from_buffer(cls, topic):
@@ -293,14 +370,16 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if cls.is_available(topic):
-            if not ProxySubscriberCached._topics[topic]['buffered']:
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                return None
+            if not topic_dict['buffered']:
                 Logger.warning('Attempted to access buffer of non-buffered topic!')
                 return None
-            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+            if len(topic_dict['msg_queue']) == 0:
                 return None
-            return ProxySubscriberCached._topics[topic]['msg_queue'].popleft()
-        return None
+            return topic_dict['msg_queue'].popleft()
 
     @classmethod
     def peek_at_buffer(cls, topic):
@@ -310,14 +389,33 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if cls.is_available(topic):
-            if not ProxySubscriberCached._topics[topic]['buffered']:
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                return None
+            if not topic_dict['buffered']:
                 Logger.warning('Attempted to access buffer of non-buffered topic!')
                 return None
-            if len(ProxySubscriberCached._topics[topic]['msg_queue']) == 0:
+            if len(topic_dict['msg_queue']) == 0:
                 return None
-            return ProxySubscriberCached._topics[topic]['msg_queue'][0]
-        return None
+            return topic_dict['msg_queue'][0]
+
+    @classmethod
+    def peek_if_buffered(cls, topic):
+        """
+        Peek at the oldest buffered message of the given topic if one exists.
+
+        @type topic: string
+        @param topic: The topic of interest.
+        """
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None or len(topic_dict['msg_queue']) == 0:
+                return None
+            if not topic_dict['buffered']:
+                Logger.warning('Attempted to access buffer of non-buffered topic!')
+                return None
+            return topic_dict['msg_queue'][0]
 
     @classmethod
     def has_msg(cls, topic):
@@ -327,9 +425,11 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if cls.is_available(topic):
-            return ProxySubscriberCached._topics[topic]['last_msg'] is not None
-        return False
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                return False
+            return topic_dict['last_msg'] is not None
 
     @classmethod
     def has_buffered(cls, topic):
@@ -339,9 +439,11 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if cls.is_available(topic):
-            return len(ProxySubscriberCached._topics[topic]['msg_queue']) > 0
-        return False
+        with ProxySubscriberCached._subscription_lock:
+            topic_dict = ProxySubscriberCached._topics.get(topic)
+            if topic_dict is None:
+                return False
+            return len(topic_dict['msg_queue']) > 0
 
     @classmethod
     def remove_last_msg(cls, topic, clear_buffer=False):
@@ -406,8 +508,8 @@ class ProxySubscriberCached:
                             ProxySubscriberCached._node.executor.create_task(ProxySubscriberCached.destroy_subscription,
                                                                              sub, topic)
                         elif inst_id in topic_dict['callbacks']:
-                            # Remove callback in executor thread to avoid changing size during callback
-                            ProxySubscriberCached._node.executor.create_task(topic_dict['callbacks'].pop, inst_id)
+                            topic_dict['callbacks'].pop(inst_id)
+                            ProxySubscriberCached._refresh_callback_items(topic_dict)
                             Logger.localdebug(f"Removed callback from proxy subscription for '{topic}' "
                                               f"from proxy! ({len(topic_dict['callbacks'])} remaining)")
 

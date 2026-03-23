@@ -30,7 +30,10 @@
 """Initialize of flexbe_core.core package."""
 
 from .concurrency_container import ConcurrencyContainer  # noqa: F401
+from .error_status import map_exception_to_bestatus  # noqa: F401
 from .event_state import EventState  # noqa: F401
+from .exceptions import BehaviorLoadError, ShutdownError, SyncError, TransitionError  # noqa: F401
+from .exceptions import ProxyAvailabilityError, ProxyError, ProxyTypeError  # noqa: F401
 from .exceptions import StateError  # noqa: F401
 from .exceptions import StateMachineError  # noqa: F401
 from .exceptions import UserDataError  # noqa: F401
@@ -53,6 +56,7 @@ from .user_data import UserData  # noqa: F401
 __all__ = [
     'ConcurrencyContainer',
     'EventState',
+    'BehaviorLoadError',
     'LockableState',
     'LockableStateMachine',
     'ManuallyTransitionableState',
@@ -61,6 +65,12 @@ __all__ = [
     'PreemptableState',
     'PreemptableStateMachine',
     'PriorityContainer',
+    'ProxyAvailabilityError',
+    'ProxyError',
+    'ProxyTypeError',
+    'ShutdownError',
+    'SyncError',
+    'TransitionError',
     'RosState',
     'RosStateMachine',
     'State',
@@ -70,5 +80,6 @@ __all__ = [
     'StateMap',
     'Topics',
     'UserData',
-    'UserDataError'
+    'UserDataError',
+    'map_exception_to_bestatus'
 ]

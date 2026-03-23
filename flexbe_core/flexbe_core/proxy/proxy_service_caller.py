@@ -31,8 +31,9 @@
 
 """A proxy for providing single service connection for FlexBE behaviors."""
 
-from threading import Lock, Timer
+from threading import Event, Lock, Timer
 
+from flexbe_core.core.exceptions import ProxyAvailabilityError, ProxyTypeError
 from flexbe_core.logger import Logger
 
 import rclpy
@@ -45,6 +46,7 @@ class ProxyServiceCaller:
     _services = {}
 
     _results = {}
+    _service_generation_counter = 0
     _service_sync_lock = Lock()
 
     @staticmethod
@@ -53,23 +55,36 @@ class ProxyServiceCaller:
         ProxyServiceCaller._node = node
         Logger.initialize(node)
 
+    @classmethod
+    def _next_service_generation(cls):
+        """Return a new generation identifier for a service client incarnation."""
+        cls._service_generation_counter += 1
+        return cls._service_generation_counter
+
     @staticmethod
     def shutdown():
         """Shut down this proxy by resetting all service callers."""
         try:
             print(f'Shutdown proxy service caller with {len(ProxyServiceCaller._services)} topics ...')
-            for topic, service in ProxyServiceCaller._services.items():
+            for topic, service in list(ProxyServiceCaller._services.items()):
                 try:
-                    ProxyServiceCaller._services[topic] = None
-                    try:
-                        ProxyServiceCaller._node.destroy_client(service)
-                    except Exception as exc:  # pylint: disable=W0703
-                        Logger.error('Something went wrong destroying service client'
-                                     f" for '{topic}'!\n  {type(exc)} - {str(exc)}")
+                    client = None
+                    if isinstance(service, dict):
+                        client = service.get('service')
+                    elif service is not None:
+                        client = service
+
+                    if client is not None:
+                        try:
+                            ProxyServiceCaller._node.destroy_client(client)
+                        except Exception as exc:  # pylint: disable=W0703
+                            Logger.error('Something went wrong destroying service client'
+                                         f" for '{topic}'!\n  {type(exc)} - {str(exc)}")
                 except Exception as exc:  # pylint: disable=W0703
                     Logger.error('Something went wrong during shutdown of proxy service'
                                  f" caller for '{topic}'!\n  {type(exc)} - {exc}")
 
+            ProxyServiceCaller._services.clear()
             ProxyServiceCaller._results.clear()
 
         except Exception as exc:  # pylint: disable=W0703
@@ -112,7 +127,9 @@ class ProxyServiceCaller:
         with cls._service_sync_lock:
             if topic not in ProxyServiceCaller._services:
                 Logger.localinfo(f'Set up ProxyServiceCaller for new topic {topic} ...')
+                generation = cls._next_service_generation()
                 ProxyServiceCaller._services[topic] = {'service': ProxyServiceCaller._node.create_client(srv_type, topic),
+                                                       'generation': generation,
                                                        'count': 1}
             else:
                 if srv_type is not ProxyServiceCaller._services[topic]['service'].srv_type:
@@ -129,11 +146,15 @@ class ProxyServiceCaller:
                         ProxyServiceCaller._node.executor.create_task(ProxyServiceCaller.destroy_service,
                                                                       ProxyServiceCaller._services[topic]['service'], topic)
 
+                        generation = cls._next_service_generation()
                         ProxyServiceCaller._services[topic] = {'service': ProxyServiceCaller._node.create_client(srv_type,
                                                                                                                  topic),
+                                                               'generation': generation,
                                                                'count': 1}
+                        if topic in ProxyServiceCaller._results:
+                            ProxyServiceCaller._results.pop(topic)
                     else:
-                        raise TypeError('Trying to replace existing service caller with different service msg type')
+                        raise ProxyTypeError('Trying to replace existing service caller with different service msg type')
                 else:
                     ProxyServiceCaller._services[topic]['count'] = ProxyServiceCaller._services[topic]['count'] + 1
 
@@ -167,11 +188,11 @@ class ProxyServiceCaller:
         @param wait_duration: Seconds to wait for service to become available (default: 1.0)
         """
         if not ProxyServiceCaller._check_service_available(topic, wait_duration):
-            raise ValueError('Cannot call service client %s: Topic not available.' % topic)
+            raise ProxyAvailabilityError('Cannot call service client %s: Topic not available.' % topic)
         # call service (forward any exceptions)
         client_dict = ProxyServiceCaller._services.get(topic)
         if client_dict is None:
-            raise ValueError('Cannot call service client %s: Topic not available.' % topic)
+            raise ProxyAvailabilityError('Cannot call service client %s: Topic not available.' % topic)
         client = client_dict['service']
 
         if not isinstance(request, client.srv_type.Request):
@@ -181,15 +202,13 @@ class ProxyServiceCaller:
                 # used in the service clients
 
                 new_request = client.srv_type.Request()
-                for attr, val in vars(new_request):
-                    # Validate that attributes in common
-                    assert hasattr(request, attr), 'Types must share common attributes!'
-                for attr, val in vars(request):
-                    setattr(new_request, attr, val)
+                assert new_request.__slots__ == request.__slots__, f"Message attributes for '{topic}' do not match!"
+                for attr in request.__slots__:
+                    setattr(new_request, attr, getattr(request, attr))
             else:
-                raise TypeError(f'Invalid request type {request.__class__.__name__}'
-                                f' (vs. {client.srv_type.Request.__name__}) '
-                                f"for topic '{topic}'")
+                raise ProxyTypeError(f'Invalid request type {request.__class__.__name__}'
+                                     f' (vs. {client.srv_type.Request.__name__}) '
+                                     f"for topic '{topic}'")
         else:
             # Same class definition instance as stored
             new_request = request
@@ -215,12 +234,12 @@ class ProxyServiceCaller:
         @param wait_duration: Seconds to wait for service to become available (default: 1.0)
         """
         if not ProxyServiceCaller._check_service_available(topic, wait_duration):
-            raise ValueError('Cannot call service client %s: Topic not available.' % topic)
+            raise ProxyAvailabilityError('Cannot call service client %s: Topic not available.' % topic)
 
         # call service (forward any exceptions)
         client_dict = ProxyServiceCaller._services.get(topic)
         if client_dict is None:
-            raise ValueError('Cannot call service client %s: Topic not available.' % topic)
+            raise ProxyAvailabilityError('Cannot call service client %s: Topic not available.' % topic)
         client = client_dict['service']
 
         if not isinstance(request, client.srv_type.Request):
@@ -234,13 +253,14 @@ class ProxyServiceCaller:
                 for attr in request.__slots__:
                     setattr(new_request, attr, getattr(request, attr))
             else:
-                raise TypeError(f'Invalid request type {request.__class__.__name__} '
-                                f'(vs. {client.srv_type.Request.__name__}) for topic {topic}')
+                raise ProxyTypeError(f'Invalid request type {request.__class__.__name__} '
+                                     f'(vs. {client.srv_type.Request.__name__}) for topic {topic}')
         else:
             # Same class definition instance as stored
             new_request = request
 
-        ProxyServiceCaller._results[topic] = client.call_async(new_request)
+        ProxyServiceCaller._results[topic] = {'future': client.call_async(new_request),
+                                              'generation': client_dict['generation']}
 
     @classmethod
     def done(cls, topic):
@@ -252,7 +272,11 @@ class ProxyServiceCaller:
         """
         if topic not in ProxyServiceCaller._results:
             return False
-        return ProxyServiceCaller._results[topic].done()
+        result_entry = ProxyServiceCaller._results[topic]
+        service_dict = ProxyServiceCaller._services.get(topic)
+        if service_dict is None or result_entry['generation'] != service_dict.get('generation'):
+            return False
+        return result_entry['future'].done()
 
     @classmethod
     def result(cls, topic):
@@ -264,7 +288,7 @@ class ProxyServiceCaller:
         """
         if not ProxyServiceCaller.done(topic):
             return None
-        return ProxyServiceCaller._results[topic].result()
+        return ProxyServiceCaller._results[topic]['future'].result()
 
     @classmethod
     def _check_service_available(cls, topic, wait_duration=1.0):
@@ -283,29 +307,30 @@ class ProxyServiceCaller:
             return False
 
         client = client_dict['service']
-        if not isinstance(wait_duration, float):
-            Logger.localinfo(f"Check for service '{topic}' requires floating point wait_duration in seconds (change to 0.001)!")
+        if isinstance(wait_duration, (float, int)):
+            wait_duration = float(wait_duration)
+        else:
+            Logger.localwarn(f"Check for service '{topic}' requires numeric wait_duration in seconds (using 0.001).")
             wait_duration = 0.001
 
-        warning_sent = False
+        warning_event = None
         available = False
         wait_timer = None
         try:
             if wait_duration > 0.5:
                 # Only start warning timer if significant wait duration
-                wait_timer = Timer(0.5, ProxyServiceCaller._print_wait_warning, [topic])
+                warning_event = Event()
+                wait_timer = Timer(0.5, ProxyServiceCaller._mark_wait_warning, [warning_event, topic])
                 wait_timer.start()
 
             available = client.wait_for_service(wait_duration)
         except rclpy.exceptions.ROSInterruptException:
             available = False
 
+        warning_sent = False
         if wait_timer:
-            try:
-                wait_timer.cancel()
-            except Exception:  # pylint: disable=W0703
-                # already printed the warning
-                warning_sent = True
+            wait_timer.cancel()
+            warning_sent = warning_event.is_set()
 
         if not available:
             Logger.error(f"Service client '{topic}' not available! (timed out with wait_duration={wait_duration:.3f} seconds)")
@@ -317,6 +342,12 @@ class ProxyServiceCaller:
     @classmethod
     def _print_wait_warning(cls, topic):
         Logger.warning(f"Waiting for service '{topic}' ...")
+
+    @classmethod
+    def _mark_wait_warning(cls, warning_event, topic):
+        """Record warning emission and log warning once."""
+        warning_event.set()
+        cls._print_wait_warning(topic)
 
     @classmethod
     def remove_client(cls, topic):

@@ -30,7 +30,7 @@
 
 
 """This defines the superclass for all implemented behaviors."""
-from flexbe_core.core import LockableStateMachine, OperatableStateMachine, PreemptableState, StateMap
+from flexbe_core.core import LockableStateMachine, OperatableStateMachine, PreemptableState, StateMachine, StateMap
 from flexbe_core.logger import Logger
 
 from flexbe_msgs.msg import BehaviorSync
@@ -172,7 +172,8 @@ class Behavior:
         behaviors[''] = self  # add this behavior as well
         found = False
         for beh in behaviors:
-            if beh.startswith(behavior) and hasattr(behaviors[beh], key):
+            if ((beh == behavior or (behavior and beh.startswith(f'{behavior}/')) or behavior == '')
+                    and hasattr(behaviors[beh], key)):
                 behaviors[beh]._set_typed_attribute(key, value)
                 found = True
         return found
@@ -181,10 +182,12 @@ class Behavior:
         """Confirm that this behavior is ready for execution."""
         self._state_map = StateMap()
         self._state_machine.confirm(self.name, self.beh_id, self._state_map)
-        LockableStateMachine.path_for_switch = None
+        LockableStateMachine.clear_path_for_switch()
         if self.requested_state_id is not None:
             requested_state = self._state_map[self.requested_state_id]
-            LockableStateMachine.path_for_switch = requested_state.path
+            if requested_state is None:
+                raise RuntimeError(f'Requested state id={self.requested_state_id} is not in the state map.')
+            LockableStateMachine.set_path_for_switch(requested_state.path)
 
     @property
     def state_map_items(self):
@@ -196,7 +199,7 @@ class Behavior:
     def get_state_by_id(self, st_id):
         """Return state reference from state map by id."""
         if self._state_map is not None:
-            return self._state_map.get(st_id)
+            return self._state_map.get_state(st_id)
         return None
 
     def execute(self):
@@ -207,9 +210,16 @@ class Behavior:
 
         @return: A string containing the execution result such as finished or failed.
         """
-        result = self._state_machine.spin()
-        self._state_machine.destroy()
-        return result
+        result = None
+        try:
+            result = self._state_machine.spin()
+            return result
+        finally:
+            if self._state_machine is not None:
+                try:
+                    self._state_machine.destroy()
+                finally:
+                    self._state_machine = None
 
     def get_latest_status(self):
         """Return the latest execution information as a BehaviorSync message."""
@@ -225,11 +235,16 @@ class Behavior:
         @type name: string
         @param name: The name of this behavior.
         """
+        if isinstance(state, StateMachine):
+            raise ValueError('prepare_for_switch requires an active leaf state, not a state-machine container.')
+
         state._locked = True  # make sure the state cannot transition during preparations
         states = self._get_states_of_path(state.path, self._state_machine)
         if states is None:
             raise RuntimeError('Did not find locked state in new behavior!')
         state_container = state._parent
+        if state_container is None:
+            raise ValueError('prepare_for_switch requires a state with a parent container.')
         state_container.remove_state(state)  # remove from old state machine
         for sm in states[1:]:
             # update userdata in new state machine
@@ -239,7 +254,7 @@ class Behavior:
         self.requested_state_id = state.state_id  # set start after switch
 
     def get_current_states(self):
-        """Get all currently active (sub-)states."""
+        """Get the currently active execution path(s), including active containers."""
         return self._state_machine.get_deep_states()
 
     def get_locked_state(self):
@@ -281,15 +296,18 @@ class Behavior:
         attr = getattr(self, name)
         # convert type if required
         if not isinstance(value, type(attr)):
-            if isinstance(attr, int):
+            if isinstance(attr, bool):
+                if isinstance(value, str):
+                    value = value.strip().lower() not in ('0', 'false')
+                else:
+                    value = bool(value)
+            elif isinstance(attr, int):
                 value = int(value)
             elif isinstance(attr, float):
                 value = float(value)
-            elif isinstance(attr, bool):
-                value = (value != '0' and value.lower() != 'false')
             elif isinstance(attr, dict):
                 import yaml  # pylint: disable=C0415
-                value = getattr(yaml, 'unsafe_load', yaml.load)(value)
+                value = yaml.safe_load(value)
         setattr(self, name, value)
 
     def set_up(self, beh_id, autonomy_level, debug):

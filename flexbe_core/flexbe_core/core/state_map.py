@@ -141,5 +141,7 @@ class StateMap:
 
     @classmethod
     def hash(cls, state, outcome_index):  # noqa: A003
-        """Convert state id and outcome to hashed identifier for outcome reports."""
+        """Convert state id and outcome to hashed identifier for status/outcome reports."""
+        if outcome_index is None:
+            return state.state_id
         return state.state_id + 1 + outcome_index

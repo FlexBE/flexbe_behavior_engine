@@ -34,6 +34,11 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
 QOS_DEFAULT = QoSProfile(depth=10)  # default queue_size setting
 """Matches the default QoS behavior of ROS topics."""
 
+# Outcome messages can arrive in short bursts during nested transitions.
+# Use a deeper queue to reduce drop risk for mirror synchronization traffic.
+QOS_OUTCOME = QoSProfile(depth=100)
+"""Queue profile for mirror outcome topic to absorb transition bursts."""
+
 QOS_LATCH = QoSProfile(depth=1,
                        durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
 """Ensure that late subscribers always receive the latest previous message on the topic."""

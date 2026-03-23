@@ -61,6 +61,7 @@ class StateLogger:
     _log_serialize = None
     _log_level = None
     _log_config = None
+    _configured_loggers = ('flexbe',)
 
     @staticmethod
     def initialize_ros(node):
@@ -99,6 +100,9 @@ class StateLogger:
         if log_folder == '' or not StateLogger._log_enabled.get_parameter_value().bool_value:
             StateLogger.enabled = False
             return
+
+        if StateLogger.enabled:
+            StateLogger.shutdown()
         StateLogger.enabled = True
 
         if not os.path.exists(log_folder):
@@ -151,7 +155,11 @@ class StateLogger:
         """Shutdown state logging."""
         if not StateLogger.enabled:
             return
-        logging.shutdown()
+        for logger_name in StateLogger._configured_loggers:
+            logger = logging.getLogger(logger_name)
+            for handler in list(logger.handlers):
+                logger.removeHandler(handler)
+                handler.close()
         StateLogger.enabled = False
 
     @staticmethod
@@ -163,39 +171,61 @@ class StateLogger:
     def log(name, state, **kwargs):
         """Log custom data as given by the keyword arguments."""
         if StateLogger.enabled:
-            StateLogger.get(name).log(kwargs.get('loglevel', logging.INFO), dict(StateLogger._basic(state), **kwargs))
+            logger = StateLogger.get(name)
+            loglevel = kwargs.get('loglevel', logging.INFO)
+            if logger.isEnabledFor(loglevel):
+                logger.log(loglevel, dict(StateLogger._basic(state), **kwargs))
 
     # state decorators
+
+    @staticmethod
+    def _install_subclass_wrapper_hook(cls, installer):
+        """Run an installer for the decorated class and all future subclasses."""
+        original_init_subclass = cls.__dict__.get('__init_subclass__')
+
+        @classmethod
+        def wrapped_init_subclass(subcls, **kwargs):
+            if original_init_subclass is not None:
+                original_init_subclass.__get__(subcls, subcls)(**kwargs)
+            else:
+                super(cls, subcls).__init_subclass__(**kwargs)
+            installer(subcls)
+
+        cls.__init_subclass__ = wrapped_init_subclass
+        installer(cls)
 
     @staticmethod
     def log_events(name, **events):
         """Log whenever any of the specified events of the state is activated."""
         def decorator(cls):
-            cls_init = cls.__init__
+            logger = StateLogger.get(name)
 
-            @wraps(cls.__init__)
-            def log_events_init(self, *args, **kwargs):
-                cls_init(self, *args, **kwargs)
-                for event, method in events.items():
-                    def wrap_event_method(event, method):
-                        if hasattr(self, method):
-                            event_method = getattr(self, method)
+            def _install(target_cls):
+                if not StateLogger.enabled:
+                    return
+                for event, method_name in events.items():
+                    event_method = target_cls.__dict__.get(method_name)
+                    if event_method is None or getattr(event_method, '__state_logger_events_wrapped__', False):
+                        continue
 
-                            @wraps(event_method)
-                            def event_wrapper(*args, **kwargs):
-                                time_start = StateLogger._node.get_clock().now().nanoseconds
-                                try:
-                                    event_method(*args, **kwargs)
-                                finally:
-                                    if StateLogger.enabled:
-                                        duration = StateLogger._node.get_clock().now().nanoseconds - time_start
-                                        StateLogger.get(name).info(dict(
-                                            StateLogger._basic(self),
-                                            event=event,
-                                            duration=duration * 1e-9))
-                            setattr(self, method, event_wrapper)
-                    wrap_event_method(event, method)
-            cls.__init__ = log_events_init
+                    @wraps(event_method)
+                    def event_wrapper(self, *args, __event=event, __event_method=event_method, **kwargs):
+                        should_log = StateLogger.enabled and logger.isEnabledFor(logging.INFO)
+                        time_start = StateLogger._node.get_clock().now().nanoseconds if should_log else None
+                        try:
+                            return __event_method(self, *args, **kwargs)
+                        finally:
+                            if should_log:
+                                duration = StateLogger._node.get_clock().now().nanoseconds - time_start
+                                logger.info(dict(
+                                    StateLogger._basic(self),
+                                    event=__event,
+                                    duration=duration * 1e-9))
+
+                    event_wrapper.__state_logger_events_wrapped__ = True
+                    setattr(target_cls, method_name, event_wrapper)
+
+            StateLogger._install_subclass_wrapper_hook(cls, _install)
             return cls
         return decorator
 
@@ -203,26 +233,32 @@ class StateLogger:
     def log_outcomes(name):
         """Log all outcomes of the state."""
         def decorator(cls):
-            cls_init = cls.__init__
+            logger = StateLogger.get(name)
 
-            @wraps(cls.__init__)
-            def log_outcomes_init(self, *args, **kwargs):
-                cls_init(self, *args, **kwargs)
-                execute_method = getattr(self, 'execute')
+            def _install(target_cls):
+                if not StateLogger.enabled:
+                    return
+                execute_method = target_cls.__dict__.get('execute')
+                if execute_method is None or getattr(execute_method, '__state_logger_outcomes_wrapped__', False):
+                    return
 
                 @wraps(execute_method)
-                def execute_wrapper(*args, **kwargs):
+                def execute_wrapper(self, *args, __execute_method=execute_method, **kwargs):
                     outcome = None
+                    should_log = StateLogger.enabled and logger.isEnabledFor(logging.INFO)
                     try:
-                        outcome = execute_method(*args, **kwargs)
+                        outcome = __execute_method(self, *args, **kwargs)
                         return outcome
                     finally:
-                        if StateLogger.enabled and outcome is not None:
-                            StateLogger.get(name).info(dict(
+                        if should_log and outcome is not None:
+                            logger.info(dict(
                                 StateLogger._basic(self),
                                 outcome=outcome))
-                setattr(self, 'execute', execute_wrapper)
-            cls.__init__ = log_outcomes_init
+
+                execute_wrapper.__state_logger_outcomes_wrapped__ = True
+                setattr(target_cls, 'execute', execute_wrapper)
+
+            StateLogger._install_subclass_wrapper_hook(cls, _install)
             return cls
         return decorator
 
@@ -230,18 +266,20 @@ class StateLogger:
     def log_userdata(name, keys=None):
         """Log all userdata that is passed to the state."""
         def decorator(cls):
-            cls_init = cls.__init__
+            logger = StateLogger.get(name)
 
-            @wraps(cls.__init__)
-            def log_userdata_init(self, *args, **kwargs):
-                cls_init(self, *args, **kwargs)
-                input_keys = kwargs.get('input_keys', [])
-                on_enter_method = getattr(self, 'on_enter')
+            def _install(target_cls):
+                if not StateLogger.enabled:
+                    return
+                on_enter_method = target_cls.__dict__.get('on_enter')
+                if on_enter_method is None or getattr(on_enter_method, '__state_logger_userdata_wrapped__', False):
+                    return
 
                 @wraps(on_enter_method)
-                def on_enter_wrapper(userdata):
-                    logger = StateLogger.get(name)
-                    if StateLogger.enabled and logger.isEnabledFor(logging.DEBUG) and input_keys:
+                def on_enter_wrapper(self, *args, __on_enter_method=on_enter_method, **kwargs):
+                    userdata = args[0] if len(args) > 0 else kwargs.get('userdata')
+                    input_keys = self.input_keys
+                    if StateLogger.enabled and logger.isEnabledFor(logging.DEBUG) and input_keys and userdata is not None:
                         logdata = dict(StateLogger._basic(self))
                         logdata['userdata'] = {}
                         for key in input_keys:
@@ -254,9 +292,12 @@ class StateLogger:
                                 Logger.warning('State %s failed to log userdata for key %s: %s' %
                                                (self.name, key, str(exc)))
                         logger.debug(logdata)
-                    on_enter_method(userdata)
-                setattr(self, 'on_enter', on_enter_wrapper)
-            cls.__init__ = log_userdata_init
+                    return __on_enter_method(self, *args, **kwargs)
+
+                on_enter_wrapper.__state_logger_userdata_wrapped__ = True
+                setattr(target_cls, 'on_enter', on_enter_wrapper)
+
+            StateLogger._install_subclass_wrapper_hook(cls, _install)
             return cls
         return decorator
 
@@ -269,8 +310,14 @@ class StateLogger:
             'str': str,
             'repr': repr,
             'pickle': pickle.dumps,
-        }.get(StateLogger._serialize_impl, lambda o: eval(StateLogger._serialize_impl,  # pylint: disable=W0123
-                                                          locals={'object': o}))(obj)
+        }.get(StateLogger._serialize_impl,
+              StateLogger._unknown_serialize)(obj)
+
+    @staticmethod
+    def _unknown_serialize(_obj):
+        raise ValueError(f"Unknown state log serialization format '{StateLogger._serialize_impl}'. "
+                         f"Valid options: 'yaml', 'str', 'repr', 'pickle'.\n"
+                         f"    '{str(_obj)}'")
 
     @staticmethod
     def _basic(state):
@@ -306,3 +353,12 @@ class PublishBehaviorLogMessage(logging.Handler):
         """Emit message."""
         message = self.format(record)
         self._pub.publish(self._topic, String(data=message))
+
+    def close(self):
+        """Release the proxy publisher used by this handler."""
+        try:
+            if self._pub is not None:
+                self._pub.remove_publisher(self._topic)
+        finally:
+            self._pub = None
+            super().close()

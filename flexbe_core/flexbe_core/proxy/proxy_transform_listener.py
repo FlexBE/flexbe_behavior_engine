@@ -53,6 +53,8 @@ class ProxyTransformListener:
     def shutdown():
         """Shut down this proxy by resetting the transform listener."""
         try:
+            if ProxyTransformListener._listener is not None:
+                ProxyTransformListener._listener.unregister()
             ProxyTransformListener._listener = None
             ProxyTransformListener._buffer = None
             print('Shutdown proxy transform listener - finished!')

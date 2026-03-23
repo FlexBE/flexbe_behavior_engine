@@ -44,6 +44,21 @@ class LockableStateMachine(RosStateMachine):
     """
 
     path_for_switch = None
+    path_for_switch_segments = None
+
+    @classmethod
+    def set_path_for_switch(cls, path):
+        """Store the desired switch path together with normalized path segments."""
+        cls.path_for_switch = path
+        if path is None:
+            cls.path_for_switch_segments = None
+        else:
+            cls.path_for_switch_segments = tuple(segment for segment in path.split('/') if segment)
+
+    @classmethod
+    def clear_path_for_switch(cls):
+        """Clear the desired switch path and its cached segments."""
+        cls.set_path_for_switch(None)
 
     def __init__(self, *args, **kwargs):
         """Initialize LockableStateMachine instance."""
@@ -68,13 +83,20 @@ class LockableStateMachine(RosStateMachine):
 
     def execute(self, userdata):
         """Execute lockable SM logic."""
-        if (LockableStateMachine.path_for_switch is not None
-                and LockableStateMachine.path_for_switch.startswith(self.path)):
-            path_segments = LockableStateMachine.path_for_switch.replace(self.path, '', 1).split('/')
-            wanted_state = path_segments[1]
-            self._current_state = self._labels[wanted_state]
-            if len(path_segments) <= 2:
-                LockableStateMachine.path_for_switch = None
+        switch_path = LockableStateMachine.path_for_switch
+        switch_segments = LockableStateMachine.path_for_switch_segments
+        if switch_path is not None and switch_segments is not None:
+            local_segments = self.path_segments
+            if switch_segments == local_segments:
+                LockableStateMachine.clear_path_for_switch()
+            elif switch_segments[:len(local_segments)] == local_segments:
+                relative_segments = switch_segments[len(local_segments):]
+                if relative_segments:
+                    wanted_state = relative_segments[0]
+                    if wanted_state in self._labels:
+                        self._current_state = self._labels[wanted_state]
+                        if len(relative_segments) == 1:
+                            LockableStateMachine.clear_path_for_switch()
         return super().execute(userdata)
 
     def replace_userdata(self, userdata):
@@ -143,5 +165,7 @@ class LockableStateMachine(RosStateMachine):
             if state.is_locked():
                 return state
             if isinstance(state, LockableStateMachine):
-                return state.get_locked_state()
+                locked_state = state.get_locked_state()
+                if locked_state is not None:
+                    return locked_state
         return None
