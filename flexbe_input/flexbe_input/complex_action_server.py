@@ -42,6 +42,8 @@ from flexbe_core import Logger
 
 import rclpy
 from rclpy.action import ActionServer
+from rclpy.action import CancelResponse
+from rclpy.action import GoalResponse
 from rclpy.duration import Duration
 
 
@@ -129,9 +131,7 @@ class ComplexActionServer:
         # get from queue
         current_goal = self.goal_queue_.get()
 
-        # set the status of the current goal to be active
-        # current_goal.set_accepted('This goal has been accepted by the simple action server');
-        current_goal.succeed()
+        self.current_goal = current_goal
 
         return current_goal
 
@@ -145,7 +145,10 @@ class ComplexActionServer:
     # @return True if a goal is active, false otherwise
     def is_active(self):
         """Check if current goal is active."""
-        if self.current_goal and not self.current_goal.get_goal():
+        if self.current_goal is None:
+            return False
+
+        if not self.current_goal.get_goal():
             return False
 
         return self.current_goal.is_active
@@ -208,15 +211,17 @@ class ComplexActionServer:
             # Trigger runLoop to call execute()
             self.execute_condition.notify()
             self.execute_condition.release()
+            return GoalResponse.ACCEPT
 
         except Exception as e:
             Logger.logerr('ComplexActionServer.internal_goal_callback - exception %s', str(e))
             self.execute_condition.release()
+            return GoalResponse.REJECT
 
     # @brief Callback for when the ActionServer receives a new preempt and passes it on
     def internal_preempt_callback(self, preempt):
         """Call when the ActionServer receives a new preempt and passes it on."""
-        return
+        return CancelResponse.ACCEPT
 
     # @brief Called from a separate thread to call blocking execute calls
     def executeLoop(self):

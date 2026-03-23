@@ -28,6 +28,7 @@
 
 import ast
 import pickle
+import threading
 import time
 
 from PySide6.QtCore import QCoreApplication, QThread, Qt, Signal, Slot
@@ -99,6 +100,10 @@ class InputActionServer(Node):
         self._input = None
         self._canceled = False
         self._worker = None
+        self._request_lock = threading.Lock()
+        self._active_goal_lock = threading.Lock()
+        self._active_goal_handle = None
+        self._pending_cancel_goal_handle = None
 
         Logger.initialize(self)
 
@@ -127,89 +132,128 @@ class InputActionServer(Node):
 
     def execute_callback(self, goal_handle):
         """On receipt of goal, open GUI and request input from user."""
-        # Reset cancellation flag
-        self._canceled = False
-
-        result = BehaviorInput.Result()
-        Logger.localinfo('Requesting: %s', goal_handle.request.msg)
-        # Logger.localinfo(f'   goal id: {goal_handle.goal_id.uuid}')
-        try:
-            type_text, type_class, expected_elements = self.get_input_type(goal_handle.request.request_type)
-            prompt_text = f'{goal_handle.request.msg}\n{type_text}'
-        except Exception as exc:  # pylint: disable=W0703
-            result.data = f'Input action server UI does not handle requests for type {goal_handle.request.request_type}'
-            result.result_code = BehaviorInput.Result.RESULT_ABORTED
-            Logger.localwarn(f'{result.data}\n    Exception: {exc}')
+        if not self._request_lock.acquire(blocking=False):
+            result = BehaviorInput.Result(
+                result_code=BehaviorInput.Result.RESULT_ABORTED,
+                data='Another input request is already active!'
+            )
+            Logger.localwarn(result.data)
             goal_handle.abort()
             return result
 
-        # Get data from user
         try:
-            # Request input from GUI running in a separate thread
-            if goal_handle.request.request_type == BehaviorInput.Goal.REQUEST_SELECTION:
-                self._worker._show_dialog_signal.emit(prompt_text, goal_handle.request.items)
-            else:
-                self._worker._show_dialog_signal.emit(prompt_text, None)
-
-            while self._input_dialog.is_none() and not self._canceled:
-                time.sleep(0.02)  # Add a short sleep to avoid busy-waiting
-
-            # Emit signal to hide the dialog and get input
-            self._worker._hide_dialog_signal.emit()
+            result = BehaviorInput.Result()
+            with self._active_goal_lock:
+                self._active_goal_handle = goal_handle
+                pending_cancel_goal_handle = getattr(self, '_pending_cancel_goal_handle', None)
+                self._canceled = pending_cancel_goal_handle is goal_handle
+                if self._canceled:
+                    self._pending_cancel_goal_handle = None
 
             if self._canceled:
-                Logger.localwarn('Request was canceled!')
+                Logger.localwarn('Request was canceled before dialog opened!')
                 goal_handle.canceled()
                 result.data = 'Input request was canceled!'
                 result.result_code = BehaviorInput.Result.RESULT_ABORTED
                 return result
 
-            if self._input is None or self._input == '':
-                Logger.logwarn(f"No data entered while input window was visible! '{self._input}'")
+            Logger.localinfo('Requesting: %s', goal_handle.request.msg)
+            # Logger.localinfo(f'   goal id: {goal_handle.goal_id.uuid}')
+            try:
+                type_text, type_class, expected_elements = self.get_input_type(goal_handle.request.request_type)
+                prompt_text = f'{goal_handle.request.msg}\n{type_text}'
+            except Exception as exc:  # pylint: disable=W0703
+                result.data = f'Input action server UI does not handle requests for type {goal_handle.request.request_type}'
                 result.result_code = BehaviorInput.Result.RESULT_ABORTED
-                result.data = 'No data entered while input window was visible!'
+                Logger.localwarn(f'{result.data}\n    Exception: {exc}')
                 goal_handle.abort()
                 return result
-            else:
-                if type_class is str:
-                    print(f"Process data as string '{self._input}' with request {type_class}", flush=True)
-                    result.data = self._input
-                    data_len = 1
-                else:
-                    print(f"Process data '{self._input}' as {type_class}", flush=True)
-                    input_data = ast.literal_eval(self._input)  # convert string to Python data
-                    print(f"  input data[{type(input_data)}] = '{input_data}'", flush=True)
-                    data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
 
-                    if not isinstance(input_data, type_class):
-                        result.data = f"Invalid input type '{type(result.data)}' not '{type_class}' - expected '{type_text}'"
+            # Get data from user
+            try:
+                # Request input from GUI running in a separate thread
+                if goal_handle.request.request_type == BehaviorInput.Goal.REQUEST_SELECTION:
+                    self._worker._show_dialog_signal.emit(prompt_text, goal_handle.request.items)
+                else:
+                    self._worker._show_dialog_signal.emit(prompt_text, None)
+
+                while self._input_dialog.is_none() and not self._canceled:
+                    time.sleep(0.02)  # Add a short sleep to avoid busy-waiting
+
+                # Emit signal to hide the dialog and get input
+                self._worker._hide_dialog_signal.emit()
+
+                if self._canceled:
+                    Logger.localwarn('Request was canceled!')
+                    goal_handle.canceled()
+                    result.data = 'Input request was canceled!'
+                    result.result_code = BehaviorInput.Result.RESULT_ABORTED
+                    return result
+
+                if self._input is None or self._input == '':
+                    Logger.logwarn(f"No data entered while input window was visible! '{self._input}'")
+                    result.result_code = BehaviorInput.Result.RESULT_ABORTED
+                    result.data = 'No data entered while input window was visible!'
+                    goal_handle.abort()
+                    return result
+                else:
+                    if type_class is str:
+                        Logger.localinfo(f"Process data as string '{self._input}' with request {type_class}")
+                        result.data = self._input
+                        data_len = 1
+                    else:
+                        Logger.localinfo(f"Process data '{self._input}' as {type_class}")
+                        input_data = ast.literal_eval(self._input)  # convert string to Python data
+                        Logger.localinfo(f"  input data[{type(input_data)}] = '{input_data}'")
+                        data_len = 1 if isinstance(input_data, (int, float)) else len(input_data)
+
+                        if not isinstance(input_data, type_class):
+                            result.data = f"Invalid input type '{type(input_data)}' not '{type_class}' - expected '{type_text}'"
+                            result.result_code = BehaviorInput.Result.RESULT_FAILED
+                            Logger.localwarn(result.data)
+                            goal_handle.abort()
+                            return result
+                        # Convert binary to string for transport
+                        result.data = str(pickle.dumps(input_data))
+
+                    if data_len != expected_elements:
+                        result.data = (f'Invalid number of elements {data_len} not {expected_elements} '
+                                       f"of {type_class} - expected '{type_text}'")
                         result.result_code = BehaviorInput.Result.RESULT_FAILED
                         Logger.localwarn(result.data)
                         goal_handle.abort()
-                        return result
-                    # Convert binary to string for transport
-                    result.data = str(pickle.dumps(input_data))
+                    else:
+                        result.result_code = BehaviorInput.Result.RESULT_OK
+                        goal_handle.succeed()
+            except Exception as exc:  # pylint: disable=W0703
+                Logger.logwarn(f'Error processing input request to set data:\n {exc}')
+                result.result_code = BehaviorInput.Result.RESULT_FAILED
+                result.data = str(exc)
+                goal_handle.abort()
 
-                if data_len != expected_elements:
-                    result.data = (f'Invalid number of elements {data_len} not {expected_elements} '
-                                   f"of {type_class} - expected '{type_text}'")
-                    result.result_code = BehaviorInput.Result.RESULT_FAILED
-                    Logger.localwarn(result.data)
-                    goal_handle.abort()
-                else:
-                    result.result_code = BehaviorInput.Result.RESULT_OK
-                    goal_handle.succeed()
-        except Exception as exc:  # pylint: disable=W0703
-            Logger.logwarn(f'Error processing input request to set data:\n {exc}')
-            result.result_code = BehaviorInput.Result.RESULT_FAILED
-            result.data = str(exc)
-            goal_handle.abort()
+            return result
 
-        self._canceled = False  # Reset cancellation flag
-        return result
+        finally:
+            with self._active_goal_lock:
+                if self._active_goal_handle is goal_handle:
+                    self._active_goal_handle = None
+                if getattr(self, '_pending_cancel_goal_handle', None) is goal_handle:
+                    self._pending_cancel_goal_handle = None
+            self._canceled = False
+            self._request_lock.release()
 
     def cancel_callback(self, goal_handle):
         """Cancel the active goal."""
+        with self._active_goal_lock:
+            pending_cancel_goal_handle = getattr(self, '_pending_cancel_goal_handle', None)
+            if self._active_goal_handle is not None:
+                if self._active_goal_handle is not goal_handle:
+                    Logger.localwarn(f"Rejecting cancel for inactive goal on '{self._action_topic}'.")
+                    return rclpy.action.CancelResponse.REJECT
+            elif pending_cancel_goal_handle is not None and pending_cancel_goal_handle is not goal_handle:
+                Logger.localwarn(f"Rejecting cancel for inactive goal on '{self._action_topic}'.")
+                return rclpy.action.CancelResponse.REJECT
+            self._pending_cancel_goal_handle = goal_handle
         Logger.localwarn(f"Canceling goal for '{self._action_topic}' ...")
         self._canceled = True
         return rclpy.action.CancelResponse.ACCEPT

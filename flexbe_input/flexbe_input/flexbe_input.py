@@ -41,6 +41,7 @@ from flexbe_core import Logger
 
 from flexbe_msgs.action import BehaviorInput
 
+import rclpy
 from rclpy.action import ActionClient
 
 from .complex_action_server import ComplexActionServer
@@ -58,6 +59,7 @@ class FlexBEInput:
                                        ActionSpec=BehaviorInput,
                                        execute_cb=self.execute_cb,
                                        auto_start=False)
+        self._server_wait_timeout = 1.0
 
         Logger.loginfo('Ready for data requests...')
 
@@ -72,7 +74,12 @@ class FlexBEInput:
 
         # wait for data msg
         Logger.localinfo('FlexBEInput waiting to relay from OCS ...')
-        relay_ocs_client_.wait_for_server()
+        if not relay_ocs_client_.wait_for_server(timeout_sec=self._server_wait_timeout):
+            result = BehaviorInput.Result(result_code=BehaviorInput.Result.RESULT_ABORTED,
+                                          data='Timed out waiting for flexbe/operator_input action server')
+            self._as.set_aborted(result, 'Timed out waiting for operator input server', goal_handle)
+            Logger.logwarn(result.data)
+            return
         Logger.localinfo('FlexBEInput is ready!')
 
         # Fill in the goal here
@@ -87,12 +94,25 @@ class FlexBEInput:
                                                         data=data_str), 'ok', goal_handle)
 
         elif result.result_code == BehaviorInput.Result.RESULT_FAILED:
-            # remove
+            # set_succeeded: the relay completed its job (operator responded with an explicit decline)
             self._as.set_succeeded(BehaviorInput.Result(result_code=BehaviorInput.Result.RESULT_FAILED,
                                                         data=data_str), 'failed', goal_handle)
             Logger.loginfo('<-- Replied with FAILED')
 
         elif result.result_code == BehaviorInput.Result.RESULT_ABORTED:
-            self._as.set_succeeded(BehaviorInput.Result(result_code=BehaviorInput.Result.RESULT_ABORTED,
-                                                        data=data_str), 'Aborted', goal_handle)
+            self._as.set_aborted(BehaviorInput.Result(result_code=BehaviorInput.Result.RESULT_ABORTED,
+                                                      data=data_str), 'Aborted', goal_handle)
             Logger.loginfo('<-- Replied with ABORT')
+
+
+def main(args=None):
+    """Run the FlexBE input relay node."""
+    rclpy.init(args=args)
+    node = rclpy.create_node('flexbe_input')
+    FlexBEInput(node)
+
+    try:
+        rclpy.spin(node)
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
