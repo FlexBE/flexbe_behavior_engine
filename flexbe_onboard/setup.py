@@ -34,7 +34,6 @@ setup(
     license='BSD',
     entry_points={
         'console_scripts': [
-            'flexbe_onboard = flexbe_onboard.flexbe_onboard',
             'start_behavior = flexbe_onboard.start_behavior:main',
         ],
     },

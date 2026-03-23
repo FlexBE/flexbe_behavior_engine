@@ -48,6 +48,7 @@ def main(args=None):
 
     executor = rclpy.executors.SingleThreadedExecutor()
     executor.add_node(onboard)
+    onboard.executor = executor
 
     onboard.get_logger().info('Begin processing onboard behavior engine ...')
 
@@ -114,6 +115,7 @@ def main(args=None):
     try:
         rclpy.try_shutdown()
     except Exception as exc:  # pylint: disable=W0703
+        import traceback
         print(f"{datetime.now()} - Exception from rclpy.shutdown for start onboard behavior: '{type(exc)}'\n{exc}", flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
