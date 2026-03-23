@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<behavior name="Onboard Profile Behavior">
+
+	<executable package_path="onboard_profile_data.profile_behavior_sm" class="OnboardProfileBehaviorSM" />
+	<tagstring>profiling,onboard</tagstring>
+	<author>OpenAI Codex</author>
+	<date>Sun Mar 08 2026</date>
+	<description>
+		Synthetic behavior used to profile FlexBE onboard execution overhead.
+	</description>
+
+	<!-- Contained Behaviors -->
+
+	<!-- Available Parameters -->
+
+</behavior>

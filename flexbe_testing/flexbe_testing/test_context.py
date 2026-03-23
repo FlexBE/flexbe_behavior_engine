@@ -37,12 +37,16 @@ Use as a 'with' statement and run 'verify' to check whether the context is valid
 
 import os
 import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
 import time
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 import rclpy
-from rclpy.exceptions import ParameterNotDeclaredException
 
 from .logger import Logger
 
@@ -66,9 +70,10 @@ class TestContext:
 
     __test__ = False  # Do not pytest this class (it is the test!)
 
-    def __init__(self):
+    def __init__(self, node=None, execute_wait=0.01):
         """Initialize."""
-        pass
+        self._node = node
+        self._execute_wait = execute_wait
 
     def __enter__(self):
         """Enter test."""
@@ -76,7 +81,9 @@ class TestContext:
 
     def ok(self):
         """Return ok status (default loop check)."""
-        return rclpy.ok()
+        if self._node is None:
+            return rclpy.ok()
+        return rclpy.ok(context=self._node.context)
 
     def verify(self):
         """Verify test results."""
@@ -94,6 +101,11 @@ class TestContext:
         """Wait for test to finish."""
         pass
 
+    def sleep(self):
+        """Sleep for the configured wait duration."""
+        if self._execute_wait is not None:
+            time.sleep(self._execute_wait)
+
     @property
     def success(self):
         """Check test success."""
@@ -103,9 +115,9 @@ class TestContext:
 class PyTestContext(TestContext):
     """Pylint based state tests uses counter and/or timeout_sec to control execute loop."""
 
-    def __init__(self, timeout_sec=None, max_cnt=50):
+    def __init__(self, node=None, timeout_sec=None, max_cnt=50, execute_wait=0.01):
         """Initialize the PyTestContext."""
-        super().__init__()
+        super().__init__(node, execute_wait)
         self._cnt = 0
         self._max_cnt = None
         self._time_out = None
@@ -132,73 +144,100 @@ class PyTestContext(TestContext):
 class LaunchContext(TestContext):
     """Test context that runs a specified launch file configuration."""
 
-    def __init__(self, node, launch_config, wait_cond='True'):
+    class _EvalRclpyProxy:
+        """Expose the live rclpy module while allowing wait_for_message to be overridden."""
+
+        def __init__(self, module, wait_for_message=None):
+            self._module = module
+            self.wait_for_message = wait_for_message
+
+        def __getattr__(self, name):
+            return getattr(self._module, name)
+
+    _RUNNER_CODE = """
+import sys
+from launch import LaunchDescription, LaunchService
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import AnyLaunchDescriptionSource
+
+service = LaunchService(noninteractive=True)
+service.include_launch_description(
+    LaunchDescription([
+        IncludeLaunchDescription(AnyLaunchDescriptionSource(sys.argv[1]))
+    ])
+)
+raise SystemExit(service.run())
+"""
+
+    def __init__(self, node, launch_config, wait_cond='True', execute_wait=0.01):
         """Initialize the launch context."""
-        self._node = node
+        super().__init__(node, execute_wait)
         Logger.initialize(node)
 
-        try:
-            self._run_id = self._node.get_parameter('/run_id').get_parameter_value()
-        except ParameterNotDeclaredException:  # pylint: disable=W0703
-            self._node.get_logger().error('Unable to get parameter: /run_id')
+        self._launch_process = None
+        self._launch_tempdir = None
+        self._launch_file = self._resolve_launch_file(launch_config)
+        self._wait_cond = wait_cond
+        self._valid = self._launch_file is not None and os.path.isfile(self._launch_file)
+        self._return_code = None
+        self._stop_signal = None
 
-        launchpath = None
-        launchcontent = None
-
-        self._launched_proc_names = []
-        self._exit_codes = {}
-
-        # load from system path
+    def _resolve_launch_file(self, launch_config):
+        """Return a launch file path, materializing inline configs into a temp file when needed."""
         if launch_config.startswith('~') or launch_config.startswith('/'):
-            launchpath = os.path.expanduser(launch_config)
-        # load from package path
-        elif re.match(r'.+\.launch$', launch_config):
-            # rp = rospkg.RosPack()
-            # pkgpath = rp.get_path(launch_config.split('/')[0])
+            return os.path.expanduser(launch_config)
 
-            pkgpath = get_package_share_directory(launch_config.split('/')[0])
-            launchpath = os.path.join(pkgpath, '/'.join(launch_config.split('/')[1:]))
-        # load from config definition
-        else:
-            launchcontent = launch_config
+        if os.path.isfile(launch_config):
+            return os.path.abspath(launch_config)
 
-        # launchconfig = roslaunch.config.ROSLaunchConfig()
-        # loader = roslaunch.xmlloader.XmlLoader()
-        # if launchpath is not None:
-        #     loader.load(launchpath, launchconfig, verbose=False)
-        # else:
-        #     loader.load_string(launchcontent, launchconfig, verbose=False)
-        # self._launchrunner = roslaunch.launch.ROSLaunchRunner(self._run_id, launchconfig)
-        self._launchrunner = None
-        self._wait_cond = None
-        self._valid = False
-        raise NotImplementedError(f"Not implemented for ROS 2 - TODO!\n {launchpath}\n {launchcontent}\n{10 * '='}")
-        # def store(process_name, exit_code):
-        #     self._exit_codes[process_name] = exit_code
-        # self._launchrunner.add_process_listener(Callback(store))
-        # self._wait_cond = wait_cond
-        # self._valid = True
+        if '/' in launch_config and re.match(r'^[A-Za-z0-9_]+/.+\.(launch(\.(py|xml))?|py|xml)$', launch_config):
+            try:
+                pkgpath = get_package_share_directory(launch_config.split('/')[0])
+            except PackageNotFoundError:
+                return None
+            return os.path.join(pkgpath, '/'.join(launch_config.split('/')[1:]))
+
+        self._launch_tempdir = tempfile.mkdtemp(prefix='flexbe_launch_')
+        stripped = launch_config.lstrip()
+        suffix = '.launch.xml' if stripped.startswith('<') else '.launch.py'
+        launch_file = os.path.join(self._launch_tempdir, f'generated{suffix}')
+        with open(launch_file, 'w', encoding='utf-8') as handle:
+            handle.write(launch_config)
+            if not launch_config.endswith('\n'):
+                handle.write('\n')
+        return launch_file
 
     def __enter__(self):
-        raise NotImplementedError('Not implemented for ROS 2 - TODO!')
-        self._launchrunner.launch()
-        self._launchrunner.spin_once()
-        Logger.print_positive('launchfile running')
-        self._valid = True
+        """Start the launch runner subprocess and wait for the launch condition."""
+        if not self._valid:
+            Logger.print_negative('launchfile is invalid or missing')
+            return self
 
-        self._launched_proc_names = [p.name for p in self._launchrunner.pm.procs]
+        self._launch_process = subprocess.Popen(
+            [sys.executable, '-c', self._RUNNER_CODE, self._launch_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        Logger.print_positive('launchfile running')
 
         try:
-            check_running_rate = self._node.create_rate(10, self._node.get_clock())
-            is_running = False
-            while not is_running:
-                is_running = eval(self._wait_cond)
-                check_running_rate.sleep()
-            Logger.print_positive('waiting condition satisfied')
-            self._node.destroy_rate(check_running_rate)
-        except Exception as e:
+            while self.ok():
+                if bool(eval(self._wait_cond, self._evaluation_globals(), {})):
+                    Logger.print_positive('waiting condition satisfied')
+                    return self
+                self.sleep()
+            self._valid = False
+            Logger.print_negative('waiting condition was not satisfied before launchfile stopped')
+        except (AttributeError, NameError, SyntaxError, TypeError, ValueError) as e:
             self._valid = False
             Logger.print_negative('unable to check waiting condition:\n\t%s' % str(e))
+        return self
+
+    def ok(self):
+        """Return ok status (default loop check)."""
+        self._poll_process()
+        return super().ok() and self._launch_process is not None and self._return_code is None
 
     def verify(self):
         """Verify valid."""
@@ -206,21 +245,122 @@ class LaunchContext(TestContext):
 
     def spin_once(self):
         """Spin test runner loop once."""
-        self._launchrunner.spin_once()
+        self._poll_process()
+        self.sleep()
 
     def wait_for_finishing(self):
         """Wait for finishing."""
-        check_exited_rate = self._node.create_rate(10, self._node.get_clock())
         self._node.get_logger().info('Waiting for all launched nodes to exit')
-        while not all(name in self._exit_codes for name in self._launched_proc_names):
-            check_exited_rate.sleep()
-        self._node.destroy_rate(check_exited_rate)
+        while self._launch_process is not None and self._return_code is None and super().ok():
+            self._poll_process()
+            self.sleep()
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self._launchrunner.stop()
+        del exception_type, exception_value, traceback
+        self._stop_launch_process()
+        if self._launch_tempdir is not None:
+            shutil.rmtree(self._launch_tempdir, ignore_errors=True)
+            self._launch_tempdir = None
         Logger.print_positive('launchfile stopped')
+        return False
 
     @property
     def success(self):
         """Verify success."""
-        return not any(code > 0 for code in self._exit_codes.values())
+        self._poll_process()
+        return self._return_code in (None, 0) or self._stop_signal == signal.SIGINT
+
+    def _evaluation_globals(self):
+        """Return globals available to launch wait-condition expressions."""
+        eval_rclpy = rclpy
+        try:
+            wait_for_message = __import__('rclpy.wait_for_message', fromlist=['wait_for_message']).wait_for_message
+            eval_rclpy = self._EvalRclpyProxy(rclpy, wait_for_message=wait_for_message)
+        except ImportError:
+            pass
+        return {
+            '__builtins__': __builtins__,
+            '__import__': __import__,
+            'node': self._node,
+            'os': os,
+            'rclpy': eval_rclpy,
+            'time': time,
+        }
+
+    def _poll_process(self):
+        """Update cached subprocess return code."""
+        if self._launch_process is None:
+            return
+        return_code = self._launch_process.poll()
+        if return_code is None:
+            return
+        self._return_code = return_code
+        if return_code != 0:
+            self._valid = False
+
+    def _stop_launch_process(self):
+        """Terminate the launch subprocess and its process group."""
+        if self._launch_process is None:
+            return
+        self._poll_process()
+        if self._return_code is None:
+            try:
+                self._stop_signal = signal.SIGINT
+                os.killpg(self._launch_process.pid, signal.SIGINT)
+                self._launch_process.wait(timeout=5.0)
+            except ProcessLookupError:
+                pass
+            except subprocess.TimeoutExpired:
+                self._stop_signal = signal.SIGTERM
+                os.killpg(self._launch_process.pid, signal.SIGTERM)
+                try:
+                    self._launch_process.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    self._stop_signal = signal.SIGKILL
+                    os.killpg(self._launch_process.pid, signal.SIGKILL)
+                    self._launch_process.wait(timeout=5.0)
+            self._poll_process()
+        self._launch_process = None
+
+
+class LaunchPyTestContext(LaunchContext):
+    """Launch-backed test context with the pytest timeout and loop limits."""
+
+    def __init__(self, node, launch_config, wait_cond='True', timeout_sec=None, max_cnt=50, execute_wait=0.01):
+        """Initialize the launch-backed pytest context."""
+        super().__init__(node, launch_config, wait_cond=wait_cond, execute_wait=execute_wait)
+        self._timeout_sec = float(timeout_sec) if timeout_sec is not None else None
+        self._cnt = 0
+        self._max_cnt = None
+        self._time_out = None
+        self._limits_active = False
+        if max_cnt is not None:
+            self._max_cnt = int(max_cnt)
+
+        assert self._max_cnt is not None or self._timeout_sec is not None, 'Must have either timeout or max cnt set!'
+
+    def __enter__(self):
+        """Start the launch runner before enabling pytest loop limits."""
+        super().__enter__()
+        if self.verify():
+            self._cnt = 0
+            self._time_out = time.time() + self._timeout_sec if self._timeout_sec is not None else None
+            self._limits_active = True
+        return self
+
+    def ok(self):
+        """Return ok status based on launch health, time, and iteration count."""
+        if not super().ok():
+            return False
+
+        if not self._limits_active:
+            return True
+
+        if self._time_out is not None and time.time() > self._time_out:
+            return False
+
+        self._cnt += 1
+        if self._max_cnt is not None and self._cnt > self._max_cnt:
+            return False
+
+        return True

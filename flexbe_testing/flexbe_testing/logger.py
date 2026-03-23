@@ -101,22 +101,22 @@ class Logger:
         mute_error = False
 
         try:
-            mute_info = Logger._node.get_parameter('~mute_info').get_parameter_value()
+            mute_info = Logger._node.get_parameter('~mute_info').get_parameter_value().bool_value
         except Exception:  # pylint: disable=W0703
             Logger._node.declare_parameter('~mute_info', False)
-            mute_info = Logger._node.get_parameter('~mute_info').get_parameter_value()
+            mute_info = Logger._node.get_parameter('~mute_info').get_parameter_value().bool_value
 
         try:
-            mute_warn = Logger._node.get_parameter('~mute_warn').get_parameter_value()
+            mute_warn = Logger._node.get_parameter('~mute_warn').get_parameter_value().bool_value
         except Exception:  # pylint: disable=W0703
             Logger._node.declare_parameter('~mute_warn', False)
-            mute_warn = Logger._node.get_parameter('~mute_warn').get_parameter_value()
+            mute_warn = Logger._node.get_parameter('~mute_warn').get_parameter_value().bool_value
 
         try:
-            mute_error = Logger._node.get_parameter('~mute_error').get_parameter_value()
+            mute_error = Logger._node.get_parameter('~mute_error').get_parameter_value().bool_value
         except Exception:  # pylint: disable=W0703
             Logger._node.declare_parameter('~mute_error', False)
-            mute_error = Logger._node.get_parameter('~mute_error').get_parameter_value()
+            mute_error = Logger._node.get_parameter('~mute_error').get_parameter_value().bool_value
 
         if cls._param_compact() or mute_info:
             Logger._node.get_logger().info = Logger._node.get_logger().debug

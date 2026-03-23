@@ -1,9 +1,28 @@
 path: flexbe_testing.test.test_sub_state
 class: TestSubState
 
-launch: '<launch>
-		<node name="test_pub" pkg="rostopic" type="rostopic" args="pub -r 20 /flexbe_testing/test_sub std_msgs/String testmsg" />
-	</launch>'
+launch: |
+    from launch import LaunchDescription
+    from launch.actions import ExecuteProcess
+
+
+    def generate_launch_description():
+        return LaunchDescription([
+            ExecuteProcess(
+                cmd=[
+                    'ros2',
+                    'topic',
+                    'pub',
+                    '-r',
+                    '20',
+                    '/flexbe_testing/test_sub',
+                    'std_msgs/msg/String',
+                    '{data: testmsg}',
+                ],
+            )
+        ])
+
+wait_cond: node.count_publishers('/flexbe_testing/test_sub') > 0
 
 params:
     topic: //flexbe_testing/test_sub

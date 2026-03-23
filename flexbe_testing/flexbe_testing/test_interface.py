@@ -33,7 +33,7 @@
 
 import inspect
 
-from flexbe_core.core import EventState
+from flexbe_core import EventState, initialize_flexbe_core
 
 import rclpy
 
@@ -53,15 +53,16 @@ class TestInterface:
         ))
 
         Logger.initialize(node)
+        initialize_flexbe_core(node)
 
         self._class = next(c for name, c in clsmembers if name == classname)
         self._instance = None
         self._node = node
         self._node.get_logger().info(f'rclpy.ok={rclpy.ok(context=self._node.context)} context={self._node.context.ok()}')
-        try:
+        if self.is_state():
             self._class.initialize_ros(node)
             Logger.print_positive('Given class is a state')
-        except Exception:
+        else:
             Logger.print_positive('Given class is a state machine')
 
         Logger.print_positive('%s imported' % self.get_base_name())
@@ -118,6 +119,7 @@ class TestInterface:
         while outcome is None and context.ok():
             outcome = self._instance.execute(userdata)
             spin_cb()
+            context.sleep()
 
         self._instance.on_stop()
         return outcome
@@ -130,6 +132,6 @@ class TestInterface:
         sm = self._instance._state_machine
         while outcome is None and context.ok():
             outcome = sm.execute(userdata)
-            sm.wait(seconds=sm.sleep_duration, context=self._node.context)
+            sm.wait(target_wakeup_ns=sm.target_wakeup_ns, context=self._node.context)
             spin_cb()
         return outcome

@@ -37,7 +37,7 @@ from flexbe_core.core.user_data import UserData
 
 from .data_provider import DataProvider
 from .logger import Logger
-from .test_context import PyTestContext, TestContext
+from .test_context import LaunchContext, LaunchPyTestContext, PyTestContext, TestContext
 from .test_interface import TestInterface
 
 
@@ -46,17 +46,19 @@ class Tester:
 
     __test__ = False  # Do not pytest this class (it is the test!)
 
-    def __init__(self, node, executor=None):
+    def __init__(self, node, executor=None, execute_wait=0.01):
         """Initialize Test instance."""
         self._tests = {}
         self.node = node
         self.executor = executor
+        self.execute_wait = execute_wait  # control tic rate for execute loop
         self._import_only = False
 
         Logger.initialize(node)
 
     def import_interface(self, name, config):
         """Import interface."""
+        config = self._normalize_config(config)
         try:
             self.node.get_logger().info(f"Importing test configuration for '{name}'\n config: {config} ...")
             self._verify_config(config)
@@ -66,11 +68,6 @@ class Tester:
             Logger.print_result(name, False)
             self._tests['test_%s_pass' % name] = self._test_config_invalid(str(e))
             return None
-
-        # allow to specify behavior name instead of generated module and class
-        if 'name' in config:
-            config['path'] += '.%s_sm' % re.sub(r'[^\w]', '_', config['name'].lower())
-            config['class'] = '%sSM' % re.sub(r'[^\w]', '', config['name'])
 
         self._import_only = config.get('import_only', False)
         Logger.print_title(name, config['class'], config['outcome'] if not self._import_only else None)
@@ -85,13 +82,30 @@ class Tester:
             self._tests['test_%s_pass' % name] = self._test_pass(False)
             return None
 
-    def run_pytest(self, name, config, timeout_sec=None, max_cnt=50):
+    def run_pytest(self, name, config, timeout_sec=None, max_cnt=50, execute_wait=0.01):
         """Run pytest."""
         self.node.get_logger().info(f" Running pytest setup for '{name}' with timeout_sec={timeout_sec} max_cnt={max_cnt} ...")
-        return self.run_test(name, config, context=PyTestContext(timeout_sec=timeout_sec, max_cnt=max_cnt))
+        if 'launch' in config:
+            context = LaunchPyTestContext(
+                self.node,
+                config['launch'],
+                wait_cond=config.get('wait_cond', 'True'),
+                timeout_sec=timeout_sec,
+                max_cnt=max_cnt,
+                execute_wait=execute_wait,
+            )
+        else:
+            context = PyTestContext(
+                self.node,
+                timeout_sec=timeout_sec,
+                max_cnt=max_cnt,
+                execute_wait=execute_wait,
+            )
+        return self.run_test(name, config, context=context)
 
     def run_test(self, name, config, context=None):
         """Run test."""
+        config = self._normalize_config(config)
         test_interface = self.import_interface(name, config)
 
         if test_interface is None:
@@ -107,22 +121,31 @@ class Tester:
         # load data source
         try:
             self.node.get_logger().info(f" Get data provider for '{name}' ...")
-            data = DataProvider(self.node, bagfile=None)
+            data = DataProvider(self.node, bagfile=config.get('data'))
         except Exception as e:
             Logger.print_failure('unable to load data source %s:\n\t%s' %
-                                 (config['data'], str(e)))
+                                 (config.get('data'), str(e)))
             self._tests['test_%s_pass' % name] = self._test_pass(False)
             return 0
 
         # prepare test context
         if context is None:
-            # If not a PyTestContext
-            context = TestContext()
+            if 'launch' in config:
+                context = LaunchContext(
+                    self.node,
+                    config['launch'],
+                    wait_cond=config.get('wait_cond', 'True'),
+                    execute_wait=self.execute_wait,
+                )
+            else:
+                # If not a PyTestContext
+                context = TestContext(self.node, self.execute_wait)
 
         # run test context
         with context:
             if not context.verify():
-                Logger.print_error('failed to initialize test context:\n\t%s' % config['launch'])
+                Logger.print_error('failed to initialize test context:\n\t%s' %
+                                   config.get('launch'))
                 self._tests['test_%s_pass' % name] = self._test_pass(False)
                 return 0
 
@@ -211,6 +234,16 @@ class Tester:
         assert 'path' in config
         assert 'class' in config or 'name' in config
         assert 'outcome' in config or config.get('import_only', False)
+
+    def _normalize_config(self, config):
+        """Return a derived copy of config without mutating the caller's dictionary."""
+        config = dict(config)
+        if 'name' in config:
+            module_suffix = '.%s_sm' % re.sub(r'[^\w]', '_', config['name'].lower())
+            if not config['path'].endswith(module_suffix):
+                config['path'] += module_suffix
+            config['class'] = '%sSM' % re.sub(r'[^\w]', '', config['name'])
+        return config
 
     def _test_output(self, value, expected):
         def _test_call(test_self):
