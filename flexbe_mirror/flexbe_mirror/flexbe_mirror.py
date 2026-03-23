@@ -461,8 +461,9 @@ class FlexbeMirror(Node):
                                           name=f'start_mirror_{msg.behavior_id}_{start_time.nanoseconds}')
                 thread.daemon = True
                 thread.start()
-            elif self._sm:
-                # We have valid state machine structure, respond according to status
+            elif self._sm or self._active_id != BehaviorSync.INVALID:
+                # We have valid state machine structure (or SM already completed but active_id not yet cleared),
+                # respond according to status
                 active_behavior_id = getattr(self, '_active_id', BehaviorSync.INVALID)
                 if active_behavior_id == BehaviorSync.INVALID and getattr(self._sm, 'id', None) is not None:
                     active_behavior_id = self._sm.id
