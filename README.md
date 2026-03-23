@@ -73,7 +73,7 @@ Use the following launch file for running the onboard engine:
 
   `ros2 launch flexbe_onboard behavior_onboard.launch.py`
 
-Use the following launch file for running the operator control station (requires the FlexBE App or WebUI):
+Use the following launch file for running the operator control station (requires the FlexBE WebUI v4.1+):
 
   `ros2 launch flexbe_webui flexbe_ocs.launch.py`
 
@@ -83,7 +83,7 @@ During testing is is recommended to start the base nodes and the UI client separ
 
   `ros2 run flexbe_webui webui_client`
 
-  See the `flexbe_webui`  README for more details.
+  See the `flexbe_webui` README for more details.
 
 
 Use the following launch file to run the entire FlexBE system, both onboard and OCS, e.g., for testing on a single computer:
@@ -99,7 +99,7 @@ For running tests use:
 - Do some of the [tutorials](http://flexbe.github.io).
 - Visit the [FlexBE GitHub Organization](https://github.com/FlexBE) for additional available states.
 
-- If you are converted an existing system from ROS 1 to ROS 2, we provide a
+- If you are converting an existing system from ROS 1 to ROS 2, we provide a
 [ROS 2 Conversion Best Practices Guide](flexbe_states/ros2-conversion-best-practices.md)
 to assist in converting any custom FlexBE state implementations.
 
