@@ -63,8 +63,6 @@ class MirrorConcurrencyContainer(MirrorStateMachine):
         """Exit state and prepare for next entry (outcome -1 means preempt)."""
         self._entering = True
         for state in self._states if states is None else states:
-            if state in self._returned_outcomes:
-                continue  # skip states that already exited themselves
             state._entering = True
             state.on_exit_mirror(userdata, -1)  # preempted
 

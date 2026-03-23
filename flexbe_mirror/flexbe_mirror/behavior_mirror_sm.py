@@ -94,6 +94,7 @@ def main(args=None):
     try:
         rclpy.try_shutdown()
     except Exception as exc:  # pylint: disable=W0703
+        import traceback
         print(f"Exception from rclpy.try_shutdown for behavior mirror: '{type(exc)}'\n{exc}", flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
