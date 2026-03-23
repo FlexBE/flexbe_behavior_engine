@@ -69,6 +69,7 @@ class FlexibleCalculationState(EventState):
 
     def on_enter(self, userdata):
         """Do calculation on entering state."""
+        self._calculation_result = None
         if self._calculation is not None:
             try:
                 self._calculation_result = self._calculation(**{key: userdata[key] for key in self._input_keys})

@@ -67,6 +67,7 @@ class CalculationState(EventState):
 
     def on_enter(self, userdata):
         """Call calculation on entering state."""
+        self._calculation_result = None
         if self._calculation is not None:
             try:
                 self._calculation_result = self._calculation(userdata.input_value)

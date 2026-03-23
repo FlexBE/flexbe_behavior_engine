@@ -64,4 +64,7 @@ class LogKeyState(EventState):
 
     def on_enter(self, userdata):
         """Log upon entering the state."""
-        Logger.log(self._text.format(userdata.data), self._severity)
+        try:
+            Logger.log(self._text.format(userdata.data), self._severity)
+        except Exception as exc:  # pylint: disable=W0703
+            Logger.logwarn(f"LogKeyState failed to format message '{self._text}': {exc}")

@@ -71,7 +71,7 @@ class SubscriberState(EventState):
     def on_stop(self):
         """Unsubscribe topic when behavior stops."""
         if self._connected:
-            ProxySubscriberCached.unsubscribe_topic(self._topic)
+            ProxySubscriberCached.unsubscribe_topic(self._topic, inst_id=id(self))
             self._connected = False
 
     def execute(self, userdata):
@@ -80,9 +80,13 @@ class SubscriberState(EventState):
             userdata.message = None
             return 'unavailable'
 
-        if self._sub.has_msg(self._topic) or not self._blocking:
+        if self._sub.has_msg(self._topic):
             userdata.message = self._sub.get_last_msg(self._topic)
             self._sub.remove_last_msg(self._topic)
+            return 'received'
+
+        if not self._blocking:
+            userdata.message = None
             return 'received'
 
         return None

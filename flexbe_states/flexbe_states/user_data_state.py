@@ -52,5 +52,5 @@ class UserdataState(EventState):
     def execute(self, userdata):
         """Execute UserdataState."""
         # Post data to userdata and return done.
-        userdata.data = copy.copy(self._data)
+        userdata.data = copy.deepcopy(self._data)
         return 'done'

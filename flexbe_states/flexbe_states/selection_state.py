@@ -110,10 +110,10 @@ class SelectionState(EventState):
                     userdata.data = None
                     self._return = 'data_error'
         elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_CANCELED:
-            Logger.localinfo(f" InputState {self._action_topic}' goal was canceled! ")
+            Logger.localinfo(f" SelectionState {self._action_topic}' goal was canceled! ")
             self._return = 'aborted'
         elif self._client.get_status(self._action_topic) == GoalStatus.STATUS_ABORTED:
-            Logger.localinfo(f" InputState {self._action_topic}' goal was aborted! ")
+            Logger.localinfo(f" SelectionState {self._action_topic}' goal was aborted! ")
             self._return = 'aborted'
 
         return self._return
@@ -122,6 +122,10 @@ class SelectionState(EventState):
         """Send goal to action server on entering state."""
         self._client.remove_result(self._action_topic)
         self._return = None
+        try:
+            userdata.data = None
+        except AttributeError:
+            userdata['data'] = None
 
         if 'items' not in userdata:
             self._return = 'aborted'

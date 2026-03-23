@@ -135,6 +135,10 @@ class InputState(EventState):
         """Send goal to action server on entering state."""
         self._client.remove_result(self._action_topic)
         self._return = None
+        try:
+            userdata.data = None
+        except AttributeError:
+            userdata['data'] = None
 
         # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal()

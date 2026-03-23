@@ -58,7 +58,8 @@ def generate_launch_description():
     # ### ros2 bag issues - testcases += join(path, 'log_state_msg.test') + '\n'
     testcases += join(path, 'operator_decision_state_suggested.test') + '\n'
     testcases += join(path, 'subscriber_state_unavailable.test') + '\n'
-    # #### issues with pub/yaml in test testcases += join(path, 'subscriber_state_pose.test') + '\n'
+    # #### issues with pub/yaml in test
+    testcases += join(path, 'subscriber_state_pose.test') + '\n'
     testcases += join(path, 'wait_state_short.test') + '\n'
 
     return LaunchDescription([

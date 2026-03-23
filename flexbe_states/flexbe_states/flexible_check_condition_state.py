@@ -79,6 +79,7 @@ class FlexibleCheckConditionState(EventState):
 
     def on_enter(self, userdata):
         """Call on entering state."""
+        self._outcome = 'false'
         if self._predicate is not None:
             try:
                 self._outcome = 'true' if self._predicate([userdata[key] for key in self._input_keys]) else 'false'

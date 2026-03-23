@@ -1,14 +1,13 @@
 path: flexbe_states.subscriber_state
 class: SubscriberState
 
-# Note: Need exec to get 'def generate_launch_description' on one line properly without syntax error
-launch: "from launch import LaunchDescription;from launch.actions import ExecuteProcess;exec('''def generate_launch_description():    return LaunchDescription([ExecuteProcess(cmd=['ros2', 'topic', 'pub', '/test', 'geometry_msgs/Pose', '{position: {x: 6.4}}'])])''')"
+launch: flexbe_states/launch/pub.launch.py
 
-wait_cond: rclpy.wait_for_message.wait_for_message('/test', __import__('geometry_msgs').msg.Pose)
+wait_cond: node.count_publishers('/test') > 0
 
 params:
     topic: /test
-    msg_type: geometry_msgs/Pose
+    msg_type: !!python/name:geometry_msgs.msg.Pose ''
     blocking: True
 
 output:
