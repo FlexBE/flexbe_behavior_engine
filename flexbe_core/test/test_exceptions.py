@@ -45,8 +45,8 @@ class TestExceptions(unittest.TestCase):
     """Test FlexBE Exception handling."""
 
     test = 0
-    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
-    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
+    __EXECUTE_TIMEOUT_SEC = 0.05
+    __TIME_SLEEP = 0.05
 
     def __init__(self, *args, **kwargs):
         """Initialize TestExceptions instance."""
@@ -82,7 +82,7 @@ class TestExceptions(unittest.TestCase):
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestExceptions.__TIME_SLEEP * 2)
+        time.sleep(TestExceptions.__TIME_SLEEP)
 
     def test_invalid_outcome(self):
         """Test invalid outcome."""
@@ -269,6 +269,7 @@ class TestExceptions(unittest.TestCase):
 
         self.assertIsNone(outcome)
         self.assertIsInstance(sm._last_exception, UserDataError)
+        self.assertEqual(sm.userdata.only_input, {'existing': 'is_allowed'})
         self.node.get_logger().info('test_modify_input_key - OK! ')
 
 

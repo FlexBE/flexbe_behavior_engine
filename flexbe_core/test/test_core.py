@@ -34,7 +34,7 @@ import time
 import unittest
 
 from flexbe_core import ConcurrencyContainer, EventState, OperatableStateMachine, initialize_flexbe_core
-from flexbe_core.core import PreemptableState, State
+from flexbe_core.core import PreemptableState, RosState, State
 from flexbe_core.core import StateMachineError
 from flexbe_core.core import Topics
 from flexbe_core.proxy import ProxySubscriberCached, shutdown_proxies
@@ -117,9 +117,9 @@ class TestCore(unittest.TestCase):
 
     test = 0
 
-    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
-    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
-    __LOOP_COUNT = 50  # Number of times to execute loops for checking (total time ~ LOOP_COUNT*(TIME_SLEEP + TIMEOUT))
+    __EXECUTE_TIMEOUT_SEC = 0.05
+    __TIME_SLEEP = 0.01
+    __SETTLE_TIMEOUT_SEC = 0.2
 
     def __init__(self, *args, **kwargs):
         """Initialize TestCore instance."""
@@ -138,30 +138,45 @@ class TestCore(unittest.TestCase):
         self.executor.add_node(self.node)
 
         initialize_flexbe_core(self.node)
-
-        time.sleep(TestCore.__TIME_SLEEP)
+        RosState._current_execution_time_ns = RosState._node.get_clock().now().nanoseconds
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
 
     def tearDown(self):
         """Tear down the TestCore test."""
         self.node.get_logger().info(' shutting down core test %d ... ' % (self.test))
-        for _ in range(int(0.25 * TestCore.__LOOP_COUNT)):
-            # Allow any lingering pub/sub to clear up
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+        self._spin_for(TestCore.__SETTLE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    shutting down proxies in core test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(TestCore.__TIME_SLEEP)
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
-        time.sleep(TestCore.__TIME_SLEEP)
 
         self.executor.shutdown()
-        time.sleep(TestCore.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestCore.__TIME_SLEEP * 2)
+
+    def _spin_until(self, predicate, timeout_sec=1.0, message='Timed out waiting for condition'):
+        """Spin until predicate returns True or the timeout expires."""
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
+            if predicate():
+                return True
+        if message:
+            self.fail(message)
+        return False
+
+    def _spin_for(self, duration_sec):
+        """Spin the executor for up to the requested wall-clock duration."""
+        deadline = time.monotonic() + duration_sec
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            rclpy.spin_once(self.node,
+                            executor=self.executor,
+                            timeout_sec=min(TestCore.__EXECUTE_TIMEOUT_SEC, max(0.0, remaining)))
 
     def _create(self):
         """Create the test."""
@@ -221,13 +236,13 @@ class TestCore(unittest.TestCase):
 
     def assertMessage(self, sub, topic, msg, timeout=1):
         """Check message."""
-        for _ in range(int(timeout * TestCore.__LOOP_COUNT)):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
             if sub.has_msg(topic):
                 received = sub.get_last_msg(topic)
                 sub.remove_last_msg(topic)
                 break
-            time.sleep(TestCore.__TIME_SLEEP)
         else:
             raise AssertionError('Did not receive message on topic %s, expected:\n%s'
                                  % (topic, str(msg)))
@@ -252,14 +267,14 @@ class TestCore(unittest.TestCase):
         """Assert no message received."""
         if not sub.has_msg(topic):
             self.node.get_logger().info(f"Wait to verify no message arrives for '{topic}' ...")
-        for _ in range(int(timeout * TestCore.__LOOP_COUNT)):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
             if sub.has_msg(topic):
                 received = sub.get_last_msg(topic)
                 sub.remove_last_msg(topic)
                 raise AssertionError('Should not receive message on topic %s, but got:\n%s'
                                      % (topic, str(received)))
-            time.sleep(TestCore.__TIME_SLEEP)
         self.node.get_logger().info(f"   No message arrived for '{topic}' - good!")
 
     # Test Cases
@@ -274,7 +289,7 @@ class TestCore(unittest.TestCase):
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
-        time.sleep(0.2)
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
 
         # enter during first execute
         self._execute(state)
@@ -329,11 +344,9 @@ class TestCore(unittest.TestCase):
         out_topic = Topics._OUTCOME_TOPIC
         req_topic = Topics._OUTCOME_REQUEST_TOPIC
         sub = ProxySubscriberCached({out_topic: UInt32, req_topic: OutcomeRequest}, inst_id=id(self))
-        #  wait for pub/sub
-        end_time = time.time() + 1
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
-            time.sleep(TestCore.__TIME_SLEEP)
+        self._spin_until(lambda: sub.is_available(out_topic) and sub.is_available(req_topic),
+                         timeout_sec=1.0,
+                         message='Proxy subscribers did not become available')
 
         state.on_enter(None)
 
@@ -389,11 +402,7 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('test_preemptable_state - subscribers ...')
 
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
-        #  wait for pub/sub
-        end_time = time.time() + 1
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
-            time.sleep(TestCore.__TIME_SLEEP)
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
         # time.sleep(0.2)
 
         # preempt when trigger variable is set
@@ -428,7 +437,7 @@ class TestCore(unittest.TestCase):
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
-        time.sleep(0.2)
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
 
         # lock and unlock as commanded, return outcome after unlock
         self.node.get_logger().info('  test lock on command ... ')
@@ -446,7 +455,9 @@ class TestCore(unittest.TestCase):
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         self.assertIsNone(outcome)
         self.assertTrue(state._locked)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']),
+                           timeout=2)
         state.result = None
 
         self.node.get_logger().info('  test unlock on command ... ')
@@ -455,7 +466,9 @@ class TestCore(unittest.TestCase):
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']),
+                           timeout=2)
 
         # lock and unlock without target
         self.node.get_logger().info('  test lock and unlock without target ... ')
@@ -463,24 +476,32 @@ class TestCore(unittest.TestCase):
         state.result = 'done'
         outcome = self._execute(state)
         self.assertIsNone(outcome)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='lock', args=[f'{state.state_id}', f'{state.state_id}']),
+                           timeout=2)
         state._sub._callback(Int32(data=0), Topics._CMD_UNLOCK_TOPIC)
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='unlock', args=[f'{state.state_id}', f'{state.state_id}']),
+                           timeout=2)
 
         # reject invalid lock command
         self.node.get_logger().info('  test reject invalid lock command ... ')
         state._sub._callback(Int32(data=12345678), Topics._CMD_LOCK_TOPIC)  # give invalid state id
         outcome = self._execute(state)
         self.assertEqual(outcome, 'done')
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='lock', args=['12345678', '-1']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='lock', args=['12345678', '-1']),
+                           timeout=2)
 
         # reject generic unlock command when not locked
         self.node.get_logger().info('  test reject invalid unlock when not locked command ... ')
         state._sub._callback(Int32(data=0), Topics._CMD_UNLOCK_TOPIC)
         self._execute(state)
-        self.assertMessage(sub, fb_topic, CommandFeedback(command='unlock', args=['0', '-1']))
+        self.assertMessage(sub, fb_topic,
+                           CommandFeedback(command='unlock', args=['0', '-1']),
+                           timeout=2)
 
         # do not transition out of locked container
         self.node.get_logger().info('  test do not transition out of locked container ... ')
@@ -501,7 +522,7 @@ class TestCore(unittest.TestCase):
         state, sm = self._create()
         fb_topic = Topics._CMD_FEEDBACK_TOPIC
         sub = ProxySubscriberCached({fb_topic: CommandFeedback}, inst_id=id(self))
-        time.sleep(0.2)
+        self._spin_for(TestCore.__EXECUTE_TIMEOUT_SEC)
 
         # return requested outcome
         state._sub._callback(OutcomeRequest(target=CoreTestState._set_state_id, outcome=1), Topics._CMD_TRANSITION_TOPIC)
@@ -579,6 +600,7 @@ class TestCore(unittest.TestCase):
     def test_concurrency_container(self):
         """Test CC."""
         self.node.get_logger().info('test_concurrency_container ... ')
+        RosState._current_execution_time_ns = RosState._node.get_clock().now().nanoseconds
         rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestCore.__EXECUTE_TIMEOUT_SEC)
         cc = ConcurrencyContainer(outcomes=['done', 'error'],
                                   conditions=[
@@ -606,10 +628,12 @@ class TestCore(unittest.TestCase):
         cc.execute(None)
 
         try:
-            self.assertAlmostEqual(cc.sleep_duration, .1, places=2)
+            self.assertAlmostEqual((cc.target_wakeup_ns - self.node.get_clock().now().nanoseconds) * 1e-9, .1, places=2)
         except AssertionError:  # pylint: disable=W0703
-            self.node.get_logger().warning(f' Caught error with cc.sleep_duration = {cc.sleep_duration:.6f} =/= 0.1 '
-                                           f'- Sometimes fails if OS interruption! ... ')
+            remaining_ns = cc.target_wakeup_ns - self.node.get_clock().now().nanoseconds
+            self.node.get_logger().warning(f' Caught error with cc.target_wakeup_ns = {cc.target_wakeup_ns} '
+                                           f'(remaining={remaining_ns * 1e-9:.6f}s) =/= 0.1 - '
+                                           f'Sometimes fails if OS interruption! ... ')
 
         # Not controlled yet (e.g. as if no UI connected)
         self.assertFalse(cc['main']._is_controlled)
@@ -622,30 +646,33 @@ class TestCore(unittest.TestCase):
         cc['side'].count = 0
 
         cc_count = 0
-        test_start_time = self.node.get_clock().now()
+        test_start_time = self.node.get_clock().now().nanoseconds
         start_time = time.time()
         elapsed = None
         self.node.get_logger().info('  test timing loop  ... ')
-        while (self.node.get_clock().now() - test_start_time).nanoseconds < 1000000001:  # 1 second
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
+        while (RosState._current_execution_time_ns - test_start_time) < 1000000001:  # 1 second
+
             cc_count += 1
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.0005)
             outcome = cc.execute(None)
             self.node.get_logger().info('  cc_count=%d (%d, %d) outcome=%s duration=%s (%s, %s) last= (%s, %s) now=%s' %
                                         (cc_count,
                                          cc['main'].count, cc['side'].count, str(outcome),
-                                         str(cc.sleep_duration),
-                                         str(cc['main'].sleep_duration), str(cc['side'].sleep_duration),
+                                         str(cc.target_wakeup_ns),
+                                         str(cc['main'].target_wakeup_ns), str(cc['side'].target_wakeup_ns),
                                          str(cc['main']._last_execution.nanoseconds), str(cc['side']._last_execution.nanoseconds),
                                          str(self.node.get_clock().now().nanoseconds)
                                          ))
-            self.assertLessEqual(cc.sleep_duration, .1)
+            self.assertLessEqual(cc.target_wakeup_ns - self.node.get_clock().now().nanoseconds, 100_000_000)
             rclpy.spin_once(self.node, executor=self.executor, timeout_sec=0.0005)
             elapsed = time.time() - start_time  # actual time for iteration
             start_time = time.time()
             elapsed = 0.1 - elapsed
-            sleep_time = min(elapsed, cc.sleep_duration)
+            sleep_time = min(elapsed, (cc.target_wakeup_ns - self.node.get_clock().now().nanoseconds) * 1e-9)
             if sleep_time > 0.00005:
                 time.sleep(sleep_time)
+            RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
 
         self.assertIn(cc['main'].count, [14, 15, 16])
         self.assertIn(cc['side'].count, [9, 10, 11])
@@ -663,31 +690,37 @@ class TestCore(unittest.TestCase):
         cc['side'].set_rate(1.e16)  # run every time
 
         self.node.get_logger().info('  verify outcomes ... ')
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertIsNone(outcome)
 
         cc['main'].result = 'error'
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertEqual(outcome, 'error')
 
         cc['main'].result = None
         cc['side'].result = 'error'
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertEqual(outcome, 'error')
 
         self.node.get_logger().info('  verify outcome only if both done (as set by conditions above) ... ')
         cc['main'].result = None
         cc['side'].result = None
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertIsNone(outcome)
 
         cc['main'].result = None
         cc['side'].result = 'done'
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertIsNone(outcome)
 
         cc['main'].result = 'done'
         self.node.get_logger().info('  verify  both done returns outcome(as set by conditions above) ... ')
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertEqual(outcome, 'done')
 
@@ -695,6 +728,7 @@ class TestCore(unittest.TestCase):
         self.node.get_logger().info('  verify on_exit called once and only once  ... ')
         cc['main'].result = None
         cc['side'].result = None
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertIsNone(outcome)
 
@@ -702,6 +736,7 @@ class TestCore(unittest.TestCase):
         cc['main'].last_events = []
         cc['side'].last_events = []
         cc['main'].result = 'error'
+        RosState._current_execution_time_ns = self.node.get_clock().now().nanoseconds
         outcome = cc.execute(None)
         self.assertEqual(outcome, 'error')
         self.assertListEqual(cc['main'].last_events, ['on_exit'])

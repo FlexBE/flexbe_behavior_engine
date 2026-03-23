@@ -36,6 +36,7 @@ import unittest
 
 from action_msgs.msg import GoalStatus
 
+from flexbe_core.core.exceptions import ProxyAvailabilityError
 from flexbe_core.proxy import ProxyActionClient, ProxyPublisher, ProxyServiceCaller, ProxySubscriberCached
 from flexbe_core.proxy import initialize_proxies, shutdown_proxies
 
@@ -54,12 +55,30 @@ class TestProxies(unittest.TestCase):
     """Test the FlexBE proxies."""
 
     test = 0
-    __EXECUTE_TIMEOUT_SEC = 0.2  # 0.025  # Timeout in executor loops for spin once
-    __TIME_SLEEP = 0.2  # 0.025  # Sleep time for loops
+    __EXECUTE_TIMEOUT_SEC = 0.05
+    __TIME_SLEEP = 0.01
 
     def __init__(self, *args, **kwargs):
         """Initialize TestProxies instance."""
         super().__init__(*args, **kwargs)
+
+    def _spin_until(self, predicate, timeout_sec=5.0, message='Timed out waiting for condition'):
+        """Spin executor until predicate returns True or timeout expires."""
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+            if predicate():
+                return
+        self.fail(message)
+
+    def _spin_for(self, duration_sec):
+        """Spin the executor for a bounded amount of wall-clock time."""
+        deadline = time.monotonic() + duration_sec
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            rclpy.spin_once(self.node,
+                            executor=self.executor,
+                            timeout_sec=min(TestProxies.__EXECUTE_TIMEOUT_SEC, max(0.0, remaining)))
 
     def setUp(self):
         """Set up the test."""
@@ -82,18 +101,15 @@ class TestProxies(unittest.TestCase):
 
         self.node.get_logger().info('    shutting down proxies in core test %d ... ' % (self.test))
         shutdown_proxies()
-        time.sleep(TestProxies.__TIME_SLEEP)
+        self._spin_for(TestProxies.__EXECUTE_TIMEOUT_SEC)
 
         self.node.get_logger().info('    destroy node in core test %d ... ' % (self.test))
         self.node.destroy_node()
-        time.sleep(TestProxies.__TIME_SLEEP)
 
         self.executor.shutdown()
-        time.sleep(TestProxies.__TIME_SLEEP)
 
         # Kill it with fire to make sure not stray published topics are available
         rclpy.shutdown(context=self.context)
-        time.sleep(TestProxies.__TIME_SLEEP * 5)
 
     def test_publish_subscribe(self):
         """Test publish and subscribe."""
@@ -122,9 +138,9 @@ class TestProxies(unittest.TestCase):
         # cannot call wait given spin_once structure
         # self.assertTrue(pub.wait_for_any(topic1))
         # self.assertFalse(pub.wait_for_any(topic2))
-        for _ in range(50):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
-            time.sleep(TestProxies.__TIME_SLEEP)
+        self._spin_until(lambda: pub.number_of_subscribers(topic1) > 0,
+                         timeout_sec=2.0,
+                         message='topic1 subscriber did not connect')
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
         self.assertFalse(pub.number_of_subscribers(topic2) > 0)
@@ -135,9 +151,9 @@ class TestProxies(unittest.TestCase):
 
         self.node.get_logger().info('  subscribe topic2 ...')
         sub = ProxySubscriberCached({topic2: String}, inst_id=id(self))
-        for _ in range(50):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
-            time.sleep(TestProxies.__TIME_SLEEP)
+        self._spin_until(lambda: pub.number_of_subscribers(topic1) > 0 and pub.number_of_subscribers(topic2) > 0,
+                         timeout_sec=2.0,
+                         message='topic subscribers did not connect')
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
         self.assertTrue(pub.number_of_subscribers(topic2) > 0)
@@ -157,9 +173,9 @@ class TestProxies(unittest.TestCase):
 
         # Make sure messages are sent before checking subscription
         self.node.get_logger().info('  listen for two messages ...')
-        end_time = time.time() + 5
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+        self._spin_until(lambda: sub.has_msg(topic1) and sub.has_msg(topic2),
+                         timeout_sec=2.0,
+                         message='Did not receive published messages')
 
         self.assertTrue(sub.has_msg(topic1))
         self.assertEqual(sub.get_last_msg(topic1).data, '1')
@@ -187,9 +203,9 @@ class TestProxies(unittest.TestCase):
         sub = ProxySubscriberCached({topic1: String}, inst_id=id(self))
         sub.enable_buffer(topic1)
         # No wait in this setup -  self.assertTrue(pub.wait_for_any(topic1))
-        for _ in range(10):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
-            time.sleep(TestProxies.__TIME_SLEEP)
+        self._spin_until(lambda: pub.number_of_subscribers(topic1) > 0,
+                         timeout_sec=2.0,
+                         message='buffered topic subscriber did not connect')
 
         self.assertTrue(pub.number_of_subscribers(topic1) > 0)
 
@@ -202,9 +218,11 @@ class TestProxies(unittest.TestCase):
         pub.publish(topic1, msg2)
 
         # make sure messages can be received
-        end_time = time.time() + 3
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+        self._spin_until(lambda: sub.has_buffered(topic1)
+                         and sub.has_msg(topic1)
+                         and sub.get_last_msg(topic1).data == '2',
+                         timeout_sec=2.0,
+                         message='Buffered messages did not arrive')
 
         self.assertTrue(sub.has_msg(topic1))
         self.assertTrue(sub.has_buffered(topic1))
@@ -215,9 +233,13 @@ class TestProxies(unittest.TestCase):
         pub.publish(topic1, msg3)
 
         # make sure message can be received
-        end_time = time.time() + 3
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+        self._spin_until(lambda: sub.has_buffered(topic1)
+                         and sub.peek_at_buffer(topic1) is not None
+                         and sub.peek_at_buffer(topic1).data == '2'
+                         and sub.has_msg(topic1)
+                         and sub.get_last_msg(topic1).data == '3',
+                         timeout_sec=2.0,
+                         message='Follow-up buffered messages did not arrive')
 
         self.assertEqual(sub.get_from_buffer(topic1).data, '2')
         self.assertEqual(sub.get_from_buffer(topic1).data, '3')
@@ -244,9 +266,9 @@ class TestProxies(unittest.TestCase):
         srv = ProxyServiceCaller({topic1: Trigger})
 
         srv.call_async(topic1, Trigger.Request())
-        end_time = time.time() + 10
-        while time.time() < end_time:
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
+        self._spin_until(lambda: srv.done(topic1),
+                         timeout_sec=3.0,
+                         message='Service call did not complete')
 
         self.assertTrue(srv.done(topic1))
 
@@ -259,6 +281,50 @@ class TestProxies(unittest.TestCase):
         self.assertFalse(srv.is_available('/invalid'))
         self.node.get_logger().info('test_service_caller  - OK! ')
 
+    def test_service_caller_raises_proxy_availability_error(self):
+        """Test unavailable service raises typed proxy availability exception."""
+        self.node.get_logger().info('test_service_caller_raises_proxy_availability_error ...')
+        ProxyServiceCaller.initialize(self.node)
+        topic = '/service_missing'
+        srv = ProxyServiceCaller({topic: Trigger}, wait_duration=.01)
+        with self.assertRaises(ProxyAvailabilityError):
+            srv.call_async(topic, Trigger.Request(), wait_duration=.01)
+        self.node.get_logger().info('test_service_caller_raises_proxy_availability_error - OK! ')
+
+    def test_service_caller_sync_request_type_reload(self):
+        """Test synchronous service conversion for reloaded request class."""
+        self.node.get_logger().info('test_service_caller_sync_request_type_reload ...')
+        topic = '/service_reload'
+
+        def server_callback(request, response):
+            response.success = True
+            response.message = 'ok'
+            return response
+
+        self.node.create_service(Trigger, topic, server_callback)
+        ProxyServiceCaller.initialize(self.node)
+        srv = ProxyServiceCaller({topic: Trigger}, wait_duration=1.0)
+        self._spin_until(lambda: srv.is_available(topic, wait_duration=0.01),
+                         timeout_sec=3.0,
+                         message='Service did not become available for reload request test')
+
+        base_req = Trigger.Request()
+        reloaded_request_name = Trigger.Request.__name__
+        ReloadedRequest = type(reloaded_request_name, (), {'__slots__': list(base_req.__slots__)})
+        request = ReloadedRequest()
+        for attr in base_req.__slots__:
+            setattr(request, attr, getattr(base_req, attr))
+
+        srv.call_async(topic, request, wait_duration=1.0)
+        self._spin_until(lambda: srv.done(topic),
+                         timeout_sec=3.0,
+                         message='Service result did not complete for reload request test')
+        response = srv.result(topic)
+        self.assertIsNotNone(response)
+        self.assertTrue(response.success)
+        self.assertEqual(response.message, 'ok')
+        self.node.get_logger().info('test_service_caller_sync_request_type_reload - OK! ')
+
     def test_action_client(self):
         """Test action client."""
         self.node.get_logger().info('test_action_client ...')
@@ -267,7 +333,7 @@ class TestProxies(unittest.TestCase):
         topic1 = '/action_1'
 
         def execute_cb(goal_handle):
-            time.sleep(TestProxies.__TIME_SLEEP)
+            time.sleep(max(TestProxies.__TIME_SLEEP, 0.05))
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 return BehaviorExecution.Result()
@@ -289,12 +355,11 @@ class TestProxies(unittest.TestCase):
         status = client.get_status(topic1)
         self.node.get_logger().info(f'validate action client - check status after goal sent = {status} ')
 
-        end_time = time.time() + 10
-        while time.time() < end_time and not client.has_result(topic1):
-            status = client.get_status(topic1)
-            # self.node.get_logger().info(f'   get status = {status} ')
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
-            self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
+        self._spin_until(lambda: client.has_result(topic1)
+                         and client.get_result(topic1).outcome == 'ok'
+                         and not client.is_active(topic1),
+                         timeout_sec=3.0,
+                         message='First action result did not arrive')
 
         self.assertTrue(client.has_result(topic1))
 
@@ -316,11 +381,11 @@ class TestProxies(unittest.TestCase):
         self.node.get_logger().info(f'   check status after sending goal 2 = {status} ')
 
         # end_time = time.time() + 2
-        while not client.has_result(topic1):
-            rclpy.spin_once(self.node, executor=self.executor, timeout_sec=TestProxies.__EXECUTE_TIMEOUT_SEC)
-            self.assertTrue(client.is_active(topic1) or client.has_result(topic1))
-            status = client.get_status(topic1)
-            # self.node.get_logger().info(f'   check status = {status} ')
+        self._spin_until(lambda: client.has_result(topic1)
+                         and client.get_result(topic1).outcome == 'ok'
+                         and not client.is_active(topic1),
+                         timeout_sec=3.0,
+                         message='Second action result did not arrive')
 
         self.assertFalse(client.is_active(topic1))
 
@@ -346,6 +411,50 @@ class TestProxies(unittest.TestCase):
         self.assertFalse(client.is_available('/invalid'))
         self.node.get_logger().info('test_action_client - OK! ')
         del server  # Through with instance, and explicitly calling del() to avoid unused warning
+
+    def test_action_client_raises_proxy_availability_error(self):
+        """Test unavailable action server raises typed proxy availability exception."""
+        self.node.get_logger().info('test_action_client_raises_proxy_availability_error ...')
+        ProxyActionClient.initialize(self.node)
+        topic = '/action_missing'
+        client = ProxyActionClient({topic: BehaviorExecution}, wait_duration=.01)
+        with self.assertRaises(ProxyAvailabilityError):
+            client.send_goal(topic, BehaviorExecution.Goal(), wait_duration=.01)
+        self.node.get_logger().info('test_action_client_raises_proxy_availability_error - OK! ')
+
+    def test_action_client_goal_type_reload(self):
+        """Test send_goal conversion for a reloaded action goal class."""
+        self.node.get_logger().info('test_action_client_goal_type_reload ...')
+        topic = '/action_reload'
+
+        def execute_cb(goal_handle):
+            goal_handle.succeed()
+            result = BehaviorExecution.Result()
+            result.outcome = 'ok'
+            return result
+
+        server = ActionServer(self.node, BehaviorExecution, topic, execute_cb)
+        ProxyActionClient.initialize(self.node)
+        client = ProxyActionClient({topic: BehaviorExecution}, wait_duration=1.0)
+        self._spin_until(lambda: client.is_available(topic), timeout_sec=3.0,
+                         message='Action server did not become available for reload goal test')
+
+        base_goal = BehaviorExecution.Goal()
+        reloaded_goal_name = BehaviorExecution.Goal.__name__
+        ReloadedGoal = type(reloaded_goal_name, (), {'__slots__': list(base_goal.__slots__)})
+        goal = ReloadedGoal()
+        for attr in base_goal.__slots__:
+            setattr(goal, attr, getattr(base_goal, attr))
+
+        client.send_goal(topic, goal, wait_duration=1.0)
+        self._spin_until(lambda: client.has_result(topic), timeout_sec=5.0,
+                         message='Action result not received for reload goal test')
+
+        result = client.get_result(topic)
+        self.assertEqual(result.outcome, 'ok')
+        self.assertEqual(client.get_status(topic), GoalStatus.STATUS_SUCCEEDED)
+        self.node.get_logger().info('test_action_client_goal_type_reload - OK! ')
+        del server
 
 
 if __name__ == '__main__':
