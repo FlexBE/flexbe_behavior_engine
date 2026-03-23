@@ -58,7 +58,13 @@ def generate_launch_description():
                 'log_folder': LaunchConfiguration('log_folder')
             }.items()
         ),
-        Node(package='flexbe_mirror', executable='behavior_mirror_sm', name='behavior_mirror'),
+        Node(package='flexbe_mirror',
+             executable='behavior_mirror_sm',
+             name='behavior_mirror',
+             parameters=[{
+                 'mirror_wait_timeout_sec': 2.0,
+                 'mirror_wait_poll_sec': 0.002
+             }]),
         Node(
             package='flexbe_widget', executable='be_action_server', output='screen',
             name='behavior_action_server')

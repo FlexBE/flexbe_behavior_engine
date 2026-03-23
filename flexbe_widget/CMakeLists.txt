@@ -6,9 +6,7 @@ find_package(ament_cmake_python REQUIRED)
 
 install(PROGRAMS
     bin/be_action_server
-    bin/be_compress
     bin/be_launcher
-    bin/breakpoint
     bin/create_repo
     bin/evaluate_logs
     bin/flexbe_status_listener

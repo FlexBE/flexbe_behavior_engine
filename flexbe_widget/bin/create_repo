@@ -1,9 +1,9 @@
 #!/bin/bash
 if [ $# -lt 1 ]; then
   echo -e "\e[93mPlease provide your desired project name as argument.\033[0m"
-  echo -e "\e[93m  Usage: ros2 run flexbe_widget create_repo <project name> [meta_package_name] [--non-interactive]
+  echo -e "\e[93m  Usage: ros2 run flexbe_widget create_repo <project name> [meta_package_name] [--non-interactive]"
   echo -e ""
-  echo -e "  By default the script will use the <project name> as the [meta_package_name]
+  echo -e "  By default the script will use the <project name> as the [meta_package_name]"
   exit 2
 fi
 

@@ -1,28 +1,6 @@
-#!/bin/bash
-if "true" : '''\'
-then
-python${ROS_PYTHON_VERSION:-} "${BASH_SOURCE[0]}" $*
-exit
-fi
-'''
-# flake8: noqa
-import rclpy
-from flexbe_widget.behavior_action_server import BehaviorActionServer
-from rclpy.executors import MultiThreadedExecutor
+#!/usr/bin/env python3
 
-def main(args=None):
-    rclpy.init(args=args)
-    executor = MultiThreadedExecutor()
-
-    node = rclpy.create_node('flexbe_action_server')
-
-    server = BehaviorActionServer(node)
-    executor.add_node(node)
-
-    # Wait for ctrl-c to stop the application
-    executor.spin()
-    node.destroy_node()
-    rclpy.shutdown()
+from flexbe_widget.behavior_action_server import main
 
 if __name__ == '__main__':
     main()

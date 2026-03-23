@@ -16,12 +16,13 @@
     <url type="website">http://ros.org/wiki/flexbe_core</url>
     <url type="bugtracker">https://github.com/FlexBE/flexbe_behavior_engine/issues</url>
 
-    <depend>rclpy</depend>
     <depend>flexbe_core</depend>
-    <depend>flexbe_msgs</depend>
     <depend>flexbe_mirror</depend>
+    <depend>flexbe_msgs</depend>
     <depend>flexbe_onboard</depend>
     <depend>launch_ros</depend>
+    <depend>rclpy</depend>
+    <depend>std_msgs</depend>
 
     <test_depend>ament_copyright</test_depend>
     <test_depend>ament_flake8</test_depend>

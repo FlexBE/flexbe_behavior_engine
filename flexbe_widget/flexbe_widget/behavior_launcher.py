@@ -43,7 +43,7 @@ from flexbe_core import BehaviorLibrary, Logger, MIN_UI_VERSION
 from flexbe_core.core import StateMap
 from flexbe_core.core.topics import Topics
 
-from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorRequest
+from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorRequest, CommandFeedback
 from flexbe_msgs.msg import BehaviorSelection, BehaviorSync
 from flexbe_msgs.msg import ContainerStructure
 from flexbe_msgs.msg import StateMapMsg
@@ -54,7 +54,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 
 from rosidl_runtime_py import get_interface_path
 
-from std_msgs.msg import Int32, String
+from std_msgs.msg import Empty, Int32, String
 
 import yaml
 
@@ -68,17 +68,25 @@ class BehaviorLauncher(Node):
         super().__init__('flexbe_widget')
 
         self._ready_event = threading.Event()
+        # Retain enough latched lifecycle history for reconnecting consumers to see
+        # FINISHED/STOPPED/READY/STARTED/RUNNING across rapid transitions.
+        status_qos = QoSProfile(depth=20, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
 
         self._sub = self.create_subscription(BehaviorRequest, Topics._REQUEST_BEHAVIOR_TOPIC, self._request_callback, 100)
         self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC, self._version_callback, 1)
-        self._status_sub = self.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC, self._status_callback, 100)
+        self._status_sub = self.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC,
+                                                    self._status_callback, qos_profile=status_qos)
         self._onboard_heartbeat_sub = self.create_subscription(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC,
                                                                self._onboard_heartbeat_callback, 10)
 
         self._pub = self.create_publisher(BehaviorSelection, Topics._START_BEHAVIOR_TOPIC, 100)
-        self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, 100)
+        self._command_feedback_pub = self.create_publisher(CommandFeedback, Topics._CMD_FEEDBACK_TOPIC, 10)
+        self._status_pub = self.create_publisher(BEStatus, Topics._ONBOARD_STATUS_TOPIC, qos_profile=status_qos)
         self._mirror_pub = self.create_publisher(ContainerStructure, Topics._MIRROR_STRUCTURE_TOPIC, 100)
         self._heartbeat_pub = self.create_publisher(Int32, Topics._LAUNCHER_HEARTBEAT_TOPIC, 2)
+        self._cmd_preempt_pub = self.create_publisher(Empty, Topics._CMD_PREEMPT_TOPIC, 10)
+
+        self._behavior_running = False
 
         # Latch state map so we can retrieve later if desired
         latching_qos = QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
@@ -102,11 +110,11 @@ class BehaviorLauncher(Node):
         self._heartbeat_pub.publish(Int32(data=self.get_clock().now().seconds_nanoseconds()[0]))
 
         if self._last_onboard_heartbeat is None:
-            self.get_logger().warn('Behavior Launcher has NOT received update from onboard behavior engine!')
+            self.get_logger().warning('Behavior Launcher has NOT received update from onboard behavior engine!')
         else:
             elapsed = self.get_clock().now() - self._last_onboard_heartbeat
             if elapsed.nanoseconds > 2e9:
-                self.get_logger().warn('Behavior Launcher is NOT receiving updates from onboard behavior engine!')
+                self.get_logger().warning('Behavior Launcher is NOT receiving updates from onboard behavior engine!')
                 self._last_onboard_heartbeat = None
 
     def _onboard_heartbeat_callback(self, msg):
@@ -115,26 +123,53 @@ class BehaviorLauncher(Node):
         self._last_heartbeat_msg = msg
 
     def _status_callback(self, msg):
-        if msg.code in [BEStatus.READY, BEStatus.FINISHED, BEStatus.FAILED, BEStatus.ERROR, BEStatus.RUNNING, BEStatus.STARTED]:
+        if msg.code == BEStatus.SWITCHING:
+            self.get_logger().info(f'BE status code={msg.code} received - block new requests during switch')
+            self._behavior_running = True
+            self._ready_event.clear()
+        elif msg.code in [BEStatus.READY, BEStatus.STARTED, BEStatus.RUNNING]:
             self.get_logger().info(f'BE status code={msg.code} received - READY for new behavior!')
+            self._behavior_running = msg.code in [BEStatus.STARTED, BEStatus.RUNNING]
             self._ready_event.set()
+        elif msg.code in [BEStatus.FINISHED, BEStatus.FAILED, BEStatus.ERROR, BEStatus.STOPPED]:
+            self.get_logger().info(f'BE status code={msg.code} received - waiting for READY after cleanup')
+            self._behavior_running = False
+            self._ready_event.clear()
         else:
             self.get_logger().info(f'BE status code={msg.code} received ')
+
+    def send_stop_behavior(self):
+        """Publish preempt command if a behavior is currently running."""
+        if self._behavior_running:
+            self.get_logger().info('Sending preempt to stop running behavior before shutdown ...')
+            self._cmd_preempt_pub.publish(Empty())
+            return True
+        return False
 
     def _request_callback(self, msg):
         """Process request in separate thread to avoid blocking callbacks."""
         if not self._ready_event.is_set():
             Logger.logerr('Behavior engine is not ready - cannot process start request!')
+            self._publish_launch_feedback('blocked', 'not_ready')
         else:
             # Not waiting in process request, so safe to not block callback
             self._process_request(msg)
+
+    def _publish_launch_feedback(self, event, reason):
+        """Publish launcher-local feedback for requests rejected before reaching onboard."""
+        self._command_feedback_pub.publish(CommandFeedback(command='launch', args=[event, reason]))
+
+    def _reject_launch(self, reason, message):
+        """Reject a launcher request before it reaches onboard without publishing synthetic BE status."""
+        self.get_logger().error(message)
+        self._publish_launch_feedback('blocked', reason)
 
     def _process_request(self, msg):
         self.get_logger().info(f"Got message from request behavior for '{msg.behavior_name}'")
         be_key, behavior = self._behavior_lib.find_behavior(msg.behavior_name)
         if be_key is None:
-            self.get_logger().error("Did not find behavior with requested name: '%s'" % msg.behavior_name)
-            self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
+            self._reject_launch('behavior_not_found',
+                                "Did not find behavior with requested name: '%s'" % msg.behavior_name)
             return
 
         self.get_logger().info(f"""Processing request using behavior '{behavior["name"]}' """
@@ -143,10 +178,15 @@ class BehaviorLauncher(Node):
         be_selection = BehaviorSelection()
         be_selection.behavior_key = be_key
         be_selection.autonomy_level = msg.autonomy_level
+        if len(msg.arg_keys) != len(msg.arg_values):
+            self._reject_launch('arg_mismatch',
+                                'Invalid behavior request: arg_keys and arg_values length mismatch '
+                                f'({len(msg.arg_keys)} != {len(msg.arg_values)})')
+            return
         try:
             for k, v in zip(msg.arg_keys, msg.arg_values):
                 if k.startswith('/YAML:'):
-                    key = k.replace('/YAML:', '/', 1)
+                    key = k.replace('/YAML:', '', 1)
                     path = v.split(':')[0]
                     ns = v.split(':')[1]
                     if path.startswith('~') or path.startswith('/'):
@@ -154,17 +194,17 @@ class BehaviorLauncher(Node):
                     else:
                         yamlpath = os.path.join(get_interface_path(path.split('/')[0]), '/'.join(path.split('/')[1:]))
                     with open(yamlpath, 'r') as f:
-                        content = getattr(yaml, 'unsafe_load', yaml.load)(f)
+                        content = yaml.safe_load(f)
                     if ns != '' and ns in content:
                         content = content[ns]
                     be_selection.arg_keys.append(key)
-                    be_selection.arg_values.append(yaml.dump(content))
+                    be_selection.arg_values.append(yaml.safe_dump(content, sort_keys=False))
                 else:
                     be_selection.arg_keys.append(k)
                     be_selection.arg_values.append(v)
         except Exception as exc:  # noqa: B902
-            self.get_logger().warn('Failed to parse and substitute behavior arguments, '
-                                   f'will use direct input.\n {type(exc)} - {str(exc)}')
+            self.get_logger().warning('Failed to parse and substitute behavior arguments, '
+                                      f'will use direct input.\n {type(exc)} - {str(exc)}')
             be_selection.arg_keys = msg.arg_keys
             be_selection.arg_values = msg.arg_values
 
@@ -176,17 +216,17 @@ class BehaviorLauncher(Node):
                 state_map.add_state(container.path, container)
             self.get_logger().info(f'Built Statemachine {state_map}')
         except Exception as exc:  # noqa: B902
-            self.get_logger().info(f"Failed to build state map for container {behavior['name']} ")
-            self.get_logger().info(f'{exc}')
+            self._reject_launch('invalid_structure',
+                                f"Failed to build state map for container {behavior['name']}: {exc}")
             self.get_logger().info(f'{state_map}')
-            raise exc
+            return
 
         try:
             be_filepath_new = self._behavior_lib.get_sourcecode_filepath(be_key)
         except Exception:  # pylint: disable=W0703 # noqa: B902
-            self.get_logger().error("Could not find behavior package '%s'" % (behavior['package']))
+            self._reject_launch('package_not_found',
+                                "Could not find behavior package '%s'" % (behavior['package']))
             self.get_logger().info('Have you built and updated your setup after creating the behavior?')
-            self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(), code=BEStatus.ERROR))
             return
 
         with open(be_filepath_new, 'r') as f:
@@ -196,10 +236,9 @@ class BehaviorLauncher(Node):
         be_filepath_old = self._behavior_lib.get_sourcecode_filepath(be_key, add_tmp=True)
         if not os.path.isfile(be_filepath_old):
             be_selection.behavior_id = zlib.adler32(be_content_new.encode()) & 0x7fffffff
-            if msg.autonomy_level != 255:
-                be_structure.behavior_id = be_selection.behavior_id
-                # self.get_logger().info(f'BELauncher: request_callback publish structure : {be_structure}')
-                self._mirror_pub.publish(be_structure)
+            be_structure.behavior_id = be_selection.behavior_id
+            # self.get_logger().info(f'BELauncher: request_callback publish structure : {be_structure}')
+            self._mirror_pub.publish(be_structure)
             self._ready_event.clear()  # require a new ready signal after publishing
             self._pub.publish(be_selection)
             self.get_logger().info('No changes to behavior version - restart')
@@ -226,11 +265,10 @@ class BehaviorLauncher(Node):
             self._state_map_pub.publish(state_map_msg)  # Used by the WebUI
 
         except Exception as exc:  # noqa: B902
-            self.get_logger().warn(f'Failed to publish state map from launcher!\n{exc}')
+            self.get_logger().warning(f'Failed to publish state map from launcher!\n{exc}')
 
-        if msg.autonomy_level != 255:
-            be_structure.behavior_id = be_selection.behavior_id
-            self._mirror_pub.publish(be_structure)
+        be_structure.behavior_id = be_selection.behavior_id
+        self._mirror_pub.publish(be_structure)
 
         self._ready_event.clear()  # Force a new ready message before processing
         self._pub.publish(be_selection)
@@ -265,6 +303,8 @@ def behavior_launcher_main():
     parser.add_argument('-b', '--behavior', type=str, help='Specify the behavior to launch')
     parser.add_argument('-a', '--autonomy', type=int, default=255, help='Specify the autonomy level')
     parser.add_argument('-s', '--autostart', action='store_true', help='Automatically start the behavior on heartbeat')
+    parser.add_argument('-x', '--no-autostop', action='store_true',
+                        help='Do not stop the running behavior on shutdown (default: stop on exit)')
 
     try:
         stop_index = len(sys.argv)
@@ -287,6 +327,7 @@ def behavior_launcher_main():
     behavior = args.behavior if args.behavior else ''
     autonomy = args.autonomy
     auto_start = args.autostart
+    auto_stop = not args.no_autostop
 
     print(f"Behavior launcher with behavior'{behavior}' autonomy={autonomy} auto_start={auto_start}\n"
           f"    behavior args='{behavior_args}'\n    node_args='{node_args}'", flush=True)
@@ -366,7 +407,16 @@ def behavior_launcher_main():
         print('Start behavior_launcher spinner ...', flush=True)
         executor.spin()
     except KeyboardInterrupt:
-        print(f'Keyboard interrupt request  at {datetime.now()} - ! Shut the behavior launcher down!', flush=True)
+        print(f'Keyboard interrupt at {datetime.now()} - shutting down behavior launcher!', flush=True)
+        if auto_stop and launcher.send_stop_behavior():
+            print('Waiting for behavior to stop ...', flush=True)
+            deadline_ns = launcher.get_clock().now().nanoseconds + int(5e9)
+            while launcher._behavior_running and launcher.get_clock().now().nanoseconds < deadline_ns:
+                executor.spin_once(timeout_sec=0.1)
+            if launcher._behavior_running:
+                print('Warning: behavior did not confirm stop within timeout.', flush=True)
+            else:
+                print('Behavior stopped.', flush=True)
     except Exception as exc:  # noqa: B902
         print(f'Exception in executor       at {datetime.now()} - ! {type(exc)}\n  {exc}', flush=True)
         import traceback
@@ -375,6 +425,7 @@ def behavior_launcher_main():
     try:
         launcher.destroy_node()
     except Exception as exc:  # pylint: disable=W0703 # noqa: B902
+        import traceback
         print(f'Exception from destroy behavior launcher node at {datetime.now()}: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
@@ -382,6 +433,7 @@ def behavior_launcher_main():
     try:
         rclpy.try_shutdown()
     except Exception as exc:  # pylint: disable=W0703 # noqa: B902
+        import traceback
         print(f'Exception from rclpy.try_shutdown for behavior launcher: {type(exc)}\n{exc}', flush=True)
         print(f"{traceback.format_exc().replace('%', '%%')}", flush=True)
 
