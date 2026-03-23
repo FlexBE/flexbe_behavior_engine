@@ -391,10 +391,13 @@ class FlexbeOnboard(Node):
                 result = be.execute()
 
                 Logger.localinfo(f'Behavior Engine - {be.name}: {be.beh_id} done execute with result={result}')
-                self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
-                                                  behavior_id=be.beh_id,
-                                                  code=BEStatus.FINISHED,
-                                                  args=[str(result)]))
+                try:
+                    self._status_pub.publish(BEStatus(stamp=self.get_clock().now().to_msg(),
+                                                      behavior_id=be.beh_id,
+                                                      code=BEStatus.FINISHED,
+                                                      args=[str(result)]))
+                except (InvalidHandle, RuntimeError):
+                    pass  # Publisher destroyed during teardown; behavior did finish successfully.
             except (BehaviorLoadError, ProxyError, ShutdownError, SyncError, TransitionError) as exc:
                 result = self._report_execution_failure(exc, result)
             except Exception as exc:
@@ -752,8 +755,11 @@ class FlexbeOnboard(Node):
 
     def _publish_ready_status(self):
         """Publish the cached READY status message with a refreshed timestamp."""
-        self._ready_status.stamp = self.get_clock().now().to_msg()
-        self._status_pub.publish(self._ready_status)  # Publish regardless of subscribers for latched
+        try:
+            self._ready_status.stamp = self.get_clock().now().to_msg()
+            self._status_pub.publish(self._ready_status)  # Publish regardless of subscribers for latched
+        except (InvalidHandle, RuntimeError):
+            pass  # Publisher destroyed during teardown.
 
     @staticmethod
     def _get_switch_leaf_states(active_states):
