@@ -1038,7 +1038,12 @@ class FlexbeMirror(Node):
                 self._timing_event.clear()
                 if not self._running:
                     break
-                self._timing_event.wait(polling_sec)  # Prefer state-change wakeups and fall back to timeout.
+                # Release lock while waiting so _execute_mirror's finally block can acquire it to clear _running.
+                self._sync_lock.release()
+                try:
+                    self._timing_event.wait(polling_sec)  # Prefer state-change wakeups and fall back to timeout.
+                finally:
+                    self._sync_lock.acquire()
             Logger.localinfo(f'Mirror for active id {self._active_id} stopped running (start thread {self._active_thread_start}) '
                              f' ({running_cnt}) (this {self.get_elapsed_str(start_time)})')
             Logger.loginfo('Mirror stopped running!')
@@ -1078,7 +1083,12 @@ class FlexbeMirror(Node):
                 self._timing_event.clear()
                 if not self._stopping:
                     break
-                self._timing_event.wait(polling_sec)  # Prefer state-change wakeups and fall back to timeout.
+                # Release lock while waiting so threads clearing _stopping can acquire it without deadlock.
+                self._sync_lock.release()
+                try:
+                    self._timing_event.wait(polling_sec)  # Prefer state-change wakeups and fall back to timeout.
+                finally:
+                    self._sync_lock.acquire()
             Logger.localinfo(f'Mirror completed stopping for active id {self._active_id} '
                              f' ({self._starting}, {self._running}, {self._stopping})'
                              f' (this {self.get_elapsed_str(start_time)}) ({stopping_cnt})!')
