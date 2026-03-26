@@ -246,18 +246,28 @@ class StateMachine(State):
 
         @return: Tuple of active states and containers along the current path.
         """
-        if self._deep_states_list_cache is not None and self._deep_states_cache_key is self._current_state:
-            return self._deep_states_list_cache
-
         if isinstance(self._current_state, StateMachine):
+            # Use the child's get_deep_states() result tuple as the cache key, not the child
+            # object identity.  ConcurrencyContainer's active path can change (e.g. when a
+            # PriorityContainer sibling completes) without the CC object itself changing, so
+            # keying on the child object would leave this level stale for the entire Normal_Work
+            # phase after Priority_Work exits.  Keying on the child's result tuple means a cache
+            # miss as soon as the child produces a new tuple.
+            child_deep = self._current_state.get_deep_states()
+            if self._deep_states_list_cache is not None and self._deep_states_cache_key is child_deep:
+                return self._deep_states_list_cache
             deep_states = [self]
-            deep_states.extend(self._current_state.get_deep_states())
+            deep_states.extend(child_deep)
+            self._deep_states_list_cache = tuple(deep_states)
+            self._deep_states_cache_key = child_deep
         else:
-            # Base case is current_state is not a state machine
+            # Base case: current_state is a leaf state — object identity is a stable key.
+            if self._deep_states_list_cache is not None and self._deep_states_cache_key is self._current_state:
+                return self._deep_states_list_cache
             deep_states = [self, self._current_state] if self._current_state is not None else [self]
+            self._deep_states_list_cache = tuple(deep_states)
+            self._deep_states_cache_key = self._current_state
 
-        self._deep_states_list_cache = tuple(deep_states)
-        self._deep_states_cache_key = self._current_state
         return self._deep_states_list_cache
 
     # consistency checks

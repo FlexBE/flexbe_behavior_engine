@@ -60,6 +60,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import Empty, Int32, String, UInt32
 
 from .mirror_concurrency_container import MirrorConcurrencyContainer
+from .mirror_priority_container import MirrorPriorityContainer
 from .mirror_state import MirrorState
 from .mirror_state_machine import MirrorStateMachine
 
@@ -779,14 +780,17 @@ class FlexbeMirror(Node):
                         self._pending_start_behavior_id = queued_start_behavior_id
                         self._pending_start_args = list(queued_start_args)
 
-                try:
-                    self._sm.destroy()
-                except Exception as exc:  # pylint: disable=W0703
-                    # Keep mirror teardown progressing even if state-machine destroy fails.
-                    self._log_exception('Mirror state-machine destroy failure during stop',
-                                        exc,
-                                        start_time=start_time,
-                                        default_status=BEStatus.WARNING)
+                # _execute_mirror may have completed naturally and already destroyed self._sm
+                # while _sync_lock was released inside _wait_stop_running; re-check before destroy.
+                if self._sm is not None:
+                    try:
+                        self._sm.destroy()
+                    except Exception as exc:  # pylint: disable=W0703
+                        # Keep mirror teardown progressing even if state-machine destroy fails.
+                        self._log_exception('Mirror state-machine destroy failure during stop',
+                                            exc,
+                                            start_time=start_time,
+                                            default_status=BEStatus.WARNING)
 
             elif self._sm is not None:
                 # SM was built (structure arrived) but STARTED never came before the stop.
@@ -1394,6 +1398,8 @@ class FlexbeMirror(Node):
                 sm_outcomes.append(outcome + '_mirror')
             if container.type == OperatableStateMachine.ContainerType.ConcurrencyContainer.value:
                 sm = MirrorConcurrencyContainer(container_name, path, outcomes=sm_outcomes)
+            elif container.type == OperatableStateMachine.ContainerType.PriorityContainer.value:
+                sm = MirrorPriorityContainer(container_name, path, outcomes=sm_outcomes)
             else:
                 sm = MirrorStateMachine(container_name, path, outcomes=sm_outcomes)
 
