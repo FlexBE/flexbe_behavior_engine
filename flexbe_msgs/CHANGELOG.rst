@@ -2,6 +2,11 @@
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.1 (2026-03-25)
+------------------
+* bump version to 4.1.0
+* flexbe_msgs: add BEStatus fields and clean up CMakeLists
+
 4.0.3 (2025-11-10)
 ------------------
 

@@ -2,6 +2,14 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.1 (2026-03-25)
+------------------
+* fix deadlock issue in mirror
+* modify handling of PriorityContainer
+* add test coverage across all packages
+* bump version to 4.1.0
+* flexbe_mirror: attach, autonomy level, and error path improvements
+
 4.0.3 (2025-11-10)
 ------------------
 

@@ -2,6 +2,12 @@
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.1 (2026-03-25)
+------------------
+* add test coverage across all packages
+* bump version to 4.1.0
+* flexbe_testing: framework improvements and profiler tools
+
 4.0.3 (2025-11-10)
 ------------------
 * correct 4.0.2 version in setup.py

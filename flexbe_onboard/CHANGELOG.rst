@@ -2,6 +2,12 @@
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.1 (2026-03-25)
+------------------
+* add test coverage across all packages
+* bump version to 4.1.0
+* flexbe_onboard: behavior lifecycle and start_behavior improvements
+
 4.0.3 (2025-11-10)
 ------------------
 

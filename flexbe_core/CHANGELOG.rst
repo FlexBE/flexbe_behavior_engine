@@ -2,6 +2,14 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.1 (2026-03-25)
+------------------
+* modify handling of PriorityContainer
+* flexbe_core: add and extend test coverage
+* bump version to 4.1.0
+* flexbe_core: add ErrorStatus class for structured error handling
+* flexbe_core: state machine, proxy layer, and logger improvements
+
 4.0.3 (2025-11-10)
 ------------------
 * fix missing python3 in shebang
