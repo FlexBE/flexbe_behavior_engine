@@ -65,7 +65,7 @@ class BehaviorLauncher(Node):
     def __init__(self):
         """Initialize BehaviorLauncher instance."""
         # Initiate the Node class's constructor and give it a name.
-        super().__init__('flexbe_widget')
+        super().__init__('flexbe_behavior_launcher')
 
         self._ready_event = threading.Event()
         # Retain enough latched lifecycle history for reconnecting consumers to see
