@@ -30,6 +30,8 @@
 
 
 """This defines the superclass for all implemented behaviors."""
+from ast import literal_eval
+
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine, PreemptableState, StateMachine, StateMap
 from flexbe_core.logger import Logger
 
@@ -308,6 +310,21 @@ class Behavior:
             elif isinstance(attr, dict):
                 import yaml  # pylint: disable=C0415
                 value = yaml.safe_load(value)
+            elif isinstance(attr, tuple):
+                if isinstance(value, str):
+                    parsed = literal_eval(value)
+                    value = tuple(parsed if isinstance(parsed, (list, tuple)) else [parsed])
+                else:
+                    value = tuple(value)
+            elif isinstance(attr, list):
+                if isinstance(value, str):
+                    parsed = literal_eval(value)
+                    value = list(parsed if isinstance(parsed, (list, tuple)) else [parsed])
+                else:
+                    value = list(value)
+            else:
+                Logger.logwarn(f"Unsupported parameter type {type(attr)} for parameter '{name}'."
+                               f" Using value {value} ({type(value)}) as is.")
         setattr(self, name, value)
 
     def set_up(self, beh_id, autonomy_level, debug):
