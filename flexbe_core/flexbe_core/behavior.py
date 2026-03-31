@@ -323,8 +323,8 @@ class Behavior:
                 else:
                     value = list(value)
             else:
-                Logger.logwarn(f"Unsupported parameter type {type(attr)} for parameter '{name}'."
-                               f" Using value {value} ({type(value)}) as is.")
+                Logger.logwarn(f'Unsupported parameter type {type(attr)} for parameter '
+                               f"'{name}'. Using value {value} ({type(value)}) as is.")
         setattr(self, name, value)
 
     def set_up(self, beh_id, autonomy_level, debug):
