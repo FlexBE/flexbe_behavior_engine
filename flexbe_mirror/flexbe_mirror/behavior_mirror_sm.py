@@ -35,6 +35,20 @@ from flexbe_core.proxy import shutdown_proxies
 from flexbe_mirror.flexbe_mirror import FlexbeMirror
 
 import rclpy
+from rclpy._rclpy_pybind11 import InvalidHandle
+from rclpy.executors import ExternalShutdownException
+
+
+def _spin_cleanup(executor, iterations, context, timeout_sec=0.001):
+    """Drain executor work until cleanup completes or ROS starts tearing handles down."""
+    for _ in range(iterations):
+        try:
+            executor.spin_once(timeout_sec=timeout_sec)
+        except (ExternalShutdownException, InvalidHandle) as exc:
+            print(f'Executor cleanup interrupted during {context} at {datetime.now()} - '
+                  f'{type(exc).__name__}: {exc}', flush=True)
+            return False
+    return True
 
 
 def main(args=None):
@@ -54,6 +68,9 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         print(f'Keyboard interrupt at {datetime.now()} ! Shut the behavior mirror down!', flush=True)
+    except (ExternalShutdownException, InvalidHandle) as exc:
+        print(f'Behavior mirror executor stopped during shutdown at {datetime.now()} - '
+              f'{type(exc).__name__}: {exc}', flush=True)
     except Exception as exc:
         print(f"Exception in mirror executor! '{type(exc)}'\n  {exc}", flush=True)
         import traceback
@@ -65,8 +82,7 @@ def main(args=None):
             print(f'Mirror shutdown at {datetime.now()} ...', flush=True)
         else:
             # Last call for clean up of any stray communications and try again
-            for _ in range(100):
-                executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+            _spin_cleanup(executor, 100, 'mirror shutdown')
             if mirror.shutdown_mirror():
                 print(f'Mirror shutdown at {datetime.now()} ...', flush=True)
 
@@ -79,12 +95,10 @@ def main(args=None):
         print(f'Shutdown proxies requested  at {datetime.now()} ...', flush=True)
         shutdown_proxies()
 
-        # Last call for clean up of any stray communications
-        for _ in range(100):
-            executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
-
         print(f'Mirror proxy  shutdown completed  at {datetime.now()} ...', flush=True)
+        executor.remove_node(mirror)
         mirror.destroy_node()
+        executor.shutdown()
     except Exception as exc:
         print(f"Exception in behavior mirror node shutdown! '{type(exc)}'\n  {exc}", flush=True)
         import traceback

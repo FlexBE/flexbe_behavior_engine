@@ -2670,6 +2670,8 @@ class TestMirrorErrorPaths(unittest.TestCase):
 
             def __init__(self):
                 self.node = None
+                self.removed_nodes = []
+                self.shutdown_calls = 0
 
             def add_node(self, node):
                 self.node = node
@@ -2679,6 +2681,12 @@ class TestMirrorErrorPaths(unittest.TestCase):
 
             def spin_once(self, timeout_sec=0.0):
                 spin_once_calls.append(timeout_sec)
+
+            def remove_node(self, node):
+                self.removed_nodes.append(node)
+
+            def shutdown(self):
+                self.shutdown_calls += 1
 
         executor = _Executor()
 
@@ -2699,15 +2707,57 @@ class TestMirrorErrorPaths(unittest.TestCase):
             'signal_handler_options': behavior_mirror_sm.rclpy.signals.SignalHandlerOptions.NO,
         }], init_calls)
         self.assertIs(executor.node, mirror)
+        self.assertEqual([mirror], executor.removed_nodes)
+        self.assertEqual(1, executor.shutdown_calls)
         self.assertEqual(['Begin behavior mirror processing ...'], log_messages)
         self.assertEqual(['destroyed'], destroy_calls)
         self.assertEqual([True], try_shutdown_calls)
-        self.assertEqual([0.001] * 100, spin_once_calls)
+        self.assertEqual([], spin_once_calls)
         shutdown_proxies.assert_called_once()
 
         printed = '\n'.join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
         self.assertIn('Keyboard interrupt', printed)
         self.assertIn('Done with behavior mirror', printed)
+
+    def test_behavior_mirror_main_treats_invalid_handle_as_shutdown(self):
+        """Destroy-request InvalidHandle from executor.spin should not be reported as a crash."""
+        mirror = types.SimpleNamespace(
+            get_logger=lambda: types.SimpleNamespace(info=self._noop),
+            shutdown_mirror=lambda: True,
+            destroy_node=self._noop,
+        )
+
+        class _Executor:
+
+            def __init__(self):
+                self.removed_nodes = []
+                self.shutdown_calls = 0
+
+            def add_node(self, _node):
+                return None
+
+            def spin(self):
+                raise behavior_mirror_sm.InvalidHandle('destruction was requested')
+
+            def remove_node(self, node):
+                self.removed_nodes.append(node)
+
+            def shutdown(self):
+                self.shutdown_calls += 1
+
+        with patch.object(behavior_mirror_sm.rclpy, 'init'), \
+                patch.object(behavior_mirror_sm.rclpy.executors,
+                             'SingleThreadedExecutor',
+                             return_value=_Executor()), \
+                patch.object(behavior_mirror_sm, 'FlexbeMirror', return_value=mirror), \
+                patch.object(behavior_mirror_sm, 'shutdown_proxies'), \
+                patch.object(behavior_mirror_sm.rclpy, 'try_shutdown'), \
+                patch('builtins.print') as print_mock:
+            behavior_mirror_sm.main()
+
+        printed = '\n'.join(str(call.args[0]) for call in print_mock.call_args_list if call.args)
+        self.assertIn('Behavior mirror executor stopped during shutdown', printed)
+        self.assertNotIn('Exception in mirror executor!', printed)
 
     def test_behavior_mirror_main_retries_shutdown_and_logs_exceptions(self):
         """Behavior mirror main should retry shutdown and log executor or proxy teardown failures."""

@@ -37,6 +37,20 @@ from flexbe_core.proxy import shutdown_proxies
 from flexbe_onboard.flexbe_onboard import FlexbeOnboard
 
 import rclpy
+from rclpy._rclpy_pybind11 import InvalidHandle
+from rclpy.executors import ExternalShutdownException
+
+
+def _spin_cleanup(executor, iterations, context, timeout_sec=0.001):
+    """Drain executor work until cleanup completes or ROS starts tearing handles down."""
+    for _ in range(iterations):
+        try:
+            executor.spin_once(timeout_sec=timeout_sec)
+        except (ExternalShutdownException, InvalidHandle) as exc:
+            print(f'Executor cleanup interrupted during {context} at {datetime.now()} - '
+                  f'{type(exc).__name__}: {exc}', flush=True)
+            return False
+    return True
 
 
 def main(args=None):
@@ -57,6 +71,9 @@ def main(args=None):
         executor.spin()
     except KeyboardInterrupt:
         print(f'Keyboard interrupt request  at {datetime.now()} - ! Shut the onboard behavior executive down!', flush=True)
+    except (ExternalShutdownException, InvalidHandle) as exc:
+        print(f'Executor stopped during shutdown at {datetime.now()} - '
+              f'{type(exc).__name__}: {exc}', flush=True)
     except Exception as exc:
         print(f'Exception in executor       at {datetime.now()} - ! {type(exc)}\n  {exc}', flush=True)
         import traceback
@@ -67,8 +84,8 @@ def main(args=None):
         print(f'Request onboard behavior shutdown   at {datetime.now()} ...', flush=True)
         if onboard.behavior_shutdown():
             for i in range(5):
-                for _ in range(100 * i):
-                    executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+                if not _spin_cleanup(executor, 100 * i, 'behavior shutdown'):
+                    break
                 if onboard.verify_no_active_behaviors(timeout=0.1):
                     break
                 else:
@@ -77,13 +94,11 @@ def main(args=None):
             print(f'    All onboard behaviors are stopped at {datetime.now()}!', flush=True)
 
         # Last call for clean up of any stray communications
-        for _ in range(50):
-            executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+        _spin_cleanup(executor, 50, 'post-behavior cleanup')
 
         print(f'{datetime.now()} - onboard shutdown requested ...', flush=True)
         onboard.onboard_shutdown()
-        for _ in range(30):
-            executor.spin_once(timeout_sec=0.001)  # allow onboard system to cleanup after itself
+        _spin_cleanup(executor, 30, 'onboard shutdown')
 
     except Exception as exc:
         print(f"{datetime.now()} - Exception in onboard shutdown! '{type(exc)}'\n  {exc}", flush=True)
@@ -94,16 +109,10 @@ def main(args=None):
         print(f'Shutdown proxies requested  at {datetime.now()} ...', flush=True)
         shutdown_proxies()
 
-        # Last call for clean up of any stray communications
-        for _ in range(50):
-            executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
-
         print(f'Proxy  shutdown  completed  at {datetime.now()} ...', flush=True)
+        executor.remove_node(onboard)
         onboard.destroy_node()
-
-        # Last call for clean up of any stray communications
-        for _ in range(50):
-            executor.spin_once(timeout_sec=0.001)  # allow behavior to cleanup after itself
+        executor.shutdown()
 
         print(f'Node destruction  completed at {datetime.now()} ...', flush=True)
     except Exception as exc:

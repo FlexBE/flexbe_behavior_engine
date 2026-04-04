@@ -22,6 +22,8 @@ class _FakeExecutor:
     def __init__(self, spin_exception=None):
         self._spin_exception = spin_exception
         self.added_nodes = []
+        self.removed_nodes = []
+        self.shutdown_calls = 0
         self.spin_calls = 0
         self.spin_once_calls = []
 
@@ -35,6 +37,12 @@ class _FakeExecutor:
 
     def spin_once(self, timeout_sec=None):
         self.spin_once_calls.append(timeout_sec)
+
+    def remove_node(self, node):
+        self.removed_nodes.append(node)
+
+    def shutdown(self):
+        self.shutdown_calls += 1
 
 
 class _FakeOnboard:
@@ -101,6 +109,8 @@ class TestStartBehaviorMain(unittest.TestCase):
         executor_cls.assert_called_once_with()
         self.assertIs(onboard.executor, executor)
         self.assertEqual([onboard], executor.added_nodes)
+        self.assertEqual([onboard], executor.removed_nodes)
+        self.assertEqual(1, executor.shutdown_calls)
         self.assertEqual(1, executor.spin_calls)
         self.assertEqual(1, onboard.behavior_shutdown_calls)
         self.assertEqual([], onboard.verify_calls)
@@ -108,7 +118,7 @@ class TestStartBehaviorMain(unittest.TestCase):
         self.assertEqual(1, onboard.destroy_calls)
         shutdown_proxies_mock.assert_called_once_with()
         try_shutdown_mock.assert_called_once_with()
-        self.assertEqual([0.001] * 180, executor.spin_once_calls)
+        self.assertEqual([0.001] * 80, executor.spin_once_calls)
         printed = '\n'.join(call.args[0] for call in print_mock.call_args_list if call.args)
         self.assertIn('All onboard behaviors are stopped', printed)
         self.assertIn('Done with behavior executive', printed)
@@ -129,11 +139,29 @@ class TestStartBehaviorMain(unittest.TestCase):
 
         self.assertEqual(1, onboard.behavior_shutdown_calls)
         self.assertEqual([0.1, 0.1], onboard.verify_calls)
-        self.assertEqual(280, len(executor.spin_once_calls))
+        self.assertEqual(180, len(executor.spin_once_calls))
         printed = '\n'.join(call.args[0] for call in print_mock.call_args_list if call.args)
         self.assertIn('Keyboard interrupt request', printed)
         self.assertIn('Active behavior still running onboard', printed)
         self.assertIn('onboard shutdown requested', printed)
+
+    def test_main_treats_invalid_handle_during_spin_as_shutdown(self):
+        """Destroy-request InvalidHandle from executor.spin should not be reported as a crash."""
+        onboard = _FakeOnboard(behavior_shutdown_result=False)
+        executor = _FakeExecutor(spin_exception=start_behavior.InvalidHandle('destruction was requested'))
+
+        with patch('flexbe_onboard.start_behavior.FlexbeOnboard', return_value=onboard), \
+                patch('flexbe_onboard.start_behavior.rclpy.executors.SingleThreadedExecutor',
+                      return_value=executor), \
+                patch('flexbe_onboard.start_behavior.rclpy.init'), \
+                patch('flexbe_onboard.start_behavior.rclpy.try_shutdown'), \
+                patch('flexbe_onboard.start_behavior.shutdown_proxies'), \
+                patch('builtins.print') as print_mock:
+            start_behavior.main()
+
+        printed = '\n'.join(call.args[0] for call in print_mock.call_args_list if call.args)
+        self.assertIn('Executor stopped during shutdown', printed)
+        self.assertNotIn('Exception in executor', printed)
 
     def test_main_reports_executor_shutdown_proxy_and_try_shutdown_exceptions(self):
         """Exception handlers should keep the wrapper progressing through all cleanup stages."""
