@@ -213,7 +213,7 @@ class ProxyServiceCaller:
             # Same class definition instance as stored
             new_request = request
 
-        Logger.loginfo('Client about to call service')
+        Logger.loginfo("Client about to call service '%s' ..." % topic)
 
         return client.call(new_request)
 
