@@ -145,6 +145,7 @@ class FlexbeOnboard(Node):
         self._trigger_ready = False
         self._ready_counter = 0
         self._heartbeat = self.create_timer(1.0, self._heartbeat_worker)
+        self._startup_probe_timer = self.create_timer(0.1, self._startup_probe_callback)
 
         Logger.localinfo('\033[92m--- Behavior Engine ready for first behavior! ---\033[0m')
         self._publish_ready_status()
@@ -742,6 +743,12 @@ class FlexbeOnboard(Node):
         else:
             self._trigger_ready = False
             self._ready_counter = 0
+
+    def _startup_probe_callback(self):
+        """Log once after the executor starts servicing timer callbacks."""
+        self._startup_probe_timer.cancel()
+        Logger.localinfo('Onboard behavior engine active; publishers are initialized '
+                         'and executor is servicing timer callbacks.')
 
     def _convert_dict(self, o):
         if isinstance(o, list):

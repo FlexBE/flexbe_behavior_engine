@@ -499,6 +499,28 @@ class TestBehaviorLauncher(unittest.TestCase):
         self.assertEqual(1, len(warnings))
         self.assertIsNone(launcher._last_onboard_heartbeat)
 
+    def test_startup_probe_callback_cancels_timer_and_logs_once(self):
+        """Startup probe should cancel itself after proving timer callbacks are serviced."""
+        infos = []
+        launcher = self._make_launcher(_FakeBehaviorLibrary())
+        launcher._startup_probe_timer = SimpleNamespace(cancel=lambda: infos.append('cancel'))
+        launcher.get_logger = lambda: SimpleNamespace(
+            info=lambda msg: infos.append(msg),
+            warning=lambda *_args, **_kwargs: None,
+            error=lambda *_args, **_kwargs: None,
+        )
+
+        launcher._startup_probe_callback()
+
+        self.assertEqual(
+            [
+                'cancel',
+                'Behavior launcher active; publishers are initialized '
+                'and executor is servicing timer callbacks.',
+            ],
+            infos,
+        )
+
     def test_launch_feedback_helpers_publish_command_feedback_and_log_errors(self):
         """Launch feedback helpers should publish blocked feedback and log local rejection reasons."""
         launcher = self._make_launcher(_FakeBehaviorLibrary())

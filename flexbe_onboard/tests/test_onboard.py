@@ -1166,8 +1166,8 @@ class TestOnboardCleanup(unittest.TestCase):
         self.assertFalse(onboard._switching)
         self.assertFalse(onboard._starting)
 
-    def test_heartbeat_worker_skips_publish_without_subscribers(self):
-        """Heartbeat worker should skip heartbeat publication when nobody is subscribed."""
+    def test_heartbeat_worker_publishes_without_subscribers(self):
+        """Heartbeat worker should publish heartbeat even when nobody is subscribed."""
         onboard = object.__new__(FlexbeOnboard)
         heartbeat_messages = []
         status_messages = []
@@ -1215,13 +1215,33 @@ class TestOnboardCleanup(unittest.TestCase):
         onboard._ready_counter = 0
         onboard.get_clock = lambda: _FakeClock()
 
-        onboard._heartbeat_worker()
+        with patch('flexbe_onboard.flexbe_onboard.Logger.check_local_enabled', lambda: None):
+            onboard._heartbeat_worker()
 
-        self.assertEqual(heartbeat_messages, [])
+        self.assertEqual(len(heartbeat_messages), 1)
         self.assertEqual(len(status_messages), 1)
         self.assertEqual(status_messages[0].code, BEStatus.READY)
         self.assertFalse(onboard._trigger_ready)
         self.assertEqual(onboard._ready_counter, 0)
+
+    def test_startup_probe_callback_cancels_timer_and_logs_once(self):
+        """Startup probe should cancel itself after proving timer callbacks are serviced."""
+        onboard = object.__new__(FlexbeOnboard)
+        canceled = []
+        onboard._startup_probe_timer = type(
+            '_Timer',
+            (),
+            {'cancel': staticmethod(lambda: canceled.append(True))},
+        )()
+
+        with patch('flexbe_onboard.flexbe_onboard.Logger.localinfo') as localinfo:
+            onboard._startup_probe_callback()
+
+        self.assertEqual(canceled, [True])
+        localinfo.assert_called_once_with(
+            'Onboard behavior engine active; publishers are initialized '
+            'and executor is servicing timer callbacks.'
+        )
 
     def test_publish_ready_status_reuses_cached_message(self):
         """READY publication should reuse the cached message shell and only refresh its stamp."""

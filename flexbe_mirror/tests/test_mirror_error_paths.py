@@ -2618,6 +2618,21 @@ class TestMirrorErrorPaths(unittest.TestCase):
         self.assertEqual([(Topics._OUTCOME_TOPIC, True)], removed)
         self.assertEqual([-(0x12345 & 0x0000FFFF), 37], heartbeats)
 
+    def test_startup_probe_callback_cancels_timer_and_logs_once(self):
+        """Startup probe should cancel itself after proving timer callbacks are serviced."""
+        canceled = []
+        mirror = self._make_mirror()
+        mirror._startup_probe_timer = types.SimpleNamespace(cancel=lambda: canceled.append(True))
+
+        with patch('flexbe_mirror.flexbe_mirror.Logger.localinfo') as localinfo:
+            mirror._startup_probe_callback()
+
+        self.assertEqual(canceled, [True])
+        localinfo.assert_called_once_with(
+            'Behavior mirror active; publishers are initialized '
+            'and executor is servicing timer callbacks.'
+        )
+
     def test_soft_stop_snapshot_helpers_cover_none_progress_and_quiescence_cases(self):
         """Soft-stop snapshot helpers should classify progress and quiescence consistently."""
         self.assertIsNone(FlexbeMirror._extract_soft_stop_snapshot(None))

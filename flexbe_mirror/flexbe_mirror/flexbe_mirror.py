@@ -166,6 +166,7 @@ class FlexbeMirror(Node):
 
         # Require periodic events in case behavior is not connected to allow orderly shutdown
         self._heartbeat_timer = self.create_timer(2.0, self.heartbeat_timer_callback)
+        self._startup_probe_timer = self.create_timer(0.1, self._startup_probe_callback)
 
         Logger.loginfo('--> Mirror - ready!')
         self._publish_mirror_status(BEStatus.READY)
@@ -304,6 +305,12 @@ class FlexbeMirror(Node):
             heartbeat.data = self._sm._total_loop_count
 
         self._heartbeat_pub.publish(heartbeat)
+
+    def _startup_probe_callback(self):
+        """Log once after the executor starts servicing timer callbacks."""
+        self._startup_probe_timer.cancel()
+        Logger.localinfo('Behavior mirror active; publishers are initialized '
+                         'and executor is servicing timer callbacks.')
 
     def shutdown_mirror(self):
         """Shut mirror down."""

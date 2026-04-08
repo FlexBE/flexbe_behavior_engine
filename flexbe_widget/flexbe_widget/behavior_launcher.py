@@ -96,6 +96,7 @@ class BehaviorLauncher(Node):
 
         # Require periodic events in case behavior is not connected to allow orderly shutdown
         self._heartbeat_timer = self.create_timer(2.0, self.heartbeat_timer_callback)
+        self._startup_probe_timer = self.create_timer(0.1, self._startup_probe_callback)
         self._last_onboard_heartbeat = None
         self._last_heartbeat_msg = None
 
@@ -116,6 +117,12 @@ class BehaviorLauncher(Node):
             if elapsed.nanoseconds > 2e9:
                 self.get_logger().warning('Behavior Launcher is NOT receiving updates from onboard behavior engine!')
                 self._last_onboard_heartbeat = None
+
+    def _startup_probe_callback(self):
+        """Log once after the executor starts servicing timer callbacks."""
+        self._startup_probe_timer.cancel()
+        self.get_logger().info('Behavior launcher active; publishers are initialized '
+                               'and executor is servicing timer callbacks.')
 
     def _onboard_heartbeat_callback(self, msg):
         """Record time of last onboard heartbeat."""
