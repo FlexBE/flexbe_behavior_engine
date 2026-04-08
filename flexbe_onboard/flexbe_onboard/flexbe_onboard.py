@@ -726,8 +726,7 @@ class FlexbeOnboard(Node):
 
         # Logger.localinfo(f'Heartbeat: {heartbeat.behavior_id}: {heartbeat.current_state_checksum } '
         #                  f'- running {self._running} switching {self._switching} ')
-        if self._heartbeat_pub.get_subscription_count() > 0:
-            self._heartbeat_pub.publish(heartbeat)
+        self._heartbeat_pub.publish(heartbeat)
 
         if not self._running and not self._switching:
             # If the statemachine is not active
