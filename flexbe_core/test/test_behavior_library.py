@@ -30,6 +30,7 @@
 
 """Unit tests for BehaviorLibrary package parsing guard paths."""
 
+import importlib
 import os
 import tempfile
 import unittest
@@ -136,12 +137,33 @@ class TestBehaviorLibrary(unittest.TestCase):
             __path__ = ['/tmp/valid_pkg/behaviors']
 
         with patch.object(BehaviorLibrary, 'get_behavior', return_value=be_entry), \
-                patch('builtins.__import__', return_value=_ImportedModule()):
+                patch('flexbe_core.behavior_library.importlib.import_module', return_value=_ImportedModule()):
             source_path = lib.get_sourcecode_filepath(123, add_tmp=False)
             tmp_path = lib.get_sourcecode_filepath(123, add_tmp=True)
 
         self.assertEqual(source_path, os.path.join('/tmp/valid_pkg/behaviors', 'valid_behavior_sm.py'))
         self.assertEqual(tmp_path, os.path.join('/tmp/valid_pkg/behaviors', 'valid_behavior_sm_tmp.py'))
+
+    def test_get_sourcecode_filepath_resolves_nested_package_path(self):
+        """Nested behavior module paths should resolve relative to the full containing package."""
+        lib = object.__new__(BehaviorLibrary)
+
+        be_entry = {
+            'name': 'Nested Behavior',
+            'package': 'pkg.nested',
+            'file': 'behavior_sm',
+            'class': 'NestedBehaviorSM'
+        }
+
+        class _ImportedModule:
+            __path__ = ['/tmp/pkg/nested']
+
+        with patch.object(BehaviorLibrary, 'get_behavior', return_value=be_entry), \
+                patch('flexbe_core.behavior_library.importlib.import_module', return_value=_ImportedModule()) as import_module:
+            source_path = lib.get_sourcecode_filepath(123)
+
+        import_module.assert_called_once_with('pkg.nested')
+        self.assertEqual(source_path, os.path.join('/tmp/pkg/nested', 'behavior_sm.py'))
 
     def test_add_behavior_manifests_recurses_and_filters_by_package(self):
         """Manifest loading should recurse into subdirectories and ignore manifests from other packages."""
@@ -344,15 +366,16 @@ class TestBehaviorLibrary(unittest.TestCase):
             'class': 'ValidBehaviorSM'
         }
 
-        original_import = __import__
+        original_import_module = importlib.import_module
 
-        def _fake_import(name, *args, **kwargs):
+        def _fake_import_module(name, *args, **kwargs):
             if name == 'valid_pkg.behaviors':
                 raise ImportError('missing module')
-            return original_import(name, *args, **kwargs)
+            return original_import_module(name, *args, **kwargs)
 
         with patch.object(BehaviorLibrary, 'get_behavior', return_value=be_entry), \
-                patch('builtins.__import__', side_effect=_fake_import), \
+                patch('flexbe_core.behavior_library.importlib.import_module',
+                      side_effect=_fake_import_module), \
                 patch('ament_index_python.packages.get_package_share_directory',
                       return_value='/tmp/share/valid_pkg.behaviors'), \
                 patch('flexbe_core.behavior_library.Logger.logwarn') as log_warn:

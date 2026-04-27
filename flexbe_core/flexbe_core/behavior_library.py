@@ -28,6 +28,7 @@
 
 
 """Provide access to all known behaviors."""
+import importlib
 import os
 import xml.etree.ElementTree as ET
 import zlib
@@ -207,7 +208,7 @@ class BehaviorLibrary:
             return None
 
         try:
-            module_path = __import__(be_entry['package']).__path__[-1]
+            module_path = importlib.import_module(be_entry['package']).__path__[-1]
         except ImportError:
             try:
                 # Attempt to replace prior use of ROS 1 package finder
