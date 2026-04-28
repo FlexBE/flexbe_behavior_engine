@@ -71,9 +71,12 @@ class BehaviorLauncher(Node):
         # Retain enough latched lifecycle history for reconnecting consumers to see
         # FINISHED/STOPPED/READY/STARTED/RUNNING across rapid transitions.
         status_qos = QoSProfile(depth=20, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+        ui_version_qos = self._latched_qos(depth=1)
 
         self._sub = self.create_subscription(BehaviorRequest, Topics._REQUEST_BEHAVIOR_TOPIC, self._request_callback, 100)
-        self._version_sub = self.create_subscription(String, Topics._UI_VERSION_TOPIC, self._version_callback, 1)
+        self._version_sub = self.create_subscription(
+            String, Topics._UI_VERSION_TOPIC, self._version_callback,
+            qos_profile=ui_version_qos)
         self._status_sub = self.create_subscription(BEStatus, Topics._ONBOARD_STATUS_TOPIC,
                                                     self._status_callback, qos_profile=status_qos)
         self._onboard_heartbeat_sub = self.create_subscription(BehaviorSync, Topics._ONBOARD_HEARTBEAT_TOPIC,
@@ -101,6 +104,11 @@ class BehaviorLauncher(Node):
         self._last_heartbeat_msg = None
 
         self.get_logger().info('%d behaviors available, ready for start request.' % self._behavior_lib.count_behaviors())
+
+    @staticmethod
+    def _latched_qos(depth=1):
+        """Return a transient-local QoS profile for latched UI/metadata topics."""
+        return QoSProfile(depth=depth, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
 
     def heartbeat_timer_callback(self):
         """

@@ -43,6 +43,8 @@ from flexbe_msgs.msg import BEStatus
 import flexbe_widget.behavior_launcher as behavior_launcher
 from flexbe_widget.behavior_launcher import BehaviorLauncher
 
+from rclpy.qos import QoSDurabilityPolicy
+
 
 class _FakeLogger:
 
@@ -630,6 +632,13 @@ class TestBehaviorLauncher(unittest.TestCase):
             launcher._version_callback(SimpleNamespace(data='999.0.0'))
 
         logwarn.assert_called_once()
+
+    def test_ui_version_qos_is_transient_local(self):
+        """UI version subscription should receive latched versions from the WebUI."""
+        qos = BehaviorLauncher._latched_qos(depth=1)
+
+        self.assertEqual(1, qos.depth)
+        self.assertEqual(QoSDurabilityPolicy.TRANSIENT_LOCAL, qos.durability)
 
     def test_behavior_launcher_main_spins_cleanly_without_behavior_request(self):
         """CLI main should initialize ROS and spin even when no behavior is requested."""
