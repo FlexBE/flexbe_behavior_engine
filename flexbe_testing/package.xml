@@ -17,6 +17,7 @@
     <url type="bugtracker">https://github.com/FlexBE/flexbe_behavior_engine/issues</url>
 
     <depend>rclpy</depend>
+    <depend>ament_index_python</depend>
     <depend>flexbe_core</depend>
     <depend>flexbe_msgs</depend>
     <depend>launch_ros</depend>

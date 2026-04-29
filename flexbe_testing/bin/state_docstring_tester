@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Run FlexBE state docstring validation from ros2 run."""
+
+import sys
+
+from flexbe_testing.state_docstring_tester import main
+
+
+if __name__ == '__main__':
+    sys.exit(main())

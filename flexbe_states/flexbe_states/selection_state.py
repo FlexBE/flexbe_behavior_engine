@@ -45,6 +45,7 @@ class SelectionState(EventState):
 
     -- message  string      Message displayed to the operators to let them know what to do.
     -- timeout  float       Timeout in seconds to wait for server to be available.
+    -- action_topic string  Action topic used by the behavior input server.
 
     ># items    object      List or tuple of items to select from
     #> data     object      The data selected by the operator. The exact type depends on the request.

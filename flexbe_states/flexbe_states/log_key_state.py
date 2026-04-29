@@ -45,7 +45,7 @@ class LogKeyState(EventState):
     -- text         string    Format string of message to be logged to the terminal; e.g., 'Counter value:  {}'.
     -- severity     uint8     Type of logging (Logger.REPORT_INFO / WARN / HINT / ERROR)
 
-    #> data         object    The data provided to be printed in the message. The exact type depends on the request.
+    ># data         object    The data provided to be printed in the message. The exact type depends on the request.
 
     <= done                   Indicates that the message has been logged.
     """

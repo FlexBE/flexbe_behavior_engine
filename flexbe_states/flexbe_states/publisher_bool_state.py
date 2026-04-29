@@ -41,7 +41,7 @@ class PublisherBoolState(EventState):
 
     -- topic    string  The topic on which should be published.
 
-    >= value            Value of bool.
+    ># value    bool    Value of bool.
 
     <= done             Done publishing.
     """

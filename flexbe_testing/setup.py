@@ -1,6 +1,6 @@
 """Setup for flexbe_testing package."""
-import os
 from glob import glob
+import os
 
 from setuptools import setup
 
@@ -24,4 +24,9 @@ setup(
     maintainer_email='robotics@cnu.edu',
     description='flexbe_testing provides a framework for unit testing states.',
     license='BSD',
+    entry_points={
+        'console_scripts': [
+            'state_docstring_tester = flexbe_testing.state_docstring_tester:main',
+        ],
+    },
 )

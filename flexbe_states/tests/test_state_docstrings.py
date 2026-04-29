@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024 Christopher Newport University
+# Copyright 2026 Christopher Newport University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -12,7 +12,7 @@
 #      notice, this list of conditions and the following disclaimer in the
 #      documentation and/or other materials provided with the distribution.
 #
-#    * Neither the name of the Christopher Newport University nor the names of its
+#    * Neither the name of Christopher Newport University nor the names of its
 #      contributors may be used to endorse or promote products derived from
 #      this software without specific prior written permission.
 #
@@ -28,29 +28,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""UserdataState."""
-import copy
+"""Validate flexbe_states docstring tags consumed by the WebUI state parser."""
 
-from flexbe_core import EventState
+from pathlib import Path
+
+from flexbe_testing.state_docstring_tester import assert_state_docstrings_valid
 
 
-class UserdataState(EventState):
-    """
-    A state that posts data onto the userdata stream.
-
-    -- data    object       The data to be posted
-
-    <= done                 Indicates that data was posted
-    #> data   object        A copy of the data
-    """
-
-    def __init__(self, data):
-        super(UserdataState, self).__init__(outcomes=['done'],
-                                            output_keys=['data'])
-        self._data = data
-
-    def execute(self, userdata):
-        """Execute UserdataState."""
-        # Post data to userdata and return done.
-        userdata.data = copy.deepcopy(self._data)
-        return 'done'
+def test_state_docstring_tags_are_valid():
+    """Check state docstring tags for this package."""
+    package_dir = Path(__file__).resolve().parents[1]
+    paths = [package_dir / 'flexbe_states']
+    assert_state_docstrings_valid(paths, strict_interface=True)

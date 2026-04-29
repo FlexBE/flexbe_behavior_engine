@@ -39,11 +39,11 @@ class PublisherStringState(EventState):
     """
     Publishes a string (std_msgs/String) message on a given topic name.
 
-    -- topic    string        The topic on which should be published.
+    -- topic   string        The topic on which should be published.
 
-    >= value                  Value of string.
+    ># value   string        Value of string.
 
-    <= done                   Done publishing.
+    <= done                  Done publishing.
     """
 
     def __init__(self, topic):

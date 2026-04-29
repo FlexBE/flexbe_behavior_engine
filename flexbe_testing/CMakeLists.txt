@@ -6,6 +6,7 @@ find_package(ament_cmake_python REQUIRED)
 
 install(PROGRAMS
     bin/testing_node
+    bin/state_docstring_tester
     DESTINATION lib/${PROJECT_NAME}
 )
 
