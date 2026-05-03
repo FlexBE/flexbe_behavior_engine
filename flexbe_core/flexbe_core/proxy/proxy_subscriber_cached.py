@@ -33,6 +33,7 @@ A proxy for subscribing topics that caches and buffers received messages.
 Provides a single point for comminications for all states in behavior
 """
 
+import warnings
 from collections import deque
 from functools import partial
 from threading import Event, Lock
@@ -47,7 +48,7 @@ class ProxySubscriberCached:
 
     _node = None
     _topics = {}
-    _persistant_topics = []
+    _persistent_topics = []
 
     _subscription_lock = Lock()  # Prevent modifications during processing
 
@@ -78,7 +79,7 @@ class ProxySubscriberCached:
                                      f'{topic}!\n{type(exc)} - {exc}')
 
                 ProxySubscriberCached._topics.clear()
-                ProxySubscriberCached._persistant_topics.clear()
+                ProxySubscriberCached._persistent_topics.clear()
                 print('Shutdown proxy subscriber - finished!')
 
         except Exception as exc:  # pylint: disable=W0703
@@ -457,7 +458,7 @@ class ProxySubscriberCached:
         @param topic: Set to true if the buffer of the given topic should be cleared as well.
         """
         with ProxySubscriberCached._subscription_lock:
-            if topic in ProxySubscriberCached._persistant_topics:
+            if topic in ProxySubscriberCached._persistent_topics:
                 return
 
             try:
@@ -468,7 +469,7 @@ class ProxySubscriberCached:
                 Logger.localwarn(f"remove_last_msg: '{topic}' is not available!")
 
     @classmethod
-    def make_persistant(cls, topic):
+    def make_persistent(cls, topic):
         """
         Make the given topic persistent which means messages can no longer be removed.
 
@@ -477,8 +478,19 @@ class ProxySubscriberCached:
         @type topic: string
         @param topic: The topic of interest.
         """
-        if topic not in ProxySubscriberCached._persistant_topics:
-            ProxySubscriberCached._persistant_topics.append(topic)
+        if topic not in ProxySubscriberCached._persistent_topics:
+            ProxySubscriberCached._persistent_topics.append(topic)
+
+    @classmethod
+    def make_persistant(cls, topic):
+        """Deprecated misspelling of make_persistent."""
+        warnings.warn(
+            'make_persistant is deprecated and will be removed in a future version. '
+            'Use make_persistent instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        cls.make_persistent(topic)
 
     @classmethod
     def unsubscribe_topic(cls, topic, inst_id=-1):

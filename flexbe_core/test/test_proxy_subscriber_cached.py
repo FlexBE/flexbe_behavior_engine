@@ -116,7 +116,7 @@ class TestProxySubscriberCached(unittest.TestCase):
     def setUp(self):
         """Reset proxy singleton state before each test."""
         ProxySubscriberCached._topics.clear()
-        ProxySubscriberCached._persistant_topics.clear()
+        ProxySubscriberCached._persistent_topics.clear()
         ProxySubscriberCached._node = None
 
     def test_subscribe_caches_message_delivered_during_subscription_creation(self):
@@ -325,7 +325,7 @@ class TestProxySubscriberCached(unittest.TestCase):
         self.assertEqual(ProxySubscriberCached._topics[topic]['subscribers'], [2])
         self.assertNotIn(1, ProxySubscriberCached._topics[topic]['callbacks'])
 
-    def test_make_persistant_prevents_remove_last_msg(self):
+    def test_make_persistent_prevents_remove_last_msg(self):
         """Persistent topics should ignore remove_last_msg requests."""
         topic = '/topic'
         ProxySubscriberCached._topics[topic] = {'subscription': _FakeSubscription(_FakeMsg),
@@ -337,7 +337,7 @@ class TestProxySubscriberCached(unittest.TestCase):
                                                 'callbacks': {},
                                                 'callback_items': (),
                                                 'subscribers': [1]}
-        ProxySubscriberCached.make_persistant(topic)
+        ProxySubscriberCached.make_persistent(topic)
 
         ProxySubscriberCached.remove_last_msg(topic, clear_buffer=True)
 
