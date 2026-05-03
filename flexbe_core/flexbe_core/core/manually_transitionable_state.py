@@ -31,6 +31,7 @@
 
 """ManuallyTransitionableState."""
 
+from flexbe_core.core.exceptions import StateError
 from flexbe_core.core.ros_state import RosState
 from flexbe_core.core.topics import Topics
 from flexbe_core.logger import Logger
@@ -60,7 +61,8 @@ class ManuallyTransitionableState(RosState):
             command_msg = self._sub.peek_at_buffer(Topics._CMD_TRANSITION_TOPIC)
             if command_msg.target == self.state_id:
                 cmd_msg2 = self._sub.get_from_buffer(Topics._CMD_TRANSITION_TOPIC)
-                assert cmd_msg2 is command_msg, 'Unexpected change in CMD_TRANSITION_TOPIC buffer'
+                if cmd_msg2 is not command_msg:
+                    raise StateError('Unexpected change in CMD_TRANSITION_TOPIC buffer')
                 if 0 <= command_msg.outcome < len(self.outcomes):
                     self._pub.publish(Topics._CMD_FEEDBACK_TOPIC,
                                       CommandFeedback(command='transition', args=[f'{command_msg.target}',

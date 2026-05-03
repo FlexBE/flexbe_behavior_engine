@@ -331,7 +331,9 @@ class OperatableStateMachine(PreemptableStateMachine):
     def get_required_autonomy(self, outcome, state):
         """Get required autonomy."""
         try:
-            assert self.current_state_label == state.name, "get required autonomys in OSM state doesn't match!"
+            if self.current_state_label != state.name:
+                raise StateError(f"get_required_autonomy: current state '{self.current_state_label}' "
+                                 f"does not match requested state '{state.name}'")
             return self._autonomy[self.current_state_label][outcome]
         except Exception:  # pylint: disable=W0703
             Logger.error(f"Failure to retrieve autonomy for '{self.name}' - {self.current_state_label}"

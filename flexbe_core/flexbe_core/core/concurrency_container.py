@@ -90,9 +90,10 @@ class ConcurrencyContainer(OperatableStateMachine):
     def get_required_autonomy(self, outcome, state):
         """Return required autonomy level for this outcome."""
         try:
-            assert state in self._states, "get required autonomy in ConcurrencyContainer - state doesn't match!"
+            if state not in self._states:
+                raise StateError(f"get_required_autonomy: state '{state.name}' is not in ConcurrencyContainer '{self.name}'")
             return self._autonomy[state.name][outcome]
-        except (AssertionError, AttributeError, KeyError, TypeError) as exc:
+        except (StateError, AttributeError, KeyError, TypeError) as exc:
             Logger.error(f"Failure to retrieve autonomy for '{self.name}' in ConcurrencyContainer - "
                          f"  current state label='{self.name}' state='{state.name}' outcome='{outcome}'.")
             Logger.localerr(f'error={type(exc)} - {exc}')
