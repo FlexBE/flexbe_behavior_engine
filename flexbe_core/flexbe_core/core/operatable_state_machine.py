@@ -30,6 +30,7 @@
 
 
 """OperatableStateMachine."""
+import traceback
 from enum import Enum
 
 from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
@@ -240,7 +241,6 @@ class OperatableStateMachine(PreemptableStateMachine):
         except Exception as exc:  # pylint: disable=W0703
             # catch any exception and log here, but re-raise to preempt behavior
             Logger.logerr("Failed to execute state '%s':\n%s - %s" % (self.current_state_label, str(type(exc)), str(exc)))
-            import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))  # Guard against exception including format!
             outcome = None
             if isinstance(exc, (StateError, StateMachineError, UserDataError)):

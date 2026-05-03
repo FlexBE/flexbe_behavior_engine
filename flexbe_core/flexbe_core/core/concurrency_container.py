@@ -34,6 +34,7 @@ A state machine that can be operated.
 
 It synchronizes its current state with the mirror and supports some control mechanisms.
 """
+import traceback
 from sys import maxsize as MAX_SIZE
 
 from flexbe_core.core.event_state import EventState
@@ -292,7 +293,6 @@ class ConcurrencyContainer(OperatableStateMachine):
             wrapped = exc if isinstance(exc, (StateError, StateMachineError, UserDataError)) else StateError(str(exc))
             self._last_exception = wrapped
             Logger.logerr('ConcurrencyContainer: Failed to execute state %s:\n%s' % (self.current_state_label, str(exc)))
-            import traceback  # pylint: disable=C0415
             Logger.localinfo(traceback.format_exc().replace('%', '%%'))
             raise self._last_exception
         return result
