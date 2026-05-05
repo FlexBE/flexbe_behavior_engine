@@ -287,7 +287,7 @@ class ProxyPublisher:
             tmr.cancel()
         warning_sent = warning_event.is_set()
 
-        # Problem here
+        # Subscriber is still not available
         if not available:
             Logger.error("Waiting for subscribers on '%s' timed out!" % topic)
             return False

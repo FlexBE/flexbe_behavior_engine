@@ -63,13 +63,13 @@ class ProxyActionClient:
     _client_sync_lock = Lock()
 
     _goal_status_dict = {
-        0: 'UNKNOWN',
-        1: 'ACCEPTED',
-        2: 'EXECUTING',
-        3: 'CANCELING',
-        4: 'SUCCEEDED',
-        5: 'CANCELED',
-        6: 'ABORTED'
+        GoalStatus.STATUS_UNKNOWN: 'UNKNOWN',
+        GoalStatus.STATUS_ACCEPTED: 'ACCEPTED',
+        GoalStatus.STATUS_EXECUTING: 'EXECUTING',
+        GoalStatus.STATUS_CANCELING: 'CANCELING',
+        GoalStatus.STATUS_SUCCEEDED: 'SUCCEEDED',
+        GoalStatus.STATUS_CANCELED: 'CANCELED',
+        GoalStatus.STATUS_ABORTED: 'ABORTED',
     }
 
     @staticmethod
@@ -109,7 +109,7 @@ class ProxyActionClient:
                 try:
                     ProxyActionClient._shutdown_topic_client(topic, client_dict)
                 except (ProxyTypeError, ShutdownError) as exc:
-                    Logger.error(f"Something went wrong during shutdown of proxy action client for '{topic}'!\n{str(exc)}")
+                    print(f"Something went wrong during shutdown of proxy action client for '{topic}'!\n{str(exc)}", flush=True)
 
             ProxyActionClient._clients.clear()
             ProxyActionClient._result.clear()

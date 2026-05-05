@@ -279,26 +279,24 @@ class TestProxyActionClientCancel(unittest.TestCase):
         self.assertIs(ProxyActionClient._current_goal['topic'], pending_future)
 
     def test_shutdown_handles_invalid_client_entry(self):
-        """Shutdown should log and continue on invalid client dictionary entries."""
+        """Shutdown should print and continue on invalid client dictionary entries."""
         ProxyActionClient._clients['topic'] = 'bad-entry'
 
-        with patch('flexbe_core.proxy.proxy_action_client.Logger.error') as log_error, \
-                patch('builtins.print'):
+        with patch('builtins.print') as mock_print:
             ProxyActionClient.shutdown()
 
-        self.assertEqual(log_error.call_count, 1)
+        self.assertGreaterEqual(mock_print.call_count, 1)
         self.assertFalse(ProxyActionClient._clients)
 
     def test_shutdown_handles_missing_node_for_live_client(self):
-        """Shutdown should log and continue when node is missing for live clients."""
+        """Shutdown should print and continue when node is missing for live clients."""
         ProxyActionClient._clients['topic'] = {'client': object(), 'count': 1}
         ProxyActionClient._node = None
 
-        with patch('flexbe_core.proxy.proxy_action_client.Logger.error') as log_error, \
-                patch('builtins.print'):
+        with patch('builtins.print') as mock_print:
             ProxyActionClient.shutdown()
 
-        self.assertEqual(log_error.call_count, 1)
+        self.assertGreaterEqual(mock_print.call_count, 1)
         self.assertFalse(ProxyActionClient._clients)
 
     def test_done_callback_ignores_late_callback_after_shutdown(self):

@@ -483,7 +483,7 @@ class ProxySubscriberCached:
 
     @classmethod
     def make_persistant(cls, topic):
-        """Deprecated misspelling of make_persistent."""
+        """Call make_persistent (deprecated misspelling)."""
         warnings.warn(
             'make_persistant is deprecated and will be removed in a future version. '
             'Use make_persistent instead.',
