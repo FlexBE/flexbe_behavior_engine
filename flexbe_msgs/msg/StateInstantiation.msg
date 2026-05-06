@@ -8,12 +8,12 @@ string state_path
 # Specifies the class implementing this state
 # Use one of the provided CLASS constants if this is not a primitive state
 # e.g. "CalculationState"
-string CLASS_STATEMACHINE 	= :STATEMACHINE
-string CLASS_CONCURRENCY 	= :CONCURRENCY
-string CLASS_PRIORITY 		= :PRIORITY
-string CLASS_BEHAVIOR 		= :BEHAVIOR
+string CLASS_STATEMACHINE   = :STATEMACHINE
+string CLASS_CONCURRENCY    = :CONCURRENCY
+string CLASS_PRIORITY       = :PRIORITY
+string CLASS_BEHAVIOR       = :BEHAVIOR
+string CLASS_OUTCOME        = :OUTCOME
 string state_class
-
 
 
 # Only relevant for state machine, priority, and concurrency
