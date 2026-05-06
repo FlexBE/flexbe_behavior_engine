@@ -1459,8 +1459,8 @@ class TestBehaviorAndPriorityGuards(unittest.TestCase):
             self.assertIsNone(state_map.get_state(999))
         log_error.assert_called_once()
 
-    def test_state_machine_reuses_userdata_wrapper_between_ticks(self):
-        """Reuse the state machine userdata wrapper across repeated ticks."""
+    def test_state_machine_persists_output_userdata_between_ticks(self):
+        """Output values written on one tick are visible on the next tick via the shared store."""
         sm = _DoneTrackingStateMachine()
         state = _WrapperTrackingState()
         with sm:
@@ -1472,7 +1472,7 @@ class TestBehaviorAndPriorityGuards(unittest.TestCase):
         self.assertIsNone(sm.execute(initial_userdata))
         self.assertEqual(sm.execute(initial_userdata), 'done')
         self.assertEqual(len(state.wrapper_ids), 2)
-        self.assertEqual(state.wrapper_ids[0], state.wrapper_ids[1])
+        self.assertEqual(initial_userdata['value'], 2)  # 0 -> 1 on tick 1, 1 -> 2 on tick 2
 
     def test_concurrency_container_preserves_shared_userdata_between_states(self):
         """Concurrency states should observe and update the same shared userdata reference."""
