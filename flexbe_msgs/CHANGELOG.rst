@@ -2,6 +2,9 @@
 Changelog for package flexbe_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+
 4.1.2 (2026-05-11)
 ------------------
 * Add ``CLASS_OUTCOME`` string constant to ``StateInstantiation.msg``

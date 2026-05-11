@@ -2,6 +2,11 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+* Use ROS 2 standard flake8 settings; use test folder as standard name
+* Fix selection_state.on_enter to use dict-style userdata['items'] access
+
 4.1.2 (2026-05-11)
 ------------------
 * Fix state docstrings in built-in states to conform to ``StateDocstringTester`` validation format

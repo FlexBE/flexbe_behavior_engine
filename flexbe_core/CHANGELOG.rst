@@ -2,6 +2,10 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.3 (2026-05-11)
+------------------
+* Use ROS 2 standard flake8 settings; use test folder as standard name
+
 4.1.2 (2026-05-11)
 ------------------
 * Support nested behavior source paths in BehaviorLibrary for multi-package behavior hierarchies
