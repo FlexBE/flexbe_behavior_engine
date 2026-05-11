@@ -136,8 +136,8 @@ class SelectionState(EventState):
 
         # Retrieve the goal for the BehaviorInput Action.
         action_goal = BehaviorInput.Goal(request_type=BehaviorInput.Goal.REQUEST_SELECTION,
-                                         items=userdata.items, msg=self._message)
-        Logger.loghint(f"Onboard requests '{self._message}' : {userdata.items}")
+                                         items=userdata['items'], msg=self._message)
+        Logger.loghint(f"Onboard requests '{self._message}' : {userdata['items']}")
 
         # Attempt to send the goal.
         try:
