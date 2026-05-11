@@ -2,6 +2,12 @@
 Changelog for package flexbe_onboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Add startup timer probes to detect and report unresponsive behavior nodes at launch
+* Always publish heartbeat regardless of whether a behavior is actively running
+* Handle ``rclpy.InvalidHandle`` exceptions during shutdown to prevent spurious error logs
+
 4.1.1 (2026-03-25)
 ------------------
 * add test coverage across all packages

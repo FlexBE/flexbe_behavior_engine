@@ -2,6 +2,17 @@
 Changelog for package flexbe_core
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Support nested behavior source paths in BehaviorLibrary for multi-package behavior hierarchies
+* Convert tuple/list behavior parameters to scalar automatically; warn on unhandled conversions
+* Replace runtime ``assert`` statements with ``StateError`` exceptions in core state containers
+* Rename ``make_persistant`` to ``make_persistent`` in ProxySubscriberCached; deprecated alias retained
+* Fix heartbeat topic type mappings in Topics constants
+* Move traceback imports to module level in ConcurrencyContainer and OperatableStateMachine
+* Proxy shutdown and GoalStatus constant cleanup in ProxyActionClient and ProxyPublisher
+* Fix test assertion to verify output userdata data-contract rather than proxy object identity
+
 4.1.1 (2026-03-25)
 ------------------
 * modify handling of PriorityContainer

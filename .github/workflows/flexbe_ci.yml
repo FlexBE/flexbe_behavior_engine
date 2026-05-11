@@ -7,21 +7,22 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   test:
     strategy:
+      fail-fast: false # Run other tests to completion
       matrix:
         ros: [jazzy, kilted, rolling]
         include:
-        - os: ubuntu-24.04
-          ros: jazzy
-          python: python3
-          ci_branch: ros2-devel
-        - os: ubuntu-24.04
-          ros: kilted
-          ci_branch: ros2-devel
-          python: python3
-        - os: ubuntu-24.04
-          ros: rolling
-          python: python3
-          ci_branch: ros2-devel
+          - os: ubuntu-24.04
+            ros: jazzy
+            python: python3
+            ci_branch: ros2-devel
+          - os: ubuntu-24.04
+            ros: kilted
+            ci_branch: ros2-devel
+            python: python3
+          - os: ubuntu-24.04
+            ros: rolling
+            python: python3
+            ci_branch: ros2-devel
 
     runs-on: ${{ matrix.os }}
     env:

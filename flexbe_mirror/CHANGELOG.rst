@@ -2,6 +2,11 @@
 Changelog for package flexbe_mirror
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Add startup timer probes to detect and report unresponsive mirror node at launch
+* Handle ``rclpy.InvalidHandle`` exceptions during shutdown to prevent spurious error logs
+
 4.1.1 (2026-03-25)
 ------------------
 * fix deadlock issue in mirror

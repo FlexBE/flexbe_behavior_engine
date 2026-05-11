@@ -2,6 +2,11 @@
 Changelog for package flexbe_widget
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Use latched QoS for UI version topic subscription to ensure late-joining nodes receive the last published version
+* Add startup timer probes to detect unresponsive nodes at launch
+
 4.1.1 (2026-03-25)
 ------------------
 * modify the default node name of behavior_launcher

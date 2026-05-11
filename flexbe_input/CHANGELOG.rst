@@ -2,6 +2,10 @@
 Changelog for package flexbe_input
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* add conftest.py to ignore or stub GUI operations for GitHub tests
+
 4.1.1 (2026-03-25)
 ------------------
 * add test coverage across all packages

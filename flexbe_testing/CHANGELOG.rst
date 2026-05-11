@@ -2,6 +2,10 @@
 Changelog for package flexbe_testing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Add ``StateDocstringTester`` framework and ``state_docstring_tester`` CLI tool for validating FlexBE state docstring tags
+
 4.1.1 (2026-03-25)
 ------------------
 * add test coverage across all packages

@@ -2,6 +2,10 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.2 (2026-05-11)
+------------------
+* Fix state docstrings in built-in states to conform to ``StateDocstringTester`` validation format
+
 4.1.1 (2026-03-25)
 ------------------
 * add test coverage across all packages
