@@ -30,8 +30,8 @@
 
 """Regression tests for calculation-state reentry behavior."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from flexbe_core import EventState

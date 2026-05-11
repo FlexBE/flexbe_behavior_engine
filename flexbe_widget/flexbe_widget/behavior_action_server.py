@@ -40,7 +40,7 @@ from flexbe_core import BehaviorLibrary
 from flexbe_core.core.topics import Topics
 
 from flexbe_msgs.action import BehaviorExecution
-from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorSelection
+from flexbe_msgs.msg import BehaviorModification, BehaviorSelection, BEStatus
 
 import rclpy
 from rclpy.action import ActionServer

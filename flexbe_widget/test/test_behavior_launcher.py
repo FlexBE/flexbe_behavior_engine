@@ -31,11 +31,11 @@
 
 """Focused tests for widget behavior launcher request processing."""
 
+from pathlib import Path
 import tempfile
 import threading
-import unittest
-from pathlib import Path
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from flexbe_msgs.msg import BEStatus

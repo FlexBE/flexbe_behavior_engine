@@ -34,8 +34,8 @@ A state machine that can be operated.
 
 It synchronizes its current state with the mirror and supports some control mechanisms.
 """
-import traceback
 from sys import maxsize as MAX_SIZE
+import traceback
 
 from flexbe_core.core.event_state import EventState
 from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError

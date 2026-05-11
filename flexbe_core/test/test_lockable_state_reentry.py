@@ -30,8 +30,8 @@
 
 """Tests that LockableState.on_enter resets _locked and _stored_outcome on re-entry."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 
 from flexbe_core.core.event_state import EventState
 from flexbe_core.logger import Logger

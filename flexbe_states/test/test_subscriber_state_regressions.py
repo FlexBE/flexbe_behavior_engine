@@ -30,8 +30,8 @@
 
 """Regression tests for SubscriberState non-blocking behavior."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from flexbe_states.subscriber_state import SubscriberState

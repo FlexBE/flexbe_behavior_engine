@@ -4,9 +4,9 @@
 
 import unittest
 
-from PySide6.QtWidgets import QApplication
-
 from flexbe_input.input_gui import InputGUI
+
+from PySide6.QtWidgets import QApplication
 
 
 class TestInputGUI(unittest.TestCase):

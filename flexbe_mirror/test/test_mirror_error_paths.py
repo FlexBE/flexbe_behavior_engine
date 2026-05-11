@@ -31,10 +31,10 @@
 
 """Unit tests for typed mirror sync and transition error paths."""
 
+from collections import deque
 import threading
 import types
 import unittest
-from collections import deque
 from unittest.mock import patch
 
 from flexbe_core.core import PreemptableState, State, SyncError, TransitionError
@@ -47,7 +47,7 @@ from flexbe_mirror.mirror_concurrency_container import MirrorConcurrencyContaine
 from flexbe_mirror.mirror_state import MirrorState
 from flexbe_mirror.mirror_state_machine import MirrorStateMachine
 
-from flexbe_msgs.msg import BEStatus, BehaviorSync
+from flexbe_msgs.msg import BehaviorSync, BEStatus
 
 
 class TestMirrorErrorPaths(unittest.TestCase):

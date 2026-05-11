@@ -1,6 +1,0 @@
-[flake8]
-exclude = .git
-max-line-length = 130
-ignore = W503, D100, D105, D107
-# Ignore docstring requirements for public modules, magic methods, and __init__ functions.
-# For W503 - https://www.flake8rules.com/rules/W503.html and https://peps.python.org/pep-0008/#should-a-line-break-before-or-after-a-binary-operator

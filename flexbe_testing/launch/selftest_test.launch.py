@@ -39,7 +39,7 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     """Generate launch description."""
     flexbe_testing_dir = get_package_share_directory('flexbe_testing')
-    path = flexbe_testing_dir + '/tests/res'
+    path = flexbe_testing_dir + '/test/res'
 
     testcases = path + '/import_only.test \n'
     testcases += path + '/test_add.test \n'

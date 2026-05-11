@@ -37,8 +37,8 @@ import unittest
 from action_msgs.msg import GoalStatus
 
 from flexbe_core.core.exceptions import ProxyAvailabilityError
-from flexbe_core.proxy import ProxyActionClient, ProxyPublisher, ProxyServiceCaller, ProxySubscriberCached
 from flexbe_core.proxy import initialize_proxies, shutdown_proxies
+from flexbe_core.proxy import ProxyActionClient, ProxyPublisher, ProxyServiceCaller, ProxySubscriberCached
 
 from flexbe_msgs.action import BehaviorExecution
 

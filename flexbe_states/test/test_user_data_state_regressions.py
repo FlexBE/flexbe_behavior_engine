@@ -30,8 +30,8 @@
 
 """Regression tests for UserdataState copy behavior."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 
 from flexbe_core import EventState
 from flexbe_core.logger import Logger

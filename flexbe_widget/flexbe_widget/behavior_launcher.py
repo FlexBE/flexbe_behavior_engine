@@ -32,18 +32,18 @@
 """Node to launch FlexBE behaviors."""
 
 import argparse
+from datetime import datetime
 import difflib
 import os
 import sys
 import threading
 import zlib
-from datetime import datetime
 
 from flexbe_core import BehaviorLibrary, Logger, MIN_UI_VERSION
 from flexbe_core.core import StateMap
 from flexbe_core.core.topics import Topics
 
-from flexbe_msgs.msg import BEStatus, BehaviorModification, BehaviorRequest, CommandFeedback
+from flexbe_msgs.msg import BehaviorModification, BehaviorRequest, BEStatus, CommandFeedback
 from flexbe_msgs.msg import BehaviorSelection, BehaviorSync
 from flexbe_msgs.msg import ContainerStructure
 from flexbe_msgs.msg import StateMapMsg

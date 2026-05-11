@@ -14,9 +14,9 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
         ('share/' + PACKAGE_NAME, ['package.xml']),
-        ('share/' + PACKAGE_NAME + '/tests', glob('tests/*.test')),
-        ('share/' + PACKAGE_NAME + '/launch', glob('tests/*.launch.py')),
-        # ros2 bag issues - ('share/' + PACKAGE_NAME + '/tests/bags', glob('tests/bags/*.bag')),
+        ('share/' + PACKAGE_NAME + '/test', glob('test/*.test')),
+        ('share/' + PACKAGE_NAME + '/launch', glob('test/*.launch.py')),
+        # ros2 bag issues - ('share/' + PACKAGE_NAME + '/test/bags', glob('test/bags/*.bag')),
     ],
     install_requires=['setuptools'],
     extras_require={'test': ['pytest']},

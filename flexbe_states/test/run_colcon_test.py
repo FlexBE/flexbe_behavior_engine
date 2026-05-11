@@ -42,7 +42,7 @@ class TestFlexBEStates(PyTester):
     def setUpClass(cls):
         """Set up TestFlexBEStates class."""
         PyTester._package = 'flexbe_states'
-        PyTester._tests_folder = 'tests'
+        PyTester._tests_folder = 'test'
 
         super().setUpClass()  # Do this last after setting package and tests folder
 

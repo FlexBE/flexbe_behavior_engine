@@ -1,7 +1,7 @@
 """Setup script for flexbe_onboard package."""
 
-import os
 from glob import glob
+import os
 
 from setuptools import find_packages, setup
 
@@ -16,12 +16,12 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name), glob('tests/*.py')),
-        (os.path.join('share', package_name), glob('tests/flexbe_onboard_test_data/*.py')),
-        (os.path.join('share', package_name, 'tests', 'flexbe_onboard_test_data'),
-            glob('tests/flexbe_onboard_test_data/*.py')),  # No * here due to __pycache__ folder
-        (os.path.join('share', package_name, 'tests', 'flexbe_onboard_test_data'),
-            glob('tests/flexbe_onboard_test_data/*.xml')),
+        (os.path.join('share', package_name), glob('test/*.py')),
+        (os.path.join('share', package_name), glob('test/flexbe_onboard_test_data/*.py')),
+        (os.path.join('share', package_name, 'test', 'flexbe_onboard_test_data'),
+            glob('test/flexbe_onboard_test_data/*.py')),  # No * here due to __pycache__ folder
+        (os.path.join('share', package_name, 'test', 'flexbe_onboard_test_data'),
+            glob('test/flexbe_onboard_test_data/*.xml')),
     ],
     install_requires=['setuptools'],
     extras_require={'test': ['pytest']},

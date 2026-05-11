@@ -37,15 +37,15 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import weakref
 import zlib
-from unittest.mock import patch
 
 from flexbe_core.core import StateMachine, TransitionError
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxySubscriberCached
 
-from flexbe_msgs.msg import BEStatus, BehaviorLog, BehaviorModification, BehaviorSelection, BehaviorSync
+from flexbe_msgs.msg import BehaviorLog, BehaviorModification, BehaviorSelection, BehaviorSync, BEStatus
 
 from flexbe_onboard import FlexbeOnboard
 

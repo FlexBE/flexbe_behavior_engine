@@ -11,7 +11,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + PACKAGE_NAME]),
         ('share/' + PACKAGE_NAME, ['package.xml']),
-        # No tests yet ('share/' + PACKAGE_NAME + '/tests', glob('tests/*.test')),
+        # No tests yet ('share/' + PACKAGE_NAME + '/test', glob('test/*.test')),
     ],
     install_requires=['setuptools', 'PySide6'],
     extras_require={'test': ['pytest']},

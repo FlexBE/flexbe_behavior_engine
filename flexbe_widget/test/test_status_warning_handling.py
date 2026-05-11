@@ -32,8 +32,8 @@
 """Regression tests for WARNING status handling in widget paths."""
 
 import threading
-import unittest
 from types import SimpleNamespace
+import unittest
 
 from flexbe_msgs.msg import BEStatus
 

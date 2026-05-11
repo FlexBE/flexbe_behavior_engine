@@ -32,7 +32,9 @@
 
 """Class defining state machine executive for onboard control."""
 
+from ast import literal_eval as cast
 import contextlib
+from datetime import datetime
 import os
 import shutil
 import sys
@@ -40,8 +42,6 @@ import tempfile
 import threading
 import time
 import zlib
-from ast import literal_eval as cast
-from datetime import datetime
 
 try:
     from prctl import set_name as set_thread_name
@@ -58,7 +58,7 @@ from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 from flexbe_core.proxy.qos import QOS_OUTCOME
 
-from flexbe_msgs.msg import BEStatus, BehaviorSelection, BehaviorSync, CommandFeedback, StateMapMsg, UserdataInfo
+from flexbe_msgs.msg import BehaviorSelection, BehaviorSync, BEStatus, CommandFeedback, StateMapMsg, UserdataInfo
 from flexbe_msgs.srv import GetUserdata
 
 import rclpy

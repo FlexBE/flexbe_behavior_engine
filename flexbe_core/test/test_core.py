@@ -33,7 +33,7 @@
 import time
 import unittest
 
-from flexbe_core import ConcurrencyContainer, EventState, OperatableStateMachine, initialize_flexbe_core
+from flexbe_core import ConcurrencyContainer, EventState, initialize_flexbe_core, OperatableStateMachine
 from flexbe_core.core import PreemptableState, RosState, State
 from flexbe_core.core import StateMachineError
 from flexbe_core.core import Topics

@@ -39,7 +39,7 @@
 
 __test__ = False  # Do not pytest this class (it is the test!)
 
-from flexbe_INVALID import Autonomy, Behavior, OperatableStateMachine, initialize_flexbe_core
+from flexbe_INVALID import Autonomy, Behavior, initialize_flexbe_core, OperatableStateMachine
 
 from flexbe_states.calculation_state import CalculationState
 from flexbe_states.decision_state import DecisionState

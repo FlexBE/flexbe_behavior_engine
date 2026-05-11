@@ -1,4 +1,0 @@
-[flake8]
-exclude = .git, build, install, dist
-max-line-length = 130
-ignore = B902, W503, D100, D105, D107

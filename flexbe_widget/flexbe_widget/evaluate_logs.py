@@ -31,8 +31,8 @@
 """Evaluate a logged behavior execution."""
 
 import argparse
-import sys
 from collections import defaultdict
+import sys
 
 import yaml
 

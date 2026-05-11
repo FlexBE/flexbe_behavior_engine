@@ -30,8 +30,8 @@
 
 
 """OperatableStateMachine."""
-import traceback
 from enum import Enum
+import traceback
 
 from flexbe_core.core.exceptions import StateError, StateMachineError, UserDataError
 from flexbe_core.core.operatable_state import OperatableState

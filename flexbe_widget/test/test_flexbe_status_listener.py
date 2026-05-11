@@ -31,12 +31,12 @@
 
 """Focused tests for the FlexBE status listener utility."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
-from flexbe_widget.flexbe_status_listener import FlexbeStatusListener
 from flexbe_widget.flexbe_status_listener import flexbe_status_listener_main
+from flexbe_widget.flexbe_status_listener import FlexbeStatusListener
 
 
 class TestFlexbeStatusListener(unittest.TestCase):

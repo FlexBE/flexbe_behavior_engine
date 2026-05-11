@@ -31,14 +31,14 @@ import pickle
 import threading
 import time
 
-from PySide6.QtCore import QCoreApplication, QThread, Qt, Signal, Slot
-from PySide6.QtWidgets import QApplication
-
 from flexbe_core import Logger
 
 from flexbe_input.input_gui import InputGUI
 
 from flexbe_msgs.action import BehaviorInput
+
+from PySide6.QtCore import QCoreApplication, Qt, QThread, Signal, Slot
+from PySide6.QtWidgets import QApplication
 
 import rclpy
 from rclpy.action import ActionServer

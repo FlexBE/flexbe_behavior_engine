@@ -31,12 +31,12 @@
 
 """Logger for active state information."""
 
+from functools import partial, wraps
 import logging
 import logging.config
 import os
 import pickle
 import time
-from functools import partial, wraps
 
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher

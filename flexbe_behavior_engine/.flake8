@@ -1,4 +1,0 @@
-[flake8]
-exclude = .git
-max-line-length = 130
-ignore = W503, D100, D105, D107

@@ -29,10 +29,10 @@
 
 """Class to handle the FlexBE mirror of onboard statemachine."""
 
+from collections import deque
 import threading
 import time
 import traceback
-from collections import deque
 
 try:
     from prctl import set_name as set_thread_name
@@ -42,16 +42,16 @@ except ImportError:
         # print('Python thread names are not visible in ps/top unless you install prctl')
         pass
 
-from flexbe_core import Logger, MIN_UI_VERSION, initialize_flexbe_core
+from flexbe_core import initialize_flexbe_core, Logger, MIN_UI_VERSION
 from flexbe_core.core import LockableStateMachine, OperatableStateMachine
+from flexbe_core.core import map_exception_to_bestatus
 from flexbe_core.core import PreemptableState, State, StateMap
 from flexbe_core.core import SyncError, TransitionError
-from flexbe_core.core import map_exception_to_bestatus
 from flexbe_core.core.topics import Topics
 from flexbe_core.proxy import ProxyPublisher, ProxySubscriberCached
 from flexbe_core.proxy.qos import QOS_OUTCOME
 
-from flexbe_msgs.msg import BEStatus, BehaviorSync, ContainerStructure, StateMapMsg
+from flexbe_msgs.msg import BehaviorSync, BEStatus, ContainerStructure, StateMapMsg
 
 from rclpy.clock import Clock
 from rclpy.node import Node

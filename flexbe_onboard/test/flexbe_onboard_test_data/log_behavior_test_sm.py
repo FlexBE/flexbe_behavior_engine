@@ -37,7 +37,7 @@
 # Only code inside the [MANUAL] tags will be kept.        #
 ###########################################################
 
-from flexbe_core import Autonomy, Behavior, OperatableStateMachine, initialize_flexbe_core
+from flexbe_core import Autonomy, Behavior, initialize_flexbe_core, OperatableStateMachine
 
 from flexbe_states.log_state import LogState as flexbe_states__LogState
 from flexbe_states.wait_state import WaitState as flexbe_states__WaitState

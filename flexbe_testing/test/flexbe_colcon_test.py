@@ -46,7 +46,7 @@ class TestFlexBETesting(PyTester):
     def setUpClass(cls):
         """Set up the test class."""
         PyTester._package = 'flexbe_testing'
-        PyTester._tests_folder = join('tests', 'res')
+        PyTester._tests_folder = join('test', 'res')
 
         super().setUpClass()  # Do this last after setting package and tests folder
 

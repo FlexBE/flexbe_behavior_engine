@@ -31,10 +31,10 @@
 
 """Focused tests for widget behavior action server request and status handling."""
 
-import tempfile
-import unittest
 from pathlib import Path
+import tempfile
 from types import SimpleNamespace
+import unittest
 
 from flexbe_msgs.msg import BEStatus
 

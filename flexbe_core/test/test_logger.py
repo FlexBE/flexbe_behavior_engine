@@ -33,7 +33,7 @@
 import time
 import unittest
 
-from flexbe_core import EventState, OperatableStateMachine, initialize_flexbe_core
+from flexbe_core import EventState, initialize_flexbe_core, OperatableStateMachine
 from flexbe_core.logger import Logger
 from flexbe_core.proxy import shutdown_proxies
 

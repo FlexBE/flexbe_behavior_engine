@@ -34,8 +34,8 @@ import importlib
 import os
 import tempfile
 import unittest
-import zlib
 from unittest.mock import patch
+import zlib
 
 from flexbe_core.behavior_library import BehaviorLibrary
 

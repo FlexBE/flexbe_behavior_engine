@@ -30,8 +30,8 @@
 
 """Tests that OperatableState logs and ignores undeclared outcomes instead of crashing."""
 
-import unittest
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from flexbe_core.core.event_state import EventState

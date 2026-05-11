@@ -33,10 +33,10 @@ A proxy for subscribing topics that caches and buffers received messages.
 Provides a single point for comminications for all states in behavior
 """
 
-import warnings
 from collections import deque
 from functools import partial
 from threading import Event, Lock
+import warnings
 
 from flexbe_core.core.exceptions import ProxyTypeError
 from flexbe_core.logger import Logger

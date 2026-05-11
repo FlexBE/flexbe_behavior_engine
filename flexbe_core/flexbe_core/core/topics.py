@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from flexbe_msgs.action import BehaviorExecution
-from flexbe_msgs.msg import BEStatus, BehaviorLog, BehaviorRequest, BehaviorSelection, BehaviorSync
+from flexbe_msgs.msg import BehaviorLog, BehaviorRequest, BehaviorSelection, BehaviorSync, BEStatus
 from flexbe_msgs.msg import CommandFeedback, ContainerStructure
 from flexbe_msgs.msg import OutcomeRequest
 from flexbe_msgs.msg import StateMapMsg

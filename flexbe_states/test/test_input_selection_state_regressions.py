@@ -31,8 +31,8 @@
 """Regression tests for stale userdata in input-oriented states."""
 
 import pickle
-import unittest
 from types import SimpleNamespace
+import unittest
 from unittest.mock import patch
 
 from action_msgs.msg import GoalStatus
