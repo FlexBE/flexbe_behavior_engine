@@ -43,7 +43,7 @@ except ImportError:
         pass
 
 from flexbe_core import initialize_flexbe_core, Logger, MIN_UI_VERSION
-from flexbe_core.core import LockableStateMachine, OperatableStateMachine
+from flexbe_core.core import LockableStateMachine, OperatableStateMachine, StateMachine
 from flexbe_core.core import map_exception_to_bestatus
 from flexbe_core.core import PreemptableState, State, StateMap
 from flexbe_core.core import SyncError, TransitionError
@@ -1422,8 +1422,13 @@ class FlexbeMirror(Node):
                 for i in range(len(container.transitions)):
                     container_transitions[sm_outcomes[i]] = transitions[container.outcomes[i]]
                 MirrorStateMachine.add(container_name + '_mirror', sm, transitions=container_transitions)
+            elif StateMachine.get_opened_container() is not None:
+                # Inner container with no exit outcomes (e.g. an infinite-loop sub-SM).
+                # Must still register with the parent so set_name/set_parent are called;
+                # without that, container.path stays '' and its children get wrong paths.
+                MirrorStateMachine.add(container_name + '_mirror', sm, transitions={})
             else:
-                # Add instance attributes to top-level state machine
+                # Top-level state machine: no parent to register with.
                 sm._total_loop_count = 0
                 self._sm = sm
 
