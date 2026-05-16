@@ -2,6 +2,10 @@
 Changelog for package flexbe_states
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.1.4 (2026-05-16)
+------------------
+* Remove \__init\__.py from test folder
+
 4.1.3 (2026-05-11)
 ------------------
 * Use ROS 2 standard flake8 settings; use test folder as standard name
